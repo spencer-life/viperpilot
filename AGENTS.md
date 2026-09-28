@@ -43,6 +43,12 @@ conditions and evidence. Label protocol or product assumptions as unproven.
 
 ## Project direction
 
+The owner's 2026-09-28 priority is quick access and fast profile switching with
+minimal background overhead, not merely replacing the Synapse settings editor.
+Read `docs/quick-switch-status.md` for this decision, the current source-only
+boundary, and recorded validation blockers before continuing the profile work.
+Do not mistake local named configurations for independently stored onboard slots.
+
 `ROADMAP.md` describes possible expansion. It is planning material, not evidence
 that a capability is supported. Update the roadmap and its validation gates as
 measured support changes.
