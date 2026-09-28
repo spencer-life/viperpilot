@@ -43,5 +43,9 @@ jobs:
           version: '2026.9.16'
           install: false
           cache: false
-      - name: Check, test, build, and smoke-test without hardware
+      - name: Check, test, build, and smoke-test without hardware on Linux
+        if: runner.os == 'Linux'
         run: mise run ci
+      - name: Check, test, build, and smoke-test without hardware on Windows
+        if: runner.os == 'Windows'
+        run: mise run ci-windows
