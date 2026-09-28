@@ -1128,7 +1128,7 @@ unsafe extern "system" fn window_proc(
             LRESULT(0)
         }
         WM_COMMAND => {
-            app.handle_menu_command(window, (wparam.0 & 0xffff) as usize);
+            app.handle_menu_command(window, wparam.0 & 0xffff);
             LRESULT(0)
         }
         TRAY_CALLBACK => {
