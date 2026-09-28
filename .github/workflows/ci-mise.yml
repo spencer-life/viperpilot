@@ -1,0 +1,47 @@
+name: Core CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'Cargo.*'
+      - 'mise.toml'
+      - 'mise.lock'
+      - '.github/workflows/ci-mise.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      # Hosted runners already provide Rust. Cross-build tools are WSL-only;
+      # native Windows CI must not install the conda/cargo-xwin toolchain.
+      MISE_ENABLE_TOOLS: ''
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+        with:
+          version: '2026.9.16'
+          install: false
+          cache: false
+      - name: Check, test, build, and smoke-test without hardware
+        run: mise run ci

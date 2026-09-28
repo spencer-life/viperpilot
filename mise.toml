@@ -1,0 +1,54 @@
+[tools]
+"cargo:cargo-xwin" = "0.22.0"
+"conda:clang" = "22.1.8"
+"conda:lld" = "22.1.8"
+
+[task_config]
+shell = "env -u BASH_ENV bash --noprofile --norc -euo pipefail -c"
+
+[tasks.bootstrap]
+description = "Install pinned cross-build tools and the Windows Rust target."
+run = ["mise install", "rustup target add x86_64-pc-windows-msvc"]
+
+[tasks.fmt]
+description = "Apply Rust formatting."
+run = "cargo fmt --all"
+
+[tasks.fmt-check]
+description = "Verify Rust formatting without changing files."
+run = "cargo fmt --all --check"
+
+[tasks.test]
+description = "Run the platform-independent test suite."
+run = "cargo test --all-targets --locked"
+
+[tasks.lint]
+description = "Reject compiler and Clippy warnings."
+run = "cargo clippy --all-targets --locked -- -D warnings"
+
+[tasks.check]
+description = "Run formatting, Clippy, and tests in sequence."
+run = [{ task = "fmt-check" }, { task = "lint" }, { task = "test" }]
+
+[tasks.build-windows]
+description = "Build native Windows release binaries through cargo-xwin."
+run = "mise exec -- cargo xwin build --target x86_64-pc-windows-msvc --release --locked"
+
+[tasks.install-windows]
+description = "Build, install both Windows binaries, and launch the tray."
+depends = ["build-windows"]
+run = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w scripts/install.ps1)"'
+
+# 2026-09-28: hardware-free native CI complements the existing WSL cross-build.
+# This never installs/starts the app, enumerates HID devices, or changes startup.
+[tasks.build-native]
+description = "Build release binaries for the current host without installing."
+run = "cargo build --release --locked"
+
+[tasks.cli-smoke]
+description = "Exercise CLI help without accessing a device."
+run = "cargo run --quiet --locked --bin viperctl -- --help"
+
+[tasks.ci]
+description = "Hardware-free checks, tests, native build, and CLI smoke test."
+run = [{ task = "check" }, { task = "build-native" }, { task = "cli-smoke" }]
