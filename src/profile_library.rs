@@ -156,7 +156,7 @@ impl ProfileLibraryV1 {
         let mut next = self.clone();
         for entry in &mut next.entries {
             if entry.id == id {
-                entry.name = name.to_owned();
+                name.clone_into(&mut entry.name);
             }
         }
         self.accept(next)
@@ -366,7 +366,11 @@ mod tests {
                 .unwrap();
         }
         let before = library.clone();
-        assert!(library.duplicate("developer", "overflow", "Overflow").is_err());
+        assert!(
+            library
+                .duplicate("developer", "overflow", "Overflow")
+                .is_err()
+        );
         assert_eq!(library, before);
     }
 
@@ -380,7 +384,8 @@ mod tests {
         }
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/profiles");
         let cases: Vec<Case> =
-            serde_json::from_str(&std::fs::read_to_string(root.join("cases.json")).unwrap()).unwrap();
+            serde_json::from_str(&std::fs::read_to_string(root.join("cases.json")).unwrap())
+                .unwrap();
         for case in cases {
             let bytes = std::fs::read(root.join(&case.file)).unwrap();
             let decoded = serde_json::from_slice::<ProfileLibraryV1>(&bytes);
