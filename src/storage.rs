@@ -642,18 +642,17 @@ mod tests {
         let paths = isolated_paths("windows-readonly");
         save_config(&paths, &UtilityConfigV1::default()).unwrap();
         let before = fs::read(&paths.config).unwrap();
-        let mut permissions = fs::metadata(&paths.config).unwrap().permissions();
-        permissions.set_readonly(true);
-        fs::set_permissions(&paths.config, permissions).unwrap();
+        let original_permissions = fs::metadata(&paths.config).unwrap().permissions();
+        let mut readonly_permissions = original_permissions.clone();
+        readonly_permissions.set_readonly(true);
+        fs::set_permissions(&paths.config, readonly_permissions).unwrap();
         let changed = UtilityConfigV1 {
             diagnostics_enabled: true,
             ..UtilityConfigV1::default()
         };
         let result = save_config(&paths, &changed);
         let after = fs::read(&paths.config).unwrap();
-        let mut permissions = fs::metadata(&paths.config).unwrap().permissions();
-        permissions.set_readonly(false);
-        fs::set_permissions(&paths.config, permissions).unwrap();
+        fs::set_permissions(&paths.config, original_permissions).unwrap();
         assert!(result.is_err());
         assert_eq!(after, before);
         assert_eq!(fs::read_dir(&paths.root).unwrap().count(), 1);
