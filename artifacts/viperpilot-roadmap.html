@@ -131,7 +131,7 @@
     <div class="shell topbar-inner">
       <a class="brand" href="#top" aria-label="ViperPilot roadmap home">Viper<span>Pilot</span></a>
       <nav aria-label="Roadmap sections"><ul>
-        <li><a href="#delivery">Delivery</a></li><li><a href="#research">Research</a></li><li><a href="#release">Release gates</a></li>
+        <li><a href="#delivery">Delivery</a></li><li><a href="#research">Open gates</a></li><li><a href="#release">Release gates</a></li>
       </ul></nav>
     </div>
   </header>
@@ -140,90 +140,89 @@
       <p class="eyebrow">Product roadmap · ViperPilot · 2026-09-29</p>
       <div class="hero-grid">
         <div>
-          <h1>Build a better daily workflow for the <span>Viper V4 Pro.</span></h1>
-          <p class="lede">A lightweight native Windows control app: inspect device state, choose a profile, edit proven controls, and recover safely when a change fails. Product work moves by evidence and exit gates, not calendar estimates.</p>
+          <h1>Fast profile switching for the <span>Viper V4 Pro.</span></h1>
+          <p class="lede">The immediate priority is a lightweight native tray and hotkey path. User-authored profile drafts are also part of the product. Device writes stay limited to documented Viper V4 Pro fields and supervised evidence gates.</p>
         </div>
-        <aside class="scope" aria-label="Current measured scope">
-          <p class="label">Measured scope today</p>
-          <p>One wireless V2 identity: <strong>1532:00e6 · firmware 1.4 · MI_03</strong>. The two built-in profiles, a forced 1600→1600 DPI setter, wireless 1000↔4000 Hz polling, Mouse4/Mouse5 assignments, tray/status app, hotkey, process exit, and power-cycle behavior have recorded tests in <code>README.md</code>. DPI remains fixed at 1600; changed values are not proven. Battery and power values remain GET-only.</p>
+        <aside class="scope" aria-label="Current implementation status">
+          <p class="label">Current checkpoint</p>
+          <p>PR 3 remains a draft. The last validated source checkpoint is <strong>7cb0440</strong>: 108 core tests and 3 egui preview tests passed, along with hosted Linux and Windows Core CI plus Security. Later documentation revisions have separate CI/security status. These are software-only checks; production UI and owner-present mouse gates remain open.</p>
         </aside>
       </div>
-      <p class="principle"><strong>Product promise:</strong> Compare launch, idle cost, and profile switching against the official Razer app on the same machine and device before making speed or resource claims. Feature parity is never assumed.</p>
+      <p class="principle"><strong>Evidence boundary:</strong> Saved aliases, profile drafts, plans, GET results, and synthetic previews are not onboard slots or proof of a hardware write. Full Synapse parity and support for all recent Razer mice are not established requirements.</p>
     </header>
     <main>
       <section id="delivery" aria-labelledby="delivery-title">
-        <div class="section-head"><h2 id="delivery-title">Delivery sequence</h2><p class="section-note">Milestones follow dependency order. Each closes only when its exit criteria and release gates pass; later research is not required to ship an earlier milestone.</p></div>
+        <div class="section-head"><h2 id="delivery-title">Delivery sequence</h2><p class="section-note">Software work follows the current public issue queue. A passed build or CI check does not close desktop or hardware gates.</p></div>
         <div class="legend" aria-label="Evidence state legend">
-          <span class="legend-item"><span class="swatch" style="--swatch:var(--measure)"></span><strong>Shipped / measured</strong> recorded implementation and result</span>
-          <span class="legend-item"><span class="swatch" style="--swatch:var(--planned)"></span><strong>Planned</strong> product or engineering work</span>
-          <span class="legend-item"><span class="swatch" style="--swatch:var(--gated)"></span><strong>Hardware-gated</strong> requires field-level hardware evidence</span>
-          <span class="legend-item"><span class="swatch" style="--swatch:var(--research)"></span><strong>Research</strong> protocol discovery; no write support implied</span>
-          <span class="legend-item"><span class="swatch" style="--swatch:var(--blocked)"></span><strong>Blocked</strong> ship only after stated gate</span>
+          <span class="legend-item"><span class="swatch" style="--swatch:var(--measure)"></span><strong>Software checked</strong> hardware-free checks only</span>
+          <span class="legend-item"><span class="swatch" style="--swatch:var(--planned)"></span><strong>Next / planned</strong> product or engineering work</span>
+          <span class="legend-item"><span class="swatch" style="--swatch:var(--gated)"></span><strong>Owner validation</strong> Windows or device session required</span>
+          <span class="legend-item"><span class="swatch" style="--swatch:var(--research)"></span><strong>Research</strong> no additional write support implied</span>
+          <span class="legend-item"><span class="swatch" style="--swatch:var(--blocked)"></span><strong>Blocked</strong> wait for the stated gate</span>
         </div>
         <ol class="sequence" aria-label="Milestones in dependency order">
-          <li class="milestone" data-state="measured"><p class="milestone-index">M0 / FOUNDATION</p><span class="status">Shipped · measured</span><h3>Preserve the measured core</h3>
-            <ul><li>Keep Developer and Gaming profiles as known-good recovery choices; preserve the immutable first baseline and diagnostic history.</li><li>Fail closed on unsupported identities, unknown raw states, and unmeasured polling transitions. Wired remains a recovery investigation.</li><li>Stay single-instance and idle without polling. No browser runtime, service, driver, interception, or injection without separate review and measured need.</li></ul>
-            <p class="gate"><strong>Exit evidence</strong>Support and limits trace to recorded runs in <code>README.md</code>; package checks and cross-builds stay green.</p>
+          <li class="milestone" data-state="measured"><p class="milestone-index">M0 / QUICK-SWITCH</p><span class="status">Software checked · manual gates open</span><h3>Preserve the native path</h3>
+            <ul><li>Keep tray, hotkey, compact switcher, and serialized worker as the fast path with low idle work.</li><li>Keep protected Developer/Gaming profiles and distinguish their local aliases from user-authored drafts and onboard storage.</li><li>Fail closed on unsupported devices, fields, transitions, and ambiguous state. No input interception or injection fallback.</li></ul>
+            <p class="gate"><strong>Exit gate</strong>Owner-present compact accessibility, production tray, and performance checkpoints (#6, #7, #9) remain pending. Editor presentation (#8) is a separate gate before shipping the editor.</p>
           </li>
-          <li class="milestone" data-state="planned"><p class="milestone-index">M1 / CONTRACT</p><span class="status">Next · planned</span><h3>Define configuration and write contract</h3>
-            <ul><li>Typed field allowlist, ranges, device/transport support; separate profile intent from raw bytes and reject unsupported combinations before planning.</li><li>Version local config. Define V1 migration, atomic save, corrupt/stale handling, recovery, and rollback copy; never touch the immutable hardware baseline.</li><li>Make plans inspectable: identity, changed fields, packet intent, expected readback, recovery path, and journal location. Preview is not proof.</li><li>Offline fixtures for valid, malformed, stale, and cross-device data; prove unsupported setters are unreachable.</li></ul>
-            <p class="gate"><strong>Exit gate</strong>Reversible migration; invalid input fails before planning; protocol, config, plan, and rollback suite passes offline.</p>
+          <li class="milestone" data-state="planned"><p class="milestone-index">M1 / ISSUE #12</p><span class="status">Next · planned</span><h3>Finish offline draft workflows</h3>
+            <ul><li>Create, name, edit, duplicate, and delete semantic user drafts without touching device storage.</li><li>Persist validated drafts separately from profile aliases, configuration, reports, and the immutable baseline.</li><li>Keep synthetic preview Save and Apply disabled; a draft store is not device authorization.</li></ul>
+            <p class="gate"><strong>Exit gate</strong><a href="https://github.com/spencer-life/viperpilot/issues/12">Issue #12</a> passes offline round-trip, invalid-data, rollback, and isolation checks.</p>
           </li>
-          <li class="milestone" data-state="gated"><p class="milestone-index">M2 / PROFILES</p><span class="status">Hardware-gated</span><h3>Editable profiles for proven fields</h3>
-            <ul><li>Create, name, duplicate, edit, select, and delete user profiles. Built-ins stay read-only measured presets.</li><li>Keep DPI fixed at 1600 until each exposed changed value/range and material combination has evidence for a write, independent readback, and baseline restoration. Then expose only the M1-supported DPI contract, measured wireless 1000/4000 Hz pair, and evidenced Mouse4/Mouse5 actions.</li><li>Preview all changes; journal, independently GET each changed field, report partial failure and recovery without premature success.</li><li>One logical field per experiment: immutable baseline, full VID/PID and serial review, exact plan, suffix guard, readback, restore before next field.</li></ul>
-            <p class="gate"><strong>Exit gate</strong>Every field has protocol evidence, recorded write/readback/restore. Profiles pass switching, interrupted-write recovery, process-exit, and power-cycle tests. Unevidenced fields stay unavailable or read-only.</p>
+          <li class="milestone" data-state="planned"><p class="milestone-index">M2 / ISSUE #4</p><span class="status">Planned</span><h3>Define field contracts</h3>
+            <ul><li>Set typed allowed values, validation, exact Viper V4 Pro scope, and readback requirements per field.</li><li>Treat changed DPI and additional button actions as separate research; existing polling and Mouse4/Mouse5 evidence is condition-specific.</li><li>A GET result, unchanged-value write, or source encoder alone never proves a changed value.</li></ul>
+            <p class="gate"><strong>Exit gate</strong><a href="https://github.com/spencer-life/viperpilot/issues/4">Issue #4</a> documents and tests the fail-closed contract offline.</p>
           </li>
-          <li class="milestone" data-state="planned"><p class="milestone-index">M3 / DAILY FLOW</p><span class="status">Planned</span><h3>Fast desktop workflow</h3>
-            <ul><li>Focused dashboard for identity, connection, available battery, current DPI/polling/profile, plus clear stale/unknown states and reachable profile action.</li><li>Profile list/editor, explicit unsaved state, keyboard and focus flow, readable errors, recovery guide. Document in Figma, then capture the running UI for visual QA.</li><li>Measure cold/warm launch, idle CPU/memory, switch time, and clicks/steps. Record machine, OS, firmware, connection, Synapse state, samples, and method. Unproven target: at least 2× faster median cold launch to actionable UI and fewer user actions to switch an existing profile; report device commit latency separately.</li><li>Keep package size and steady-state work in release review; prefer native controls and event-driven updates unless measurements justify more.</li></ul>
-            <p class="gate"><strong>Exit gate</strong>Keyboard/screen-reader, high-DPI/narrow-window, idle, benchmark record against the target, and visual QA pass. No speed claim without reproducible comparison.</p>
+          <li class="milestone" data-state="gated"><p class="milestone-index">M3 / ISSUE #13</p><span class="status">Planned · hardware-gated</span><h3>Guard draft promotion</h3>
+            <ul><li>Create inspectable plans only for contract-approved fields and combinations.</li><li>Keep identity checks, exact changed-field reporting, independent GET, journaling, partial-failure handling, and rollback.</li><li>One logical field per supervised experiment, then restore the immutable baseline before any next field.</li></ul>
+            <p class="gate"><strong>Exit gate</strong><a href="https://github.com/spencer-life/viperpilot/issues/13">Issue #13</a> passes offline safety checks; device writes still need owner-reviewed field evidence.</p>
           </li>
-          <li class="milestone" data-state="planned"><p class="milestone-index">M4 / PORTABILITY</p><span class="status">Planned</span><h3>Profile library and distribution</h3>
-            <ul><li>Define portable vs identity-bound fields. Validate schema, ranges, transport, and provenance before import offers a plan.</li><li>Imported files never carry a trusted baseline or authorize writes. Add device association only after identity semantics stabilize.</li><li>Test malformed, stale, future-version, and cross-device files offline.</li><li>Review install/update/uninstall, config rollback, diagnostics export, and recovery to last verified profile. Startup stays opt-in until its gates pass.</li></ul>
-            <p class="gate"><strong>Exit gate</strong>Round-trip, migration/downgrade/recovery fixtures, clean install/update/uninstall, and documented rollback pass. No automatic cross-device application.</p>
+          <li class="milestone" data-state="planned"><p class="milestone-index">M4 / EDITOR QUALITY</p><span class="status">Planned</span><h3>Complete and measure the editor</h3>
+            <ul><li>Finish user-facing draft editing with keyboard, screen-reader, high-DPI, and narrow-window review.</li><li>Keep rendering work out of tray-only idle unless production measurements justify a different arrangement.</li><li>Measure the production app before making launch, overhead, or switching-speed claims.</li></ul>
+            <p class="gate"><strong>Exit gate</strong>Figma files are planning references. Running UI presentation, accessibility, and performance checks remain pending.</p>
           </li>
         </ol>
-        <p class="direction">The measured baseline is narrow by design: wired 4000 Hz, other Razer models, arbitrary assignments, and user-editable profiles are not currently supported.</p>
+        <p class="direction">The supported device scope remains the documented Razer Viper V4 Pro field set. No support is implied for other mice, transports, fields, or arbitrary Synapse settings.</p>
       </section>
       <section class="support" id="research" aria-labelledby="research-title">
-        <div class="section-head"><h2 id="research-title">Independent research track</h2><p class="section-note">Candidates do not promise controls. A GET result or source inspection alone never enables a setter.</p></div>
+        <div class="section-head"><h2 id="research-title">Open owner-present gates</h2><p class="section-note">These checks remain pending. A software build, preview, GET, or design reference cannot close them.</p></div>
         <div class="support-grid">
           <section class="panel" aria-labelledby="candidates-title">
-            <div class="panel-head"><h3 id="candidates-title">Candidate controls</h3><p>Research stays separate from the delivery sequence.</p></div>
+            <div class="panel-head"><h3 id="candidates-title">Manual checkpoints</h3><p>Work with the device owner at a Windows PC and preserve the evidence record.</p></div>
             <ul class="research-list">
-              <li><span class="candidate">DPI stage count and values<span class="state-word">Research</span></span><span class="evidence">Exact encoding and range; one field at a time with independent readback and baseline restoration.</span></li>
-              <li><span class="candidate">Additional button assignments<span class="state-word">Research</span></span><span class="evidence">Per-action raw mapping, OS behavior, persistence, and rollback. No arbitrary raw editor.</span></li>
-              <li><span class="candidate">Battery, idle sleep, low-power threshold<span class="state-word get">GET-only / research</span></span><span class="evidence">Setter protocol, supported range, and persistence. Optional reads are not setter evidence.</span></li>
-              <li><span class="candidate">Sensor options<span class="state-word">Research</span></span><span class="evidence">Identify real fields and firmware behavior before designing controls.</span></li>
-              <li><span class="candidate">Wired setup or 4000 Hz<span class="state-word block">Blocked</span></span><span class="evidence">Separate wired identity, transport, and polling-transition evidence.</span></li>
-              <li><span class="candidate">Other mouse models<span class="state-word block">Blocked</span></span><span class="evidence">Per-model capability matrix and independent baselines/tests. Similarity does not confer support.</span></li>
+              <li><span class="candidate"><a href="https://github.com/spencer-life/viperpilot/issues/6">#6</a> Compact switcher<span class="state-word block">Pending</span></span><span class="evidence">Check accessibility, focus, labels, and legibility on the Windows display in use.</span></li>
+              <li><span class="candidate"><a href="https://github.com/spencer-life/viperpilot/issues/7">#7</a> Production tray<span class="state-word block">Pending</span></span><span class="evidence">Validate both complete profiles, hotkey, rollback, and normal process lifecycle.</span></li>
+              <li><span class="candidate"><a href="https://github.com/spencer-life/viperpilot/issues/8">#8</a> Editor presentation<span class="state-word block">Pending</span></span><span class="evidence">Review real running UI against approved planning states. Figma has not been updated by this docs-only refresh.</span></li>
+              <li><span class="candidate"><a href="https://github.com/spencer-life/viperpilot/issues/9">#9</a> Production performance<span class="state-word block">Pending</span></span><span class="evidence">Measure launch, idle resources, and switching under recorded conditions before claims.</span></li>
+              <li><span class="candidate"><a href="https://github.com/spencer-life/viperpilot/issues/10">#10</a> Changed DPI<span class="state-word block">Pending</span></span><span class="evidence">Isolated changed-value experiment, independent readback, and baseline restoration. 1600→1600 is not changed-value evidence.</span></li>
+              <li><span class="candidate"><a href="https://github.com/spencer-life/viperpilot/issues/11">#11</a> Additional buttons<span class="state-word block">Pending</span></span><span class="evidence">Test one action at a time with independent readback and baseline restoration; do not add a raw assignment editor.</span></li>
             </ul>
-            <p class="callout"><strong>For each proposal, record:</strong> date; full device, firmware, and transport identity; starting raw state; source hypothesis; GET discovery; exact single-field plan; independent readback; restore; relevant process-exit and power-cycle persistence; linked report files. Stop on ambiguous identity or state. Treat each setter as a possible flash write.</p>
+            <p class="callout"><strong>Device gate:</strong> Review full VID/PID and serials, the immutable baseline, and exact one-field plan before any setter. Use the required serial suffix as the final command guard. Record failed experiments and restore the reviewed baseline.</p>
           </section>
-          <aside class="panel" aria-labelledby="release-gates-title">
-            <div class="panel-head"><h3 id="release-gates-title">Release decision gates</h3><p>Apply the relevant checks before shipping a milestone.</p></div>
+          <aside class="panel" aria-labelledby="links-title">
+            <div class="panel-head"><h3 id="links-title">Current references</h3><p>Public progress and design planning.</p></div>
             <ol class="rules">
-              <li><strong>Offline correctness</strong> — protocol, config, migration, validation, plan, rollback, and UI logic via the repository <code>mise.toml</code> tasks and pinned Windows cross-build tools.</li>
-              <li><strong>Hardware safety</strong> — complete immutable baseline, reviewed full identity, exact plan, one-field experiment, independent readback, verified restore. No apply/restore from planning or design tasks.</li>
-              <li><strong>Regression</strong> — both complete built-in profiles, production hotkey, process exit, and mouse power-cycle pass after relevant changes. Tray startup stays off until documented gates pass.</li>
-              <li><strong>Product quality</strong> — accessibility, visual QA, installation rollback, and measured performance meet the milestone's criteria.</li>
-              <li><strong>Claims</strong> — <code>README.md</code> lists only evidenced support and conditions. Candidates stay planned, research, or blocked until gates pass.</li>
+              <li><strong>PR 3</strong> remains a draft. Last validated source checkpoint: <a href="https://github.com/spencer-life/viperpilot/commit/7cb0440">7cb0440</a>, with passing <a href="https://github.com/spencer-life/viperpilot/actions/runs/36612610509">Linux + Windows Core</a> and <a href="https://github.com/spencer-life/viperpilot/actions/runs/36612610273">Security</a> checks. Later revisions have separate check results.</li>
+              <li><strong>Next software issues</strong> — <a href="https://github.com/spencer-life/viperpilot/issues/12">#12 draft persistence</a>, <a href="https://github.com/spencer-life/viperpilot/issues/4">#4 capability contracts</a>, <a href="https://github.com/spencer-life/viperpilot/issues/13">#13 guarded promotion</a>.</li>
+              <li><strong>Design planning</strong> — <a href="https://www.figma.com/design/Ujs2cpFXYNnSI2YquOG1jF">Figma design</a>, <a href="https://www.figma.com/board/7ZCW50LM1czKUmPISbxukM/Figma---Development-Workflow">development workflow</a>, and <a href="https://www.figma.com/board/1DhV61xcYdFD3SbtWbGBHN/ViperPilot-%25E2%2580%2594-Project-Brain---Roadmap">project brain</a>. Links are references, not evidence that these files were revised or validated.</li>
+              <li><strong>Evidence limits</strong> — start with <a href="../docs/continue-here.md">the continuation brief</a>, then see <a href="../docs/quick-switch-status.md">quick-switch status</a>, <a href="../docs/quick-switch-supervised-checklist.md">supervised checklist</a>, and <code>ROADMAP.md</code>. Software-only test results do not establish mouse behavior.</li>
             </ol>
           </aside>
         </div>
       </section>
       <section class="release" id="release" aria-labelledby="release-title">
-        <div class="release-layout"><div><p class="eyebrow">Definition of a release</p><h2 id="release-title">Evidence closes the gate.</h2><p class="release-intro">The roadmap advances when the recorded conditions support it. Dates, protocol guesses, and visual previews do not count as proof of device support.</p></div>
+        <div class="release-layout"><div><p class="eyebrow">Definition of a release</p><h2 id="release-title">Evidence closes the gate.</h2><p class="release-intro">Keep software checks, desktop usability, and measured device behavior distinct. Plans and visual previews do not prove device support.</p></div>
           <ol class="checklist">
-            <li><strong>Offline correctness.</strong> Checks run through the repository's <code>mise.toml</code> tasks and pinned cross-build workflow.</li>
-            <li><strong>Hardware safety.</strong> Full identity, immutable baseline, exact one-field plan, independent readback, and restoration recorded.</li>
-            <li><strong>Regression.</strong> Complete built-in profiles, hotkey, exit behavior, and power-cycle behavior revalidated when relevant.</li>
-            <li><strong>Product quality.</strong> Accessibility, visual QA, rollback, and performance meet the milestone's exit criteria.</li>
-            <li><strong>Claims.</strong> Documentation and release notes state only evidence-backed support and measured conditions.</li>
+            <li><strong>Software.</strong> Checks pass for the exact candidate and are reported as hardware-free where applicable.</li>
+            <li><strong>Desktop.</strong> Owner-present tray, editor, accessibility, presentation, and performance gates are recorded.</li>
+            <li><strong>Hardware.</strong> Full identity, immutable baseline, one-field plan, independent readback, and restoration are recorded.</li>
+            <li><strong>Regression.</strong> Both complete built-in profiles and production hotkey pass; process-exit and power-cycle behavior are recorded before persistence claims.</li>
+            <li><strong>Scope.</strong> Public claims stay within the documented Viper V4 Pro field scope and tested conditions.</li>
           </ol>
         </div>
       </section>
     </main>
-    <footer><p><strong>ViperPilot</strong> is the project name. Existing executable and Cargo package identifiers may remain for compatibility. Scope and release gates are in <code>ROADMAP.md</code> and <code>docs/quick-switch-status.md</code>. Figma source is not mirrored in this public repository.</p></footer>
+    <footer><p><strong>ViperPilot</strong> is the project name. Existing executable and Cargo package identifiers may remain for compatibility. Current software and hardware validation boundaries are in <a href="../docs/quick-switch-status.md">quick-switch status</a> and the <a href="../docs/quick-switch-supervised-checklist.md">supervised checklist</a>.</p></footer>
   </div>
 </body>
 </html>

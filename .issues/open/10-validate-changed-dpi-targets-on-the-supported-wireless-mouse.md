@@ -5,7 +5,7 @@ labels:
     - hardware-test
 state: open
 state_reason: null
-synced_at: 2026-09-29T18:28:43.729681449Z
+synced_at: 2026-09-29T21:45:09.073299167Z
 ---
 
 ## Context
@@ -22,3 +22,7 @@ Implementation baseline: [public PR #3](https://github.com/spencer-life/viperpil
 - Update public support claims only for values actually measured. If the experiment is unsafe or inconclusive, keep that value draft-only and explain the limitation in the redacted summary. Do not use unattended CI or guess a range.
 
 This issue does not authorize a write unless the project's hardware safety gates are satisfied.
+
+## Checkpoint — 2026-09-29
+
+No changed DPI target has been tested in this checkpoint. Any future experiment must follow the immutable-baseline and single-field readback/restore gates. Keep unmeasured targets draft-only; this issue does not authorize a hardware write.

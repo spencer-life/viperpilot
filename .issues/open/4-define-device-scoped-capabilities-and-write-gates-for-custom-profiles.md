@@ -5,7 +5,7 @@ labels:
     - enhancement
 state: open
 state_reason: null
-synced_at: 2026-09-29T18:28:47.274435634Z
+synced_at: 2026-09-29T21:45:11.865952647Z
 ---
 
 ## Context
@@ -23,3 +23,7 @@ Implementation baseline: [public PR #3](https://github.com/spencer-life/viperpil
 - Keep physical validation separate. This issue alone cannot enable Apply.
 
 Full device identity and experiment evidence stay in private local records; only redacted summaries belong in public issues or documentation.
+
+## Checkpoint — 2026-09-29
+
+The capability contract remains an open gate in the sequence draft editor #12 → this contract → profile promotion #13. Local draft CRUD and persistence are the next code slice; drafts remain unverified and cannot enter onboard slots or Apply. No hardware write is authorized by this work.

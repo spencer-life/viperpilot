@@ -1,94 +1,105 @@
 # ViperPilot roadmap
 
-> **Product name and scope, 2026-09-29.** ViperPilot is the project name for this independent Viper V4 Pro utility. Existing executable and Cargo package identifiers may remain for compatibility. This roadmap separates product work from hardware research because most requested configurability is not yet proven safe to write.
+> **Current direction · 2026-09-29.** ViperPilot is a lightweight native Windows utility for the Razer Viper V4 Pro. The immediate product priority is a fast tray and hotkey path with minimal idle overhead. Users should also be able to create and save their own profile drafts; device writes remain limited to the documented Viper V4 Pro field scope and its evidence gates. This roadmap is planning, not proof of hardware support.
 
-Live work: [public GitHub Issues](https://github.com/spencer-life/viperpilot/issues).
+Live work: [public GitHub issues](https://github.com/spencer-life/viperpilot/issues). The current implementation candidate is [PR 3](https://github.com/spencer-life/viperpilot/pull/3), still a draft. Its last validated source checkpoint is [`7cb0440`](https://github.com/spencer-life/viperpilot/commit/7cb0440): the [Linux and Windows Core CI run](https://github.com/spencer-life/viperpilot/actions/runs/36612610509) and [Security run](https://github.com/spencer-life/viperpilot/actions/runs/36612610273) passed for that checkpoint. Later documentation revisions have separate CI/security status. These are software checks only; no production tray or physical mouse validation is claimed. See [quick-switch status](docs/quick-switch-status.md) for the validation boundary.
 
-Planning views: [HTML roadmap](artifacts/viperpilot-roadmap.html). The Figma design source is not mirrored in this public repository. The [egui evaluation](docs/egui-evaluation.md) records the UI options and validation gates.
-
-**Design direction selected 2026-09-28:** Start with a compact native quick switcher and direct tray profile actions, using a dark rose/charcoal palette and a pink V tray mark. The visual direction is a design reference; example values and future controls are proposals, not measured hardware support or completed UI behavior. The detailed dashboard follows the quick-switch flow.
+Planning views: [HTML roadmap](artifacts/viperpilot-roadmap.html), [Figma design](https://www.figma.com/design/Ujs2cpFXYNnSI2YquOG1jF), [Figma development workflow](https://www.figma.com/board/7ZCW50LM1czKUmPISbxukM/Figma---Development-Workflow), and [project brain and roadmap](https://www.figma.com/board/1DhV61xcYdFD3SbtWbGBHN/ViperPilot-%25E2%2580%2594-Project-Brain---Roadmap). These are planning references; this documentation refresh does not claim that any Figma file was updated or that its designs were validated in a running application.
 
 ## Product goal
 
-Build a lightweight native Windows control app for supported Viper devices. The quick-switch path should make current state and profile selection easy to understand, with editable controls added only when they have a safe device-specific contract. Developer and Gaming are protected recovery examples, not the product's complete profile model. Users should eventually create profiles with their own DPI, button, polling, and other settings. Unverified values may be saved as clearly marked drafts, but drafts do not authorize device writes. Compare startup, idle cost, and switching workflow against the official Razer app under the same conditions before making speed or resource claims.
+Make switching an established profile pair quick and direct from the native tray or hotkey, without settings navigation and with little background work. Preserve a compact switcher and add a detailed editor for user-owned profile drafts. Developer and Gaming are protected recovery examples, not the product's only profile choices. Full Synapse parity and support for every recent Razer mouse are not established requirements.
+
+The product's device scope is the Razer Viper V4 Pro and the field-level capabilities documented in the current project evidence. User intent, local drafts, aliases, plans, and GET results are not onboard slots and do not prove that a hardware write worked. Keep unsupported devices, fields, transitions, and ambiguous states fail-closed. See [quick-switch status](docs/quick-switch-status.md), [custom profile capability plan](docs/custom-profile-capability-plan.md), and [supervised checklist](docs/quick-switch-supervised-checklist.md) for the current boundaries.
 
 ## Evidence key
 
 | State | Meaning |
 | --- | --- |
-| **Shipped / measured** | Implemented, with reproducible conditions and results in a sanitized status document. Keep serials and raw reports in private local evidence. |
-| **Planned** | Product or engineering work. No new hardware support is implied. |
-| **Research** | A control or transport that needs protocol evidence and isolated hardware tests. |
-| **Blocked** | Cannot ship until the stated safety or validation gate passes. |
+| **Software checked** | Hardware-free implementation checks passed for the identified candidate. This does not establish desktop usability or device behavior. |
+| **Planned** | Software or product work not complete. |
+| **Owner validation pending** | Requires an observed Windows desktop or physical-device session. |
+| **Research** | A field or transport needs additional evidence; no write support is implied. |
+| **Blocked** | Do not ship or enable until the named gate passes. |
 
-The measured scope is limited to one wireless Viper V4 Pro device/firmware/transport combination. See [quick-switch status](docs/quick-switch-status.md) for current software validation and open gates. Do not infer support for other models, transports, fields, or assignments from source similarity.
+Foundation sources compile and their software suites pass: 108 core tests plus 3 egui preview tests have been reported, alongside the candidate's local build checks. Hosted Linux and Windows Core CI plus Security also pass for PR 3. These checks do not count as mouse tests. The production tray and hotkey have not passed their owner-present manual gate, and the synthetic egui editor does not yet save user drafts.
+
+## Current priority
+
+The next software work follows the public issue sequence:
+
+1. [#12 — persist profile drafts offline](https://github.com/spencer-life/viperpilot/issues/12): complete draft-only user workflows and persistence, with no device planner or HID path.
+2. [#4 — define per-field capability contracts](https://github.com/spencer-life/viperpilot/issues/4): make supported values, device scope, and evidence requirements explicit before any new writable field can be exposed.
+3. [#13 — add guarded promotion to the device path](https://github.com/spencer-life/viperpilot/issues/13): connect only contract-approved intents to inspectable plans and the existing guarded worker, preserving independent readback and rollback checks.
+
+Owner-present checkpoints remain pending: [#6 compact switcher accessibility](https://github.com/spencer-life/viperpilot/issues/6), [#7 production tray validation](https://github.com/spencer-life/viperpilot/issues/7), [#8 editor presentation](https://github.com/spencer-life/viperpilot/issues/8), [#9 production performance](https://github.com/spencer-life/viperpilot/issues/9), [#10 changed DPI values](https://github.com/spencer-life/viperpilot/issues/10), and [#11 additional button actions](https://github.com/spencer-life/viperpilot/issues/11). The field experiments for DPI and buttons remain isolated, one logical field at a time, with readback and baseline restoration. Software checks do not close these gates.
 
 ## Delivery sequence
 
-The milestones are ordered by dependency, not calendar date. Each closes only when its exit criteria and relevant release gates pass. A milestone may ship without later research tracks.
+### M0 — Native quick-switch foundation · software checked, manual gates open
 
-### M0 — Preserve the measured core · shipped / measured
+- Preserve the native tray, global hotkey, compact switcher, and serialized hardware worker as the fast path.
+- Keep saved entries that alias the built-in presets distinct from user-authored profile drafts and from onboard device storage.
+- Keep unsupported identity, unknown state, field, and polling transitions fail-closed. Do not add input interception or injection as a fallback.
+- Keep startup opt-in. Do not claim tray usability, accessibility, production performance, process-exit persistence, or power-cycle persistence until its documented owner-present checks are recorded.
 
-- Keep the protected Developer and Gaming recovery examples available. Preserve the first immutable baseline and raw diagnostic evidence locally; do not commit full serials or private reports.
-- Keep unsupported device identities, unknown raw states, and unmeasured polling transitions fail-closed. The wired path stays a recovery investigation, not a general configuration path.
-- Keep the native app single-instance and idle without polling. Do not add a browser runtime, background service, driver, input interception, or injection without a separate design review and measured need.
+**Exit gate:** Hardware-free checks remain green, then the owner-present tray checkpoints #6, #7 and #9 pass with recorded Windows conditions. Complete-profile and hotkey device regressions still require their own supervised evidence.
 
-**Exit evidence:** Current support boundaries and software validation remain traceable to sanitized project docs; package checks and cross-builds remain green.
+### M1 — Offline user-authored profile drafts · next
 
-### M1 — Define the configuration and write contract · next / planned
+- Let a user create, name, edit, duplicate, and delete semantic profile drafts offline. Preserve Developer and Gaming as protected recovery profiles.
+- Persist validated drafts separately from complete-preset aliases, device configuration, reports, and the immutable first baseline. Preserve previous valid data on failed writes and reject corrupt or future schemas without silently resetting them.
+- Keep the synthetic egui preview isolated. Its Save and Apply actions remain disabled until the actual editor and safe boundaries are implemented.
 
-- Define a typed allowlist, ranges, and device/transport support for each editable field. Distinguish profile intent from raw protocol bytes and reject unsupported combinations before any write plan is created.
-- Version the local config schema. Specify migration from `UtilityConfigV1`, atomic save, corrupt-file handling, stale data, and recovery without touching the immutable hardware baseline. Keep the original config as a rollback copy during migration.
-- Make the proposed write plan inspectable: device identity, exact changed fields, packet intents, expected readback, recovery path, and journal location. A preview is not proof of a write.
-- Add offline fixtures for valid, malformed, stale, and cross-device data; plan and rollback tests must prove no unsupported setter can be reached.
+**Exit gate:** Issue #12 passes hardware-free round-trip, invalid-data, rollback, and isolation checks. Saving intent does not invoke a planner or HID operation.
 
-**Exit gate:** Schema migration is reversible; unsupported input fails before planning; the automated protocol, config, plan, and rollback suite passes with no hardware connected.
+### M2 — Per-field capability contracts · planned
 
-### M2 — Editable profiles for proven fields · planned, hardware-gated
+- Define typed field support, allowed semantic values, exact device/transport scope, validation, readback expectations, and the evidence required before a value can be applied.
+- Treat DPI changes and additional button actions as separate research items. Existing wireless polling transitions and particular Mouse4/Mouse5 assignments apply only to their documented Viper V4 Pro identity and conditions.
+- No source encoder, unchanged-value write, saved draft, or GET response by itself establishes support for a changed value.
 
-- Let users create, name, duplicate, edit, select, and delete their own profiles. Keep built-in profiles read-only and clearly marked as measured presets.
-- Expose only values and combinations supported by the per-field contract from M1. Do not turn Developer/Gaming examples into fixed user choices. A field stays fixed, draft-only, or unavailable until its changed values and relevant combinations have independent evidence. A readback of an unchanged value does not prove a changed target or range.
-- Show a complete change preview before applying. Journal the operation, verify each changed logical field with an independent GET, and report partial failure and recovery steps without declaring success prematurely.
-- Perform one logical-field hardware experiment at a time: immutable baseline, full VID/PID and serial review, exact plan, suffix command guard, independent readback, then baseline restoration before the next field.
+**Exit gate:** Issue #4 documents and tests the fail-closed contract offline. Any new hardware capability remains unavailable until its own supervised single-field evidence is recorded.
 
-**Exit gate:** Each exposed value or supported range, and each material cross-field combination, has source/protocol evidence plus a changed-value write, independent readback, and baseline restoration for the supported wireless identity. Built-in and edited profiles pass complete-profile switching, interrupted-write recovery, process-exit, and power-cycle tests. A field without this evidence remains fixed, read-only, or unavailable.
+### M3 — Guarded draft promotion · planned, hardware-gated
 
-### M3 — Fast daily desktop workflow · planned
+- Add a reviewed path from a draft to an inspectable change plan only for contract-approved fields and combinations.
+- Keep identity checks, exact changed-field reporting, journaling, independent GET readback, partial-failure handling, and baseline restoration requirements.
+- Validate one logical field at a time against a complete immutable baseline. Review full VID/PID and serials, exact plan, and the required serial-suffix command guard before any authorized setter experiment.
 
-- Design a focused dashboard for identity, connection, battery when available, current DPI/polling/profile, and clear stale or unknown states. Keep the main profile action reachable without navigating through device settings.
-- Add profile list/editor, explicit unsaved-change behavior, accessible keyboard flow and focus states, readable errors, and a guided recovery view. Document interaction states in Figma before implementation, then capture the running UI back for visual QA.
-- Measure cold and warm launch, idle CPU and memory, profile-switch elapsed time, and clicks/steps to switch. Record machine, OS, firmware, connection mode, Synapse state, sample count, and method. Compare the same workflow against the official Razer app before publishing any superiority claim. **Unproven target:** at least 2× faster median cold launch to an actionable UI and fewer user actions to switch an existing profile; report device commit latency separately.
-- Keep package size and steady-state work visible in release review. Prefer native controls and event-driven updates unless measurements justify more.
+**Exit gate:** Issue #13 passes offline safety tests. The production tray and hotkey still require owner-present validation, and every writable field requires its own recorded write/readback/restore evidence before release.
 
-**Exit gate:** Keyboard and screen-reader review, high-DPI and narrow-window review, no-polling idle check, benchmark record against the target, and visual QA pass. No speed claim ships without reproducible comparative evidence.
+### M4 — Detailed editor and measured product quality · planned
 
-### M4 — Portable profile library and distribution · planned
+- Complete an accessible user-facing draft editor and align presentation with the approved design references. The editor must not present synthetic preview state as live device state.
+- Measure production cold and warm launch, idle CPU and memory, and profile switching on a documented machine; compare equivalent conditions with the official Razer app before making performance claims.
+- Keep editor, renderer, and any process boundary out of the tray-only path unless measured need and architecture gates justify them.
 
-- Define which profile fields are portable and which are bound to the measured device identity. Import/export must validate schema, ranges, supported transport, and provenance before offering a plan. Imported files never carry a trusted baseline or authorize a hardware write.
-- Add clear per-device profile association only after identity semantics are stable. Test malformed, stale, future-version, and cross-device files offline.
-- Review installer/update/uninstall behavior, config rollback, diagnostics export, and a path back to the last verified profile. Keep startup opt-in until the production app passes its own startup and exit gates.
+**Exit gate:** Owner-reviewed presentation, keyboard and screen-reader behavior, high-DPI and narrow-window behavior, and reproducible performance records. The preview's current renderer measurements are not production-app or Synapse comparisons.
 
-**Exit gate:** Round-trip import/export, migration and downgrade/recovery fixtures, clean install/update/uninstall, and documented rollback pass. No automatic cross-device application is allowed.
+## Independent hardware research
 
-## Research tracks — independent of delivery milestones
+The supported scope remains the documented Razer Viper V4 Pro field set. Do not broaden to other mice, firmware, transports, or arbitrary Synapse settings by analogy. Each proposed field needs its own reviewed identity, immutable baseline, exact single-field plan, independent readback, and verified restoration. Record process-exit and mouse power-cycle observations in the project status documentation only after an owner-observed test. A GET-only result or successful software build is not hardware evidence.
 
-These are candidates, not promised controls. A GET result or source inspection alone does not enable a setter. Record failed experiments and ruled-out explanations as carefully as successful runs.
+## Later possibilities, without a scope commitment
 
-| Candidate | Current status | Required evidence before UI write support |
-| --- | --- | --- |
-| DPI stage count and stage values | Research | Exact encoding and supported ranges; one field at a time with readback and baseline restoration. |
-| Additional button assignments | Research | Per-action raw mapping, OS behavior, persistence, and rollback; no arbitrary raw editor. |
-| Battery, idle sleep, low-power threshold | GET-only / research | Setter protocol, supported range and persistence; current optional reads are not setter evidence. |
-| Sensor options | Research | Identify real fields and firmware behavior before designing controls. |
-| Wired configuration or 4000 Hz | Blocked | Separate wired identity, transport, and polling transition evidence. |
-| Other mouse models | Blocked | A per-model capability matrix and independent baselines/tests; no support inherited by similarity. |
+The earlier roadmap's expansion ideas remain possible later work, not supported
+features or requirements for the next slice:
 
-For every proposed control, record the date, reviewed device/firmware/transport identity, starting state, source hypothesis, GET-only discovery, exact single-field plan, independent readback, restore result, and persistence checks where relevant. Store full serials and raw reports in private local evidence; do not publish them. Stop on ambiguous identity or state. Treat every setter as a possible flash write.
+- DPI stages, more button actions, battery/power settings and sensor options each
+  need their own field contract and independent evidence before a setter.
+- Wired transport and other models need separate identity, transport, baseline
+  and capability evidence; no support is inherited from the wireless device.
+- Portable profile import/export would need schema/provenance validation and
+  reversible migrations. An imported file cannot carry a trusted baseline or
+  automatically authorize cross-device application.
+- Distribution work would need install/update/uninstall checks, configuration
+  rollback and recovery. Startup remains opt-in; diagnostics must stay sanitized.
 
-## Release decision checklist
+## Release checklist
 
-1. **Offline correctness:** Protocol, config, migration, validation, plan, rollback, and UI-logic checks pass using the repository `mise.toml` tasks and pinned Windows cross-build tools.
-2. **Hardware safety:** Every newly writable field has a complete immutable baseline, reviewed full VID/PID and serials, exact plan, one-field experiment, independent readback, and verified baseline restoration. No hardware `apply` or `restore` runs from a planning or design task.
-3. **Regression:** Both complete built-in profiles, the production hotkey, process exit, and mouse power-cycle pass after relevant app, transport, or packaging changes. Tray startup remains off until its documented gates pass.
-4. **Product quality:** Accessibility, visual QA, installation rollback, and measured performance meet the milestone's stated criteria.
-5. **Claims:** Public docs list only support claims that can be reviewed without publishing personal device identifiers or raw diagnostics. Roadmap candidates remain labelled planned, research, or blocked until their gates pass.
+1. Hardware-free formatting, lint, test, build, and security checks pass for the candidate being reviewed.
+2. Owner-present desktop gates pass for the shipped production tray/compact switcher and any included editor, accessibility, or performance claims. The optional preview's separate editor gate does not establish tray support.
+3. Every enabled setter has field-specific evidence for the documented Viper V4 Pro scope, including independent readback and baseline restoration.
+4. Complete built-in profiles and the production hotkey pass their supervised regression; process-exit and power-cycle behavior are recorded before any persistence claim.
+5. Public documentation distinguishes software checks, plans, measured device behavior, and open gates. Preserve private identifiers and raw diagnostic material in private evidence.

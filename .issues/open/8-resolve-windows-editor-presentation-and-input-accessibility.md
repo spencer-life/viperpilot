@@ -6,7 +6,7 @@ labels:
     - codex-created
 state: open
 state_reason: null
-synced_at: 2026-09-29T18:28:51.036061842Z
+synced_at: 2026-09-29T21:45:14.653843481Z
 ---
 
 ## Context
@@ -21,3 +21,7 @@ Implementation baseline: [public PR #3](https://github.com/spencer-life/viperpil
 - Verify keyboard focus/activation, screen-reader names/roles, IME composition, paste, non-Latin profile names, high-DPI behavior, and narrow-window layout in Quick edit and All settings.
 - Confirm disabled Apply cannot be activated and draft status remains clear.
 - Update public evaluation notes with passing evidence or exact remaining blockers. Keep full screenshots and environment-specific records in private local records; publish only a redacted summary.
+
+## Checkpoint — 2026-09-29
+
+The optional editor's Windows presentation and real input/accessibility behavior remain unverified. The user is away from the Windows PC, so monitor, IME, paste, screen-reader, and DPI checks are deferred. Keep the production integration gate open.

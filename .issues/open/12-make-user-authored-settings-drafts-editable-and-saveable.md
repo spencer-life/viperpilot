@@ -5,7 +5,7 @@ labels:
     - enhancement
 state: open
 state_reason: null
-synced_at: 2026-09-29T18:28:45.41908308Z
+synced_at: 2026-09-29T21:45:10.524461402Z
 ---
 
 ## Context
@@ -23,3 +23,7 @@ Implementation baseline: [public PR #3](https://github.com/spencer-life/viperpil
 - Cover CRUD, round-trip, invalid/corrupt/future data, and separation from configuration, aliases, diagnostic reports, and immutable baseline evidence in hardware-free tests. Confirm editor code is not loaded in tray-only idle mode.
 
 Any full device evidence stays in private local records; only a redacted summary may be published.
+
+## Checkpoint — 2026-09-29
+
+Next implementation slice: real local create, edit, duplicate, rename, delete, and reopen of persisted drafts while offline. Save is currently disabled/disconnected; Apply must remain disabled until device-specific gates pass. The sequence continues through capability contract #4 and profile promotion #13. No interactive Windows UI or device tests were run; headless preview checks remain software-only.

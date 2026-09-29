@@ -1,6 +1,8 @@
 # Quick-switch supervised validation checklist
 
-Prepared 2026-09-28 for supervised validation of the native quick-switch integration. **Planning only: no step in this checklist is a recorded result.** Use it with the device owner at a Windows PC. Keep full serials and personal paths in local diagnostic records, not this repository.
+Updated 2026-09-29 for supervised validation of the native quick-switch integration. **Planning only: no step in this checklist is a recorded result.** The current PR 3 candidate remains a draft; green Linux and Windows Core CI plus Security checks establish software validation only. They do not close any desktop or device gate below. Use this checklist with the device owner at a Windows PC. Keep full serials and personal paths in local diagnostic records, not this repository.
+
+The corresponding owner-present issues remain open: [#6 compact switcher accessibility](https://github.com/spencer-life/viperpilot/issues/6), [#7 production tray validation](https://github.com/spencer-life/viperpilot/issues/7), [#8 editor presentation](https://github.com/spencer-life/viperpilot/issues/8), [#9 production performance](https://github.com/spencer-life/viperpilot/issues/9), [#10 changed DPI values](https://github.com/spencer-life/viperpilot/issues/10), and [#11 additional button actions](https://github.com/spencer-life/viperpilot/issues/11). Checklist items stay unchecked until observed and recorded. DPI and button experiments must remain separate one-field sessions with readback and baseline restoration.
 
 ## Before launching the PR build
 
@@ -15,7 +17,7 @@ A portable PR tray launch is not automatically side-effect-free: startup refresh
 ## UI-only checks before a device write
 
 - [ ] Observe the tray menu and status window. The two selected quick-switch names should be directly visible in the tray; Developer/Gaming recovery choices remain available. Labels must distinguish local aliases from onboard slots.
-- [ ] Open the 900×520 compact switcher and Details view. Check the mouse silhouette, actual connection/profile/DPI/polling readbacks, error text, six read-only hotspots, focus order, and visibility at the Windows display scale in use. A screenshot or build alone cannot establish legibility.
+- [ ] Open the 900×520 compact switcher and Details view. Check the mouse silhouette, actual connection/profile/DPI/polling readbacks, error text, six read-only hotspots, focus order, and visibility at the Windows display scale in use. A screenshot, Figma planning file, or build alone cannot establish legibility.
 - [ ] Reverse the saved quick-switch pair without applying either preset. Check the two compact button labels, their Windows accessible names, and active highlight all follow the saved names and source presets rather than button position. When the library is unavailable, both compact buttons must be disabled and announced as unavailable; Details must still identify its built-in recovery actions.
 - [ ] To exercise pair selection with more than the two built-ins, back up `%LOCALAPPDATA%\ViperV4Utility\profiles-v1.json` (or record that it was absent), then stage the tested `tests/fixtures/profiles/work.json` local alias fixture. It names the existing Developer preset; it is not a new onboard profile.
 - [ ] Change the local quick-switch pair and reload the library. Confirm neither action applies a mouse profile. Check that an incompatible pair is unavailable or rejected clearly. Restore the original library bytes, or remove the test file if none existed before.

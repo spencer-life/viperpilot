@@ -5,7 +5,7 @@ labels:
     - hardware-test
 state: open
 state_reason: null
-synced_at: 2026-09-29T18:28:44.528790344Z
+synced_at: 2026-09-29T21:45:09.897695921Z
 ---
 
 ## Context
@@ -22,3 +22,7 @@ Implementation baseline: [public PR #3](https://github.com/spencer-life/viperpil
 - Add only measured actions to the public capability contract and support claims. Keep unsupported actions as local draft intents. Do not use runtime input interception or injection as a fallback.
 
 This issue does not authorize a write unless the project's hardware safety gates are satisfied.
+
+## Checkpoint — 2026-09-29
+
+No additional side-button action has been tested in this checkpoint. Keep unmeasured mappings as draft intents; any future experiment requires one action at a time, independent readback, and baseline restoration. Runtime interception and input injection remain out of scope.

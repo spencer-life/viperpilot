@@ -5,7 +5,7 @@ labels:
     - enhancement
 state: open
 state_reason: null
-synced_at: 2026-09-29T18:28:48.181853044Z
+synced_at: 2026-09-29T21:45:12.50006097Z
 ---
 
 ## Context
@@ -23,3 +23,7 @@ Implementation baseline: [public PR #3](https://github.com/spencer-life/viperpil
 - Provide a reproducible local command for each required job, and keep hardware-dependent experiments out of unattended CI.
 - Run the checks against the current development code and record the resulting workflow URL and commit in the public repository.
 - Keep any credentials, device identifiers, local paths, and full hardware evidence out of workflow logs and artifacts.
+
+## Checkpoint — 2026-09-29
+
+Public hosted Core Linux and Windows CI passed at sanitized PR #3 head `7cb0440` ([run](https://github.com/spencer-life/viperpilot/actions/runs/36612610509)); Security also passed ([run](https://github.com/spencer-life/viperpilot/actions/runs/36612610273)). `main` currently has no required checks or rulesets, so defining checks and validating the stacked PR merge order remains open.
