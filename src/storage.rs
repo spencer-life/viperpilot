@@ -12,6 +12,7 @@ use serde::de::DeserializeOwned;
 use crate::engine::VerificationReport;
 use crate::model::{DeviceSnapshotV1, UtilityConfigV1};
 use crate::planning::WritePlan;
+use crate::profile_intent::ProfileDraftLibraryV1;
 use crate::profile_library::ProfileLibraryV1;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -20,6 +21,7 @@ pub struct StoragePaths {
     pub backups: PathBuf,
     pub reports: PathBuf,
     pub config: PathBuf,
+    pub profile_drafts: PathBuf,
     pub diagnostics: PathBuf,
 }
 
@@ -39,6 +41,7 @@ impl StoragePaths {
             backups: root.join("backups"),
             reports: root.join("reports"),
             config: root.join("config-v1.json"),
+            profile_drafts: root.join("profile-drafts-v1.json"),
             diagnostics: root.join("diagnostics-v1.log"),
             root,
         }
@@ -208,6 +211,35 @@ pub fn save_profile_library(
 ) -> Result<(), StorageError> {
     library.validate().map_err(StorageError::Path)?;
     write_json_atomic(&paths.root.join("profiles-v1.json"), library)
+}
+
+/// Local user-authored settings drafts are stored separately from profile aliases,
+/// app config, reports, and immutable device baselines. A missing file stays in-memory.
+pub fn load_profile_drafts(paths: &StoragePaths) -> Result<ProfileDraftLibraryV1, StorageError> {
+    let library: ProfileDraftLibraryV1 = match read_json(&paths.profile_drafts) {
+        Ok(library) => library,
+        Err(StorageError::Io(error)) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(ProfileDraftLibraryV1::default());
+        }
+        Err(error) => return Err(error),
+    };
+    library.validate().map_err(StorageError::Path)?;
+    Ok(library)
+}
+
+/// Atomically persist only validated, local profile intent drafts.
+/// Callers must serialize read-modify-save operations through one owner.
+pub fn save_profile_drafts(
+    paths: &StoragePaths,
+    library: &ProfileDraftLibraryV1,
+) -> Result<(), StorageError> {
+    library.validate().map_err(StorageError::Path)?;
+    match read_json::<ProfileDraftLibraryV1>(&paths.profile_drafts) {
+        Ok(existing) => existing.validate().map_err(StorageError::Path)?,
+        Err(StorageError::Io(error)) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error),
+    }
+    write_json_atomic(&paths.profile_drafts, library)
 }
 
 // 2026-09-28: replace the in-place config truncation with a complete, synced
@@ -633,6 +665,110 @@ mod tests {
         fs::create_dir_all(&path).unwrap();
         assert!(load_profile_library(&paths).is_err());
         assert!(path.is_dir());
+        fs::remove_dir_all(&paths.root).unwrap();
+    }
+
+    fn draft_intent(name: &str) -> crate::profile_intent::ProfileIntentV1 {
+        use crate::profile_intent::{
+            ButtonActionIntent, DpiTarget, KeyboardKey, PROFILE_INTENT_SCHEMA_VERSION,
+            ProfileIntentV1,
+        };
+
+        ProfileIntentV1 {
+            schema_version: PROFILE_INTENT_SCHEMA_VERSION,
+            name: name.to_owned(),
+            dpi: DpiTarget { x: 1200, y: 1600 },
+            polling_hz: 2000,
+            mouse4: ButtonActionIntent::KeyboardShortcut {
+                control: true,
+                alt: false,
+                shift: true,
+                windows: false,
+                key: KeyboardKey::Z,
+            },
+            mouse5: ButtonActionIntent::Unmodeled {
+                description: "Launch an application".to_owned(),
+            },
+        }
+    }
+
+    #[test]
+    fn missing_profile_drafts_return_empty_without_creating_files() {
+        let paths = isolated_paths("missing-profile-drafts");
+        assert_eq!(
+            load_profile_drafts(&paths).unwrap(),
+            ProfileDraftLibraryV1::default()
+        );
+        assert!(!paths.root.exists());
+    }
+
+    #[test]
+    fn profile_drafts_round_trip_unverified_settings_and_reject_corrupt_or_future_bytes() {
+        let paths = isolated_paths("profile-drafts-roundtrip");
+        let mut library = ProfileDraftLibraryV1::default();
+        library
+            .create("custom-1", draft_intent("My settings"))
+            .unwrap();
+        save_profile_drafts(&paths, &library).unwrap();
+        let loaded = load_profile_drafts(&paths).unwrap();
+        assert_eq!(loaded, library);
+        let assessment = loaded.entries()[0]
+            .intent()
+            .assess_fields(
+                crate::profile_intent::CapabilityTarget::MEASURED_WIRELESS_VIPER_V4_PRO_FW_1_4_MI_03,
+            )
+            .unwrap();
+        assert_eq!(
+            assessment.dpi,
+            crate::profile_intent::FieldCapability::ResearchRequired
+        );
+        assert_eq!(
+            assessment.mouse4,
+            crate::profile_intent::FieldCapability::ResearchRequired
+        );
+        assert_eq!(
+            assessment.mouse5,
+            crate::profile_intent::FieldCapability::ResearchRequired
+        );
+        let before = fs::read(&paths.profile_drafts).unwrap();
+
+        let mut future = serde_json::to_value(&library).unwrap();
+        future["schema_version"] = serde_json::json!(999);
+        for bytes in [b"{bad json".to_vec(), serde_json::to_vec(&future).unwrap()] {
+            fs::write(&paths.profile_drafts, &bytes).unwrap();
+            assert!(load_profile_drafts(&paths).is_err());
+            assert_eq!(fs::read(&paths.profile_drafts).unwrap(), bytes);
+            assert!(save_profile_drafts(&paths, &library).is_err());
+            assert_eq!(fs::read(&paths.profile_drafts).unwrap(), bytes);
+        }
+        fs::write(&paths.profile_drafts, before).unwrap();
+        fs::remove_dir_all(&paths.root).unwrap();
+    }
+
+    #[test]
+    fn draft_saves_leave_config_profile_aliases_and_baseline_bytes_unchanged() {
+        let paths = isolated_paths("draft-isolation");
+        let baseline = write_snapshot(&paths, &snapshot(), None)
+            .unwrap()
+            .baseline_path;
+        save_config(&paths, &UtilityConfigV1::default()).unwrap();
+        let aliases = ProfileLibraryV1::default();
+        save_profile_library(&paths, &aliases).unwrap();
+        let baseline_before = fs::read(&baseline).unwrap();
+        let config_before = fs::read(&paths.config).unwrap();
+        let aliases_path = paths.root.join("profiles-v1.json");
+        let aliases_before = fs::read(&aliases_path).unwrap();
+
+        let mut drafts = ProfileDraftLibraryV1::default();
+        drafts
+            .create("custom-1", draft_intent("Unverified settings"))
+            .unwrap();
+        save_profile_drafts(&paths, &drafts).unwrap();
+
+        assert_eq!(fs::read(&baseline).unwrap(), baseline_before);
+        assert_eq!(fs::read(&paths.config).unwrap(), config_before);
+        assert_eq!(fs::read(&aliases_path).unwrap(), aliases_before);
+        assert_eq!(load_profile_drafts(&paths).unwrap(), drafts);
         fs::remove_dir_all(&paths.root).unwrap();
     }
 

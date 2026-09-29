@@ -8,6 +8,7 @@ pub mod engine;
 pub mod gui_logic;
 pub mod model;
 pub mod planning;
+pub mod profile_intent;
 pub mod profile_library;
 pub mod protocol;
 pub mod storage;

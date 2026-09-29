@@ -1,0 +1,4 @@
+# 2026-09-29: Track the latest stable Rust; Cargo.toml records the tested minimum.
+[toolchain]
+channel = "stable"
+components = ["clippy", "rustfmt"]

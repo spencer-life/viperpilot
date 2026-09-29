@@ -1,0 +1,4 @@
+# 2026-09-28: native Windows runners need a native task shell.
+# CI sets MISE_ENV=windows so this overrides the WSL/Linux shell in mise.toml.
+[task_config]
+shell = "powershell"

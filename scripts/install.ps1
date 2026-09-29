@@ -11,7 +11,8 @@ $traySource = Join-Path $releaseRoot 'viper-v4-utility.exe'
 $cliSource = Join-Path $releaseRoot 'viperctl.exe'
 $iconSource = Join-Path $packageRoot 'assets\viper-utility-icon.ico'
 $mouseImageSource = Join-Path $packageRoot 'assets\viper-v4-black-dashboard.bmp'
-foreach ($source in @($traySource, $cliSource, $iconSource, $mouseImageSource)) {
+$compactMouseImageSource = Join-Path $packageRoot 'assets\viperpilot-mouse-silhouette.bmp'
+foreach ($source in @($traySource, $cliSource, $iconSource, $mouseImageSource, $compactMouseImageSource)) {
     if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
         throw "Missing Windows release binary: $source. Run mise run build-windows first."
     }
@@ -31,6 +32,7 @@ try {
     Copy-Item -LiteralPath $cliSource -Destination (Join-Path $stagingRoot 'viperctl.exe')
     Copy-Item -LiteralPath $iconSource -Destination (Join-Path $stagingRoot 'viper-utility-icon.ico')
     Copy-Item -LiteralPath $mouseImageSource -Destination (Join-Path $stagingRoot 'viper-v4-black-dashboard.bmp')
+    Copy-Item -LiteralPath $compactMouseImageSource -Destination (Join-Path $stagingRoot 'viperpilot-mouse-silhouette.bmp')
     if (Test-Path -LiteralPath $installRoot) {
         Move-Item -LiteralPath $installRoot -Destination $backupRoot
         $previousInstallMoved = $true

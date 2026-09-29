@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#131315">
+  <title>ViperPilot — Product roadmap</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #131315; --bg-2: #141416; --surface: #1c1c1f; --raised: #232326;
+      --text: #faf8f5; --secondary: #dac0c9; --muted: #a28a93; --border: #42383e;
+      --rose: #ffafd3; --rose-strong: #f472b6; --cyan: #38bdf8; --amber: #fbbf24;
+      --green: #34d399; --coral: #fb7185; --measure: #34d399; --planned: #ffafd3;
+      --research: #38bdf8; --blocked: #fb7185; --gated: #fbbf24; --radius: 12px;
+      font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg); color: var(--text);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; min-width: 320px; background: var(--bg); line-height: 1.55; }
+    a { color: var(--rose); text-underline-offset: .2em; }
+    a:hover { color: #ffd6e9; }
+    a:focus-visible { outline: 3px solid var(--rose); outline-offset: 4px; border-radius: 2px; }
+    .shell { width: min(1120px, calc(100% - 48px)); margin-inline: auto; }
+    .topbar { border-bottom: 1px solid var(--border); }
+    .topbar-inner { min-height: 60px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+    .brand { color: var(--text); text-decoration: none; font-weight: 750; letter-spacing: -.03em; }
+    .brand span { color: var(--rose); }
+    .topbar nav ul { list-style: none; display: flex; gap: 24px; margin: 0; padding: 0; font-size: .88rem; }
+    .topbar nav a { color: var(--secondary); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+    .topbar nav a:hover { color: var(--text); }
+    .hero { padding: 64px 0 42px; }
+    .eyebrow, .label, .milestone-index, .status { font-family: "Roboto Mono", "Cascadia Code", Consolas, monospace; font-size: .72rem; font-weight: 700; letter-spacing: .04em; }
+    .eyebrow { color: var(--rose); margin: 0 0 14px; text-transform: uppercase; }
+    h1 { max-width: 760px; margin: 0; font-size: clamp(2.6rem, 7vw, 5.2rem); line-height: .98; letter-spacing: -.065em; }
+    h1 span { color: var(--rose); }
+    .hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(250px, 340px); gap: 48px; align-items: end; }
+    .lede { color: var(--secondary); max-width: 690px; font-size: clamp(1.05rem, 1.7vw, 1.24rem); margin: 24px 0 0; }
+    .scope { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+    .scope .label { margin: 0 0 10px; color: var(--green); text-transform: uppercase; }
+    .scope p { margin: 0; color: var(--secondary); font-size: .93rem; }
+    .scope strong { color: var(--text); }
+    .principle { padding: 14px 16px; margin: 28px 0 0; border-left: 3px solid var(--rose-strong); color: var(--text); background: var(--bg-2); max-width: 850px; }
+    main { padding-bottom: 76px; }
+    .section-head { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin: 14px 0 22px; }
+    h2 { margin: 0; font-size: clamp(1.55rem, 3vw, 2rem); letter-spacing: -.035em; line-height: 1.15; }
+    .section-note { margin: 0; color: var(--muted); font-size: .9rem; max-width: 420px; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 16px 0 24px; border-top: 1px solid var(--border); }
+    .legend-item { display: inline-flex; align-items: center; gap: 8px; color: var(--secondary); font-size: .82rem; }
+    .swatch { width: 9px; height: 9px; border-radius: 2px; background: var(--swatch); flex: 0 0 auto; }
+    .legend-item strong { color: var(--text); font-weight: 650; }
+    .sequence { list-style: none; margin: 0; padding: 0; counter-reset: milestone; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
+    .milestone { --state: var(--planned); position: relative; min-width: 0; display: flex; flex-direction: column; padding: 18px 16px 17px; background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--state); border-radius: var(--radius); }
+    .milestone[data-state="measured"] { --state: var(--measure); }
+    .milestone[data-state="planned"] { --state: var(--planned); }
+    .milestone[data-state="gated"] { --state: var(--gated); }
+    .milestone-index { color: var(--state); margin: 0 0 9px; }
+    .status { display: inline-flex; align-self: flex-start; color: var(--state); font-size: .66rem; text-transform: uppercase; padding: 3px 7px; border: 1px solid color-mix(in srgb, var(--state), transparent 58%); border-radius: 4px; margin-bottom: 11px; }
+    .milestone h3 { font-size: 1.08rem; letter-spacing: -.025em; line-height: 1.2; margin: 0 0 13px; }
+    .milestone ul { color: var(--secondary); font-size: .82rem; margin: 0; padding-left: 17px; }
+    .milestone li + li { margin-top: 8px; }
+    .gate { border-top: 1px solid var(--border); padding-top: 12px; margin: auto 0 0; padding-bottom: 0; color: var(--text); font-size: .8rem; }
+    .gate strong { display: block; color: var(--state); font-size: .67rem; font-family: "Roboto Mono", "Cascadia Code", Consolas, monospace; text-transform: uppercase; margin: 15px 0 5px; }
+    .direction { border-top: 1px solid var(--border); padding-top: 14px; color: var(--muted); font-size: .82rem; margin: 16px 0 0; }
+    .support { margin: 64px 0 0; }
+    .support-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr); gap: 28px; align-items: start; }
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+    .panel-head { padding: 20px 22px 14px; border-bottom: 1px solid var(--border); }
+    .panel-head h3 { margin: 0; font-size: 1.2rem; letter-spacing: -.025em; }
+    .panel-head p { margin: 6px 0 0; color: var(--muted); font-size: .86rem; }
+    .research-list { list-style: none; margin: 0; padding: 0 22px; }
+    .research-list li { display: grid; grid-template-columns: minmax(150px, .7fr) minmax(0, 1.3fr); gap: 16px; padding: 15px 0; border-bottom: 1px solid var(--border); font-size: .83rem; }
+    .research-list li:last-child { border-bottom: 0; }
+    .candidate { color: var(--text); font-weight: 650; }
+    .evidence { color: var(--secondary); }
+    .state-word { display: block; color: var(--research); font-family: "Roboto Mono", "Cascadia Code", Consolas, monospace; text-transform: uppercase; font-size: .65rem; margin-top: 4px; }
+    .state-word.get { color: var(--amber); }
+    .state-word.block { color: var(--coral); }
+    .rules { margin: 0; padding: 16px 24px 20px 42px; color: var(--secondary); font-size: .86rem; }
+    .rules li + li { margin-top: 11px; }
+    .rules strong { color: var(--text); }
+    .callout { color: var(--text); background: var(--raised); margin: 0 18px 18px; border-left: 3px solid var(--cyan); padding: 13px 14px; font-size: .82rem; }
+    .release { margin: 64px 0 0; }
+    .release-layout { display: grid; grid-template-columns: .72fr 1.28fr; gap: 34px; }
+    .release-intro { color: var(--secondary); margin: 13px 0 0; font-size: .93rem; }
+    .checklist { list-style: none; counter-reset: gate; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .checklist li { counter-increment: gate; padding: 14px 15px 14px 49px; min-height: 75px; position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--secondary); font-size: .82rem; }
+    .checklist li::before { content: counter(gate, decimal-leading-zero); position: absolute; left: 15px; top: 14px; font: 700 .72rem "Roboto Mono", "Cascadia Code", Consolas, monospace; color: var(--rose); }
+    .checklist strong { color: var(--text); }
+    footer { border-top: 1px solid var(--border); padding: 22px 0 34px; color: var(--muted); font-size: .8rem; }
+    footer p { margin: 0; }
+    footer strong { color: var(--secondary); }
+    @media (max-width: 1000px) { .sequence { grid-template-columns: repeat(2, minmax(0, 1fr)); } .milestone:last-child { grid-column: span 2; } }
+    @media (max-width: 720px) {
+      .shell { width: min(100% - 32px, 560px); }
+      .topbar-inner { align-items: flex-start; padding: 8px 0; flex-direction: column; gap: 0; }
+      .topbar nav { width: 100%; overflow-x: auto; }
+      .topbar nav ul { gap: 18px; white-space: nowrap; }
+      .hero { padding: 40px 0 30px; }
+      .hero-grid, .support-grid, .release-layout { grid-template-columns: 1fr; gap: 24px; }
+      .section-head { align-items: flex-start; flex-direction: column; gap: 8px; }
+      .sequence { grid-template-columns: 1fr; gap: 12px; }
+      .milestone:last-child { grid-column: auto; }
+      .milestone { padding: 17px 18px; }
+      .milestone h3 { font-size: 1.12rem; }
+      .milestone ul { font-size: .9rem; }
+      .research-list { padding-inline: 17px; }
+      .research-list li { grid-template-columns: 1fr; gap: 4px; }
+      .panel-head { padding-inline: 17px; }
+      .rules { padding-left: 36px; }
+      .checklist { grid-template-columns: 1fr; }
+      .support, .release { margin-top: 48px; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+    @media print {
+      :root { color-scheme: light; --bg:#fff; --bg-2:#f7f4f5; --surface:#fff; --raised:#f3eef0; --text:#181518; --secondary:#393239; --muted:#5c5056; --border:#c9bec3; --rose:#a12662; --rose-strong:#a12662; --green:#137858; --cyan:#05658b; --amber:#855b00; --coral:#aa3444; --measure:#137858; --planned:#a12662; --research:#05658b; --blocked:#aa3444; --gated:#855b00; }
+      body { background:#fff; print-color-adjust:exact; -webkit-print-color-adjust:exact; }
+      .shell { width:100%; max-width:none; } .topbar { display:none; } .hero { padding:10px 0 24px; }
+      .hero-grid { grid-template-columns:1fr 270px; gap:24px; } h1 { font-size:42pt; }
+      .sequence { grid-template-columns:repeat(2, 1fr); } .milestone:last-child { grid-column:span 2; }
+      .milestone, .panel, .checklist li { break-inside:avoid; } .support-grid { grid-template-columns:1.2fr .8fr; }
+      .support, .release { margin-top:32px; } a { color:inherit; } footer { padding-bottom:0; }
+    }
+    @page { size: A4 landscape; margin: 12mm; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <a class="brand" href="#top" aria-label="ViperPilot roadmap home">Viper<span>Pilot</span></a>
+      <nav aria-label="Roadmap sections"><ul>
+        <li><a href="#delivery">Delivery</a></li><li><a href="#research">Research</a></li><li><a href="#release">Release gates</a></li>
+      </ul></nav>
+    </div>
+  </header>
+  <div class="shell" id="top">
+    <header class="hero">
+      <p class="eyebrow">Product roadmap · ViperPilot · 2026-09-29</p>
+      <div class="hero-grid">
+        <div>
+          <h1>Build a better daily workflow for the <span>Viper V4 Pro.</span></h1>
+          <p class="lede">A lightweight native Windows control app: inspect device state, choose a profile, edit proven controls, and recover safely when a change fails. Product work moves by evidence and exit gates, not calendar estimates.</p>
+        </div>
+        <aside class="scope" aria-label="Current measured scope">
+          <p class="label">Measured scope today</p>
+          <p>One wireless V2 identity: <strong>1532:00e6 · firmware 1.4 · MI_03</strong>. The two built-in profiles, a forced 1600→1600 DPI setter, wireless 1000↔4000 Hz polling, Mouse4/Mouse5 assignments, tray/status app, hotkey, process exit, and power-cycle behavior have recorded tests in <code>README.md</code>. DPI remains fixed at 1600; changed values are not proven. Battery and power values remain GET-only.</p>
+        </aside>
+      </div>
+      <p class="principle"><strong>Product promise:</strong> Compare launch, idle cost, and profile switching against the official Razer app on the same machine and device before making speed or resource claims. Feature parity is never assumed.</p>
+    </header>
+    <main>
+      <section id="delivery" aria-labelledby="delivery-title">
+        <div class="section-head"><h2 id="delivery-title">Delivery sequence</h2><p class="section-note">Milestones follow dependency order. Each closes only when its exit criteria and release gates pass; later research is not required to ship an earlier milestone.</p></div>
+        <div class="legend" aria-label="Evidence state legend">
+          <span class="legend-item"><span class="swatch" style="--swatch:var(--measure)"></span><strong>Shipped / measured</strong> recorded implementation and result</span>
+          <span class="legend-item"><span class="swatch" style="--swatch:var(--planned)"></span><strong>Planned</strong> product or engineering work</span>
+          <span class="legend-item"><span class="swatch" style="--swatch:var(--gated)"></span><strong>Hardware-gated</strong> requires field-level hardware evidence</span>
+          <span class="legend-item"><span class="swatch" style="--swatch:var(--research)"></span><strong>Research</strong> protocol discovery; no write support implied</span>
+          <span class="legend-item"><span class="swatch" style="--swatch:var(--blocked)"></span><strong>Blocked</strong> ship only after stated gate</span>
+        </div>
+        <ol class="sequence" aria-label="Milestones in dependency order">
+          <li class="milestone" data-state="measured"><p class="milestone-index">M0 / FOUNDATION</p><span class="status">Shipped · measured</span><h3>Preserve the measured core</h3>
+            <ul><li>Keep Developer and Gaming profiles as known-good recovery choices; preserve the immutable first baseline and diagnostic history.</li><li>Fail closed on unsupported identities, unknown raw states, and unmeasured polling transitions. Wired remains a recovery investigation.</li><li>Stay single-instance and idle without polling. No browser runtime, service, driver, interception, or injection without separate review and measured need.</li></ul>
+            <p class="gate"><strong>Exit evidence</strong>Support and limits trace to recorded runs in <code>README.md</code>; package checks and cross-builds stay green.</p>
+          </li>
+          <li class="milestone" data-state="planned"><p class="milestone-index">M1 / CONTRACT</p><span class="status">Next · planned</span><h3>Define configuration and write contract</h3>
+            <ul><li>Typed field allowlist, ranges, device/transport support; separate profile intent from raw bytes and reject unsupported combinations before planning.</li><li>Version local config. Define V1 migration, atomic save, corrupt/stale handling, recovery, and rollback copy; never touch the immutable hardware baseline.</li><li>Make plans inspectable: identity, changed fields, packet intent, expected readback, recovery path, and journal location. Preview is not proof.</li><li>Offline fixtures for valid, malformed, stale, and cross-device data; prove unsupported setters are unreachable.</li></ul>
+            <p class="gate"><strong>Exit gate</strong>Reversible migration; invalid input fails before planning; protocol, config, plan, and rollback suite passes offline.</p>
+          </li>
+          <li class="milestone" data-state="gated"><p class="milestone-index">M2 / PROFILES</p><span class="status">Hardware-gated</span><h3>Editable profiles for proven fields</h3>
+            <ul><li>Create, name, duplicate, edit, select, and delete user profiles. Built-ins stay read-only measured presets.</li><li>Keep DPI fixed at 1600 until each exposed changed value/range and material combination has evidence for a write, independent readback, and baseline restoration. Then expose only the M1-supported DPI contract, measured wireless 1000/4000 Hz pair, and evidenced Mouse4/Mouse5 actions.</li><li>Preview all changes; journal, independently GET each changed field, report partial failure and recovery without premature success.</li><li>One logical field per experiment: immutable baseline, full VID/PID and serial review, exact plan, suffix guard, readback, restore before next field.</li></ul>
+            <p class="gate"><strong>Exit gate</strong>Every field has protocol evidence, recorded write/readback/restore. Profiles pass switching, interrupted-write recovery, process-exit, and power-cycle tests. Unevidenced fields stay unavailable or read-only.</p>
+          </li>
+          <li class="milestone" data-state="planned"><p class="milestone-index">M3 / DAILY FLOW</p><span class="status">Planned</span><h3>Fast desktop workflow</h3>
+            <ul><li>Focused dashboard for identity, connection, available battery, current DPI/polling/profile, plus clear stale/unknown states and reachable profile action.</li><li>Profile list/editor, explicit unsaved state, keyboard and focus flow, readable errors, recovery guide. Document in Figma, then capture the running UI for visual QA.</li><li>Measure cold/warm launch, idle CPU/memory, switch time, and clicks/steps. Record machine, OS, firmware, connection, Synapse state, samples, and method. Unproven target: at least 2× faster median cold launch to actionable UI and fewer user actions to switch an existing profile; report device commit latency separately.</li><li>Keep package size and steady-state work in release review; prefer native controls and event-driven updates unless measurements justify more.</li></ul>
+            <p class="gate"><strong>Exit gate</strong>Keyboard/screen-reader, high-DPI/narrow-window, idle, benchmark record against the target, and visual QA pass. No speed claim without reproducible comparison.</p>
+          </li>
+          <li class="milestone" data-state="planned"><p class="milestone-index">M4 / PORTABILITY</p><span class="status">Planned</span><h3>Profile library and distribution</h3>
+            <ul><li>Define portable vs identity-bound fields. Validate schema, ranges, transport, and provenance before import offers a plan.</li><li>Imported files never carry a trusted baseline or authorize writes. Add device association only after identity semantics stabilize.</li><li>Test malformed, stale, future-version, and cross-device files offline.</li><li>Review install/update/uninstall, config rollback, diagnostics export, and recovery to last verified profile. Startup stays opt-in until its gates pass.</li></ul>
+            <p class="gate"><strong>Exit gate</strong>Round-trip, migration/downgrade/recovery fixtures, clean install/update/uninstall, and documented rollback pass. No automatic cross-device application.</p>
+          </li>
+        </ol>
+        <p class="direction">The measured baseline is narrow by design: wired 4000 Hz, other Razer models, arbitrary assignments, and user-editable profiles are not currently supported.</p>
+      </section>
+      <section class="support" id="research" aria-labelledby="research-title">
+        <div class="section-head"><h2 id="research-title">Independent research track</h2><p class="section-note">Candidates do not promise controls. A GET result or source inspection alone never enables a setter.</p></div>
+        <div class="support-grid">
+          <section class="panel" aria-labelledby="candidates-title">
+            <div class="panel-head"><h3 id="candidates-title">Candidate controls</h3><p>Research stays separate from the delivery sequence.</p></div>
+            <ul class="research-list">
+              <li><span class="candidate">DPI stage count and values<span class="state-word">Research</span></span><span class="evidence">Exact encoding and range; one field at a time with independent readback and baseline restoration.</span></li>
+              <li><span class="candidate">Additional button assignments<span class="state-word">Research</span></span><span class="evidence">Per-action raw mapping, OS behavior, persistence, and rollback. No arbitrary raw editor.</span></li>
+              <li><span class="candidate">Battery, idle sleep, low-power threshold<span class="state-word get">GET-only / research</span></span><span class="evidence">Setter protocol, supported range, and persistence. Optional reads are not setter evidence.</span></li>
+              <li><span class="candidate">Sensor options<span class="state-word">Research</span></span><span class="evidence">Identify real fields and firmware behavior before designing controls.</span></li>
+              <li><span class="candidate">Wired setup or 4000 Hz<span class="state-word block">Blocked</span></span><span class="evidence">Separate wired identity, transport, and polling-transition evidence.</span></li>
+              <li><span class="candidate">Other mouse models<span class="state-word block">Blocked</span></span><span class="evidence">Per-model capability matrix and independent baselines/tests. Similarity does not confer support.</span></li>
+            </ul>
+            <p class="callout"><strong>For each proposal, record:</strong> date; full device, firmware, and transport identity; starting raw state; source hypothesis; GET discovery; exact single-field plan; independent readback; restore; relevant process-exit and power-cycle persistence; linked report files. Stop on ambiguous identity or state. Treat each setter as a possible flash write.</p>
+          </section>
+          <aside class="panel" aria-labelledby="release-gates-title">
+            <div class="panel-head"><h3 id="release-gates-title">Release decision gates</h3><p>Apply the relevant checks before shipping a milestone.</p></div>
+            <ol class="rules">
+              <li><strong>Offline correctness</strong> — protocol, config, migration, validation, plan, rollback, and UI logic via the repository <code>mise.toml</code> tasks and pinned Windows cross-build tools.</li>
+              <li><strong>Hardware safety</strong> — complete immutable baseline, reviewed full identity, exact plan, one-field experiment, independent readback, verified restore. No apply/restore from planning or design tasks.</li>
+              <li><strong>Regression</strong> — both complete built-in profiles, production hotkey, process exit, and mouse power-cycle pass after relevant changes. Tray startup stays off until documented gates pass.</li>
+              <li><strong>Product quality</strong> — accessibility, visual QA, installation rollback, and measured performance meet the milestone's criteria.</li>
+              <li><strong>Claims</strong> — <code>README.md</code> lists only evidenced support and conditions. Candidates stay planned, research, or blocked until gates pass.</li>
+            </ol>
+          </aside>
+        </div>
+      </section>
+      <section class="release" id="release" aria-labelledby="release-title">
+        <div class="release-layout"><div><p class="eyebrow">Definition of a release</p><h2 id="release-title">Evidence closes the gate.</h2><p class="release-intro">The roadmap advances when the recorded conditions support it. Dates, protocol guesses, and visual previews do not count as proof of device support.</p></div>
+          <ol class="checklist">
+            <li><strong>Offline correctness.</strong> Checks run through the repository's <code>mise.toml</code> tasks and pinned cross-build workflow.</li>
+            <li><strong>Hardware safety.</strong> Full identity, immutable baseline, exact one-field plan, independent readback, and restoration recorded.</li>
+            <li><strong>Regression.</strong> Complete built-in profiles, hotkey, exit behavior, and power-cycle behavior revalidated when relevant.</li>
+            <li><strong>Product quality.</strong> Accessibility, visual QA, rollback, and performance meet the milestone's exit criteria.</li>
+            <li><strong>Claims.</strong> Documentation and release notes state only evidence-backed support and measured conditions.</li>
+          </ol>
+        </div>
+      </section>
+    </main>
+    <footer><p><strong>ViperPilot</strong> is the project name. Existing executable and Cargo package identifiers may remain for compatibility. Scope and release gates are in <code>ROADMAP.md</code> and <code>docs/quick-switch-status.md</code>. Figma source is not mirrored in this public repository.</p></footer>
+  </div>
+</body>
+</html>

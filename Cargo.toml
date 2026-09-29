@@ -2,7 +2,8 @@
 name = "viper-v4-utility"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+# 2026-09-29: Set the tested minimum to the current stable Rust for egui evaluation.
+rust-version = "1.98.1"
 license = "GPL-2.0-only"
 description = "Machine-specific native utility for the Razer Viper V4 Pro"
 publish = false
@@ -19,9 +20,27 @@ path = "src/bin/viperctl.rs"
 name = "viper-v4-utility"
 path = "src/bin/viper-v4-utility.rs"
 
+[features]
+ui-preview = []
+egui-preview = ["dep:eframe"]
+
+[[bin]]
+name = "viperpilot-ui-preview"
+path = "src/bin/viperpilot-ui-preview.rs"
+required-features = ["ui-preview"]
+
+[[bin]]
+name = "viperpilot-egui-preview"
+path = "src/bin/viperpilot-egui-preview.rs"
+required-features = ["egui-preview"]
+
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+eframe = { version = "=0.36.2", default-features = false, features = ["glow", "accesskit", "default_fonts"], optional = true }
+
+[dev-dependencies]
+egui_kittest = { version = "=0.36.2", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 hidapi = { version = "2.6.6", default-features = false, features = [

@@ -2,7 +2,8 @@
 //!
 //! Entries refer to the two existing complete presets; they are not onboard
 //! slots, device authorizations, arbitrary assignments, or hardware write plans.
-//! No UI/CLI activation is added here. The tray's existing apply path is unchanged.
+//! The tray may select these local aliases through its existing guarded
+//! complete-preset apply path; the library never authorizes a hardware write.
 
 use std::collections::HashSet;
 

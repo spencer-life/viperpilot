@@ -1,0 +1,12 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="190" height="250" viewBox="0 0 190 250" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Original mouse silhouette">
+<path id="Vector" d="M95 5C49 5 20 42 20 94V170C20 216 45 243 95 243C145 243 170 216 170 170V94C170 42 141 5 95 5Z" fill="#232932" stroke="#56616C" stroke-width="2"/>
+<g id="Vector_2">
+<path d="M95 5V80ZM20 93H170Z" fill="black"/>
+<path d="M95 5V80M20 93H170" stroke="#56616C" stroke-width="2"/>
+</g>
+<path id="Vector_3" d="M96 30H94C89.5817 30 86 33.5817 86 38V65C86 69.4183 89.5817 73 94 73H96C100.418 73 104 69.4183 104 65V38C104 33.5817 100.418 30 96 30Z" fill="#10161B" stroke="#E87D91" stroke-width="2"/>
+<path id="Vector_4" d="M32 120H28V162H32M158 120H162V162H158" stroke="#56616C" stroke-width="2"/>
+<path id="Vector_5" d="M84 196L95 220L106 196L99 207L95 216L91 207L84 196Z" fill="#E87D91"/>
+</g>
+</svg>

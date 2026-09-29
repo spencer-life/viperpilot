@@ -164,6 +164,39 @@ impl WriteOperation {
                 }),
         }
     }
+
+    /// Return whether this field is unchanged from the last trusted snapshot.
+    /// The reference snapshot advances only after a complete, independently
+    /// validated readback, allowing later rollback steps to account for known
+    /// side effects from earlier successful setters.
+    #[must_use]
+    pub fn matches_before(&self, observed: &DeviceSnapshotV1, expected: &DeviceSnapshotV1) -> bool {
+        match self {
+            Self::SetDpiStages { .. } => {
+                observed.dpi.active_stage_id == expected.dpi.active_stage_id
+                    && observed.dpi.stages == expected.dpi.stages
+            }
+            Self::SetCurrentDpi { .. } => {
+                observed.dpi.current == expected.dpi.current
+                    && observed.dpi.active_stage_id == expected.dpi.active_stage_id
+                    && observed.dpi.active_stage() == expected.dpi.active_stage()
+            }
+            Self::SetPolling { .. } => {
+                observed.polling.transport == expected.polling.transport
+                    && observed.polling.raw_code == expected.polling.raw_code
+            }
+            Self::SetButton {
+                before,
+                ignore_returned_mode,
+                ..
+            } => observed
+                .button(before.protocol_button_id)
+                .zip(expected.button(before.protocol_button_id))
+                .is_some_and(|(observed, expected)| {
+                    button_assignment_matches(observed, expected, *ignore_returned_mode)
+                }),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
