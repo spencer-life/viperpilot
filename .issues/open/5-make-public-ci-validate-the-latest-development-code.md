@@ -4,7 +4,7 @@ labels:
     - enhancement
 state: open
 state_reason: null
-synced_at: 2026-09-29T18:22:39.891909922Z
+synced_at: 2026-09-29T18:24:13.224348247Z
 ---
 
 ## Context
@@ -14,6 +14,8 @@ The public repository is becoming the main development repository. Its checks ne
 Implementation baseline: [public PR #3](https://github.com/spencer-life/viperpilot/pull/3) (draft).
 
 ## Done when
+
+- After the current public PR checks pass, define and enforce the required status checks for public `main` without creating a circular dependency in the stacked PR merge order. Record the required check names and verify that the stacked PRs can merge in order. Until then, branch protection is an open gate.
 
 - Document which workflows run on pushes, pull requests, and the default branch, and which host platforms each job covers.
 - Ensure pull request checks target the checked-out PR commit and include the required formatting, tests, and supported Windows build checks.
