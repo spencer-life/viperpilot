@@ -52,3 +52,13 @@ Do not mistake local named configurations for independently stored onboard slots
 `ROADMAP.md` describes possible expansion. It is planning material, not evidence
 that a capability is supported. Update the roadmap and its validation gates as
 measured support changes.
+
+## Public issue tracking
+
+Track development work in the public issue tracker at
+https://github.com/spencer-life/viperpilot/issues using `gh-issue-sync` and the
+Markdown files under `.issues/open/`. Pull remote issue state before editing or
+pushing. Keep full device identifiers, raw reports, local paths, private-repository
+links, and unredacted screenshots in private local records; public issues may
+contain only redacted summaries. An issue does not authorize hardware writes;
+follow the safety gates above.
