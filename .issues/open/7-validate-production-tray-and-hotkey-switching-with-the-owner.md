@@ -1,11 +1,12 @@
 ---
 title: Validate production tray and hotkey switching with the owner
 labels:
+    - codex-created
     - hardware-test
     - release-gate
 state: open
 state_reason: null
-synced_at: 2026-09-29T18:22:44.128233695Z
+synced_at: 2026-09-29T18:28:49.929850376Z
 ---
 
 ## Context

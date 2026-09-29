@@ -1,11 +1,12 @@
 ---
 title: Measure tray-only resource use and quick-switch latency
 labels:
+    - codex-created
     - enhancement
     - release-gate
 state: open
 state_reason: null
-synced_at: 2026-09-29T18:22:48.194672384Z
+synced_at: 2026-09-29T18:28:51.846962927Z
 ---
 
 ## Context

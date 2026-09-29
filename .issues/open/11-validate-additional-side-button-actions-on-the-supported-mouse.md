@@ -1,10 +1,11 @@
 ---
 title: Validate additional side-button actions on the supported mouse
 labels:
+    - codex-created
     - hardware-test
 state: open
 state_reason: null
-synced_at: 2026-09-29T18:22:52.233804781Z
+synced_at: 2026-09-29T18:28:44.528790344Z
 ---
 
 ## Context

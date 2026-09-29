@@ -1,10 +1,11 @@
 ---
 title: Make user-authored settings drafts editable and saveable
 labels:
+    - codex-created
     - enhancement
 state: open
 state_reason: null
-synced_at: 2026-09-29T18:22:54.514211353Z
+synced_at: 2026-09-29T18:28:45.41908308Z
 ---
 
 ## Context

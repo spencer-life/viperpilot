@@ -1,10 +1,11 @@
 ---
 title: Promote verified custom profiles into quick switching
 labels:
+    - codex-created
     - enhancement
 state: open
 state_reason: null
-synced_at: 2026-09-29T18:22:56.46907601Z
+synced_at: 2026-09-29T18:28:46.34145338Z
 ---
 
 ## Context

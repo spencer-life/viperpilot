@@ -1,10 +1,11 @@
 ---
 title: Validate changed DPI targets on the supported wireless mouse
 labels:
+    - codex-created
     - hardware-test
 state: open
 state_reason: null
-synced_at: 2026-09-29T18:22:50.047869214Z
+synced_at: 2026-09-29T18:28:43.729681449Z
 ---
 
 ## Context

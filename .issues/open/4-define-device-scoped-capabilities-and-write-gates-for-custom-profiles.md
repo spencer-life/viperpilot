@@ -1,10 +1,11 @@
 ---
 title: Define device-scoped capabilities and write gates for custom profiles
 labels:
+    - codex-created
     - enhancement
 state: open
 state_reason: null
-synced_at: 2026-09-29T18:22:37.854189218Z
+synced_at: 2026-09-29T18:28:47.274435634Z
 ---
 
 ## Context

@@ -3,9 +3,10 @@ title: Resolve Windows editor presentation and input accessibility
 labels:
     - accessibility
     - bug
+    - codex-created
 state: open
 state_reason: null
-synced_at: 2026-09-29T18:22:46.176477268Z
+synced_at: 2026-09-29T18:28:51.036061842Z
 ---
 
 ## Context

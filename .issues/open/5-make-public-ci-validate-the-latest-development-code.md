@@ -1,10 +1,11 @@
 ---
 title: Make public CI validate the latest development code
 labels:
+    - codex-created
     - enhancement
 state: open
 state_reason: null
-synced_at: 2026-09-29T18:24:13.224348247Z
+synced_at: 2026-09-29T18:28:48.181853044Z
 ---
 
 ## Context

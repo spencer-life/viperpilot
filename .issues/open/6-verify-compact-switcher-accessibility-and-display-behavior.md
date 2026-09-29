@@ -2,10 +2,11 @@
 title: Verify compact switcher accessibility and display behavior
 labels:
     - accessibility
+    - codex-created
     - release-gate
 state: open
 state_reason: null
-synced_at: 2026-09-29T18:22:42.119811715Z
+synced_at: 2026-09-29T18:28:49.047907042Z
 ---
 
 ## Context
