@@ -29,7 +29,7 @@ only the local draft store. Renaming uses the name field and Save. Unsaved edits
 require Save or Discard before switching or closing.
 
 Drafts use the existing versioned `profile-drafts-v1.json` under
-`%LOCALAPPDATA%/ViperV4Utility`. Corrupt, invalid or future-format files show an
+`%LOCALAPPDATA%/ViperPilotDevelopment`. Corrupt, invalid or future-format files show an
 error and are preserved. Drafts are separate from recovery presets, aliases,
 configuration, diagnostics and immutable baselines. No draft action plans or
 sends a device write. Unsupported fields are explicitly unsavable. For isolated

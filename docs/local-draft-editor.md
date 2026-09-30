@@ -29,7 +29,7 @@ raw device assignments.
 
 ## Persistence and recovery
 
-The editor uses `%LOCALAPPDATA%/ViperV4Utility/profile-drafts-v1.json`, separate
+The editor uses `%LOCALAPPDATA%/ViperPilotDevelopment/profile-drafts-v1.json`, separate
 from `profiles-v1.json`, configuration, diagnostics, reports and immutable
 baselines. It never reads or changes built-in recovery presets. A missing file
 opens an empty library without writing. Corrupt, invalid or newer-schema files

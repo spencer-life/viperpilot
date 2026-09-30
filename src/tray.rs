@@ -586,6 +586,7 @@ impl Drop for TrayApp {
 /// instance already holds the mutex, this signals its window to show itself
 /// and exits successfully instead of starting a second instance.
 pub fn run(show_window_at_start: bool) -> Result<(), String> {
+    gui_logic::require_isolated_tray_launch().map_err(str::to_owned)?;
     let _ = unsafe { SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) };
     let show_message = unsafe { RegisterWindowMessageW(SHOW_MESSAGE_NAME) };
     let instance_mutex = match create_single_instance_mutex()? {

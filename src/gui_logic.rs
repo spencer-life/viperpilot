@@ -12,6 +12,19 @@ use crate::model::{
     WirelessPowerSettings,
 };
 
+/// Keep the development production tray from affecting the daily-use app.
+///
+/// # Errors
+/// Always rejects until separate process/startup/hotkey identities and the
+/// owner-supervised production validation are implemented and reviewed.
+pub fn require_isolated_tray_launch() -> Result<(), &'static str> {
+    // 2026-09-29: storage isolation alone cannot protect legacy registry Run
+    // values, window/mutex identities, global hotkeys or the physical device.
+    Err(
+        "Development tray launch is disabled to preserve your current app. Use offline previews; see docs/development-isolation.md.",
+    )
+}
+
 /// What the serialized device worker is currently doing.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BusyKind {
@@ -472,6 +485,11 @@ pub fn clock_label(hour: u16, minute: u16, second: u16) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn development_production_tray_launch_is_blocked() {
+        assert!(require_isolated_tray_launch().is_err());
+    }
 
     fn idle_state() -> GuiState {
         GuiState {

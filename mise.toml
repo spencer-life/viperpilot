@@ -37,10 +37,10 @@ run = [{ task = "fmt-check" }, { task = "lint" }, { task = "test" }]
 description = "Build native Windows release binaries through cargo-xwin."
 run = "mise exec -- cargo xwin build --target x86_64-pc-windows-msvc --release --locked"
 
+# 2026-09-29: block the legacy replacement installer while the owner uses it.
 [tasks.install-windows]
-description = "Build, install both Windows binaries, and launch the tray."
-depends = ["build-windows"]
-run = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w scripts/install.ps1)"'
+description = "Disabled: preserve the current installed app; build separately."
+run = "echo 'Development installation is disabled; see docs/development-isolation.md.' >&2; exit 1"
 
 # 2026-09-28: hardware-free native CI complements the existing WSL cross-build.
 # This never installs/starts the app, enumerates HID devices, or changes startup.
