@@ -8,7 +8,7 @@ projects:
     - ViperPilot dashboard
 state: open
 state_reason: ""
-synced_at: 2026-09-30T09:22:48.801631224Z
+synced_at: 2026-09-30T09:34:11.152172083Z
 info:
     author: spencer-life
     created_at: 2026-09-29T18:22:45Z
@@ -64,3 +64,13 @@ at normal/minimum sizes, including an invalid draft and a populated library,
 were inspected. Strict preview checks and Windows cross-lint/build passed.
 The newly styled Windows binary still requires owner visual/focus validation;
 compact/detailed view alignment remains a separate check.
+
+### Styled Windows paste/Unicode round trip — 2026-09-30
+
+The owner pasted `Test – 日本語 – café`, saved and closed the styled isolated
+editor. Reopening the same hash-checked executable and temporary library
+preserved that exact Unicode sequence in both the saved JSON and actual UIA
+Profile name/Edit value. DPI X/Y remained 1200/1200 and Apply remained disabled.
+This validates the requested paste/name persistence case, not IME composition or
+screen-reader speech. The owner also confirmed visible keyboard focus on this
+styled build. Narrow-window/other-scale and reader/IME checks remain open.
