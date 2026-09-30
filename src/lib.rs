@@ -4,6 +4,8 @@
 //! compiled only for the Windows target so packet and safety behavior can be
 //! tested in WSL without access to the mouse.
 
+#[cfg(feature = "egui-preview")]
+pub mod draft_editor;
 pub mod engine;
 pub mod gui_logic;
 pub mod model;
