@@ -6,7 +6,7 @@ Updated 2026-09-30. This brief is the starting point for a new coding session.
 
 - Public development repository: https://github.com/spencer-life/viperpilot
 - Catalog PR: https://github.com/spencer-life/viperpilot/pull/3; the focused implementation stack is listed below.
-- Choose the owning branch from the table below; the current integration top is `codex/development-check-tasks` (tooling); UI/accessibility source remains on `codex/native-button-accessibility`. Fetch and reconcile the latest remote head before editing. The historical software checkpoint is `7cb0440a8b21f54154c1042757c810f3b9552c24`. Issue #12 adds a later local editor implementation; use the validation record below and reconcile the latest head rather than treating historical checks as validation of new code.
+- Choose the owning branch from the table below; the current integration top is `codex/manual-validation-handoff` (documentation); UI/accessibility source remains on `codex/native-button-accessibility`. Fetch and reconcile the latest remote head before editing. The historical software checkpoint is `7cb0440a8b21f54154c1042757c810f3b9552c24`. Issue #12 adds a later local editor implementation; use the validation record below and reconcile the latest head rather than treating historical checks as validation of new code.
 - PR #3 now targets `codex/profile-capabilities` (PR #16). The stack ultimately targets `main` through the original foundation PR #1.
 - This is in-progress development. Keep PR #3 in draft until its documented gates pass. Do not merge, release, install the tray, enable startup, or reapply the historical ZIP as part of resuming work.
 
@@ -33,6 +33,7 @@ release or hardware operation occurred. PR #3 and all new implementation PRs rem
 | 9 | [UI readiness](https://github.com/spencer-life/viperpilot/tree/codex/ui-readiness) | `codex/ui-readiness` | Fail-closed generic worker errors, accessible editor controls and manual handoff |
 | 10 | [#23](https://github.com/spencer-life/viperpilot/pull/23) | `codex/native-button-accessibility` | Standard Windows buttons, semantic hotspot names and strict manual UIA checks |
 | 11 | [Development checks](https://github.com/spencer-life/viperpilot/tree/codex/development-check-tasks) | `codex/development-check-tasks` | Linux core/editor aggregate and sequential Windows cross-lint/build tasks |
+| 12 | [Manual handoff](https://github.com/spencer-life/viperpilot/tree/codex/manual-validation-handoff) | `codex/manual-validation-handoff` | Audited preview/tray test boundaries, current hosted checks and Cloud access diagnostic handoff |
 
 Official [stack #17](https://github.com/spencer-life/viperpilot/pull/3) is
 registered on GitHub. The first sanitized import is still broad; its original

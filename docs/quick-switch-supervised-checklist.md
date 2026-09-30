@@ -28,20 +28,40 @@ app's binaries, config, library, startup, process and mouse state.
   privately. Stop for missing or ambiguous identity, baseline or raw state.
   A serial suffix is only the final command guard; a GET or plan is not write proof.
 
-## UI-only checks before a device write
+## Isolated preview/editor checks first
 
-- [ ] Observe the tray menu and status window. The two selected quick-switch names should be directly visible in the tray; Developer/Gaming recovery choices remain available. Labels must distinguish local aliases from onboard slots.
-- [ ] Open the 900×520 compact switcher and Details view. Check the mouse silhouette, actual connection/profile/DPI/polling readbacks, error text, six read-only hotspots, focus order, and visibility at the Windows display scale in use. A screenshot, Figma planning file, or build alone cannot establish legibility.
-- [ ] Reverse the saved quick-switch pair without applying either preset. Check the two compact button labels, their Windows accessible names, and active highlight all follow the saved names and source presets rather than button position. When the library is unavailable, both compact buttons must be disabled and announced as unavailable; Details must still identify its built-in recovery actions.
-- [ ] Exercise pair selection using only an isolated preview/development fixture root, with `tests/fixtures/profiles/work.json` where supported. Never stage fixtures in the legacy data folder. The fixture names the Developer preset; it is not a new onboard profile.
-- [ ] Change the local quick-switch pair and reload the library. Confirm neither action applies a mouse profile. Check that an incompatible pair is unavailable or rejected clearly. Restore the original library bytes, or remove the test file if none existed before.
-- [ ] Check an unavailable, corrupt, or externally changed library fails closed and offers a recovery path without silently replacing the file. Preserve the original bytes for restoration.
-- [ ] Check disconnected/unknown device state shows no verified profile and does not write. A hotkey request in that state must fail closed. Restore normal connection before any write test.
-- [ ] Confirm normal close/hide, tray Exit, second-launch behavior, menu readability, keyboard access, and no idle polling. Record the method and sample interval for idle CPU and memory.
+2026-09-30 audit correction: previews expose synthetic window state and local
+draft editing, not a production tray, global hotkey or live mouse readbacks.
+Run these checks only with the owner present; leave every result unchecked until
+observed. Do not use a preview result as production evidence.
 
-## Observed complete-profile regression
+- [ ] Run the isolated native preview scenarios (`mise run test-ui-preview-windows`) and editor smoke test (`mise run test-egui-preview-windows`). Review scripts and exact binary hashes first. Record UIA Button/Invoke/names/states, including reversed-pair and unavailable-library scenarios. These scripts launch only development previews.
+- [ ] Open the preview's 900×520 compact switcher and Details view. Check the mouse silhouette, synthetic connection/profile/DPI/polling values, error text, six read-only hotspots, focus order, narrow windows and Windows scaling. A screenshot or build alone cannot establish legibility.
+- [ ] Check reversed-pair synthetic labels and Windows accessible names follow saved-name/source-preset semantics. Verify unavailable compact actions are disabled and Details identifies built-in recovery actions. Standard buttons no longer use the historical custom-colored active painting; assess the visible profile status separately.
+- [ ] In the isolated editor, create/edit/rename/duplicate/delete a draft and Save/reopen it using a temporary draft root. Check keyboard-only focus, paste, IME/non-Latin names, screen reader, monitor vs capture and scale. Confirm custom Apply stays disabled.
+- [ ] In a temporary editor store, exercise corrupt/externally changed draft-library conflict and recovery paths without replacing original bytes silently. Preserve failed inputs and recovery evidence privately.
+- [ ] Confirm each preview/editor closes cleanly. Preview resource measurements describe only that executable; record the method and sample interval and do not report them as tray performance.
 
-This section uses only the already measured complete Developer/Gaming presets through the new tray/hotkey route. Any **new** field or action needs its own one-logical-field experiment, independent readback, and restoration to the recorded baseline before another field is tested.
+## Future production tray checks before a device write
+
+Only after the separately reviewed launch/hotkey/coexistence arrangement and a
+deliberate change to the production launch gate. The currently blocked tray
+cannot satisfy this section. UI-only here means no setter, not no device access:
+production refresh can read the mouse. Do not infer authorization from this plan.
+
+- [ ] Observe the tray menu and live status window. Both selected quick-switch names should be directly visible; Developer/Gaming recovery choices remain available. Labels must distinguish local aliases from onboard slots.
+- [ ] Exercise pair selection using only an isolated development fixture root, with `tests/fixtures/profiles/work.json` where supported. Never stage fixtures in legacy data. Change the pair/reload the library and confirm neither action applies a profile; reject incompatible pairs clearly. Restore original development library bytes afterward.
+- [ ] Check unavailable/corrupt/externally changed production alias libraries fail closed without silent replacement. Do not confuse this V1 alias library with the local draft store tested above.
+- [ ] Check disconnected/unknown device state shows no verified profile; profile actions and hotkey requests must fail closed. Coordinate disconnects with the owner and restore normal connection before any write test.
+- [ ] Confirm close/hide, tray Exit, second-launch behavior, menu readability, keyboard access and no idle polling. Record tray-only idle CPU/memory separately from preview/editor measurements.
+
+## Planned complete-profile regression
+
+The complete Developer/Gaming preset definitions have historical measurements;
+the new tray/hotkey route has not passed this checklist. This section plans its
+future supervised regression and is not recorded evidence. Any **new** field or
+action needs its own one-logical-field experiment, independent readback, and
+restoration to the recorded baseline before another field is tested.
 
 - [ ] With the owner present and the reviewed baseline and exact plan in hand, apply one complete preset through a top-level tray action. Independently reread the device with the separate CLI, compare every relevant field to the expected complete preset, and save the report. An app notification alone is not proof.
 - [ ] Repeat with the other preset and with `Ctrl+Alt+P` in both directions. Check repeated hotkey input does not queue duplicate writes. Record observed click count, elapsed time, Synapse state, and any device commit delay separately from UI time.
