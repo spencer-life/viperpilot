@@ -4,13 +4,15 @@ labels:
     - codex-created
     - enhancement
     - release-gate
+projects:
+    - ViperPilot dashboard
 state: open
-state_reason: ""
-synced_at: 2026-09-30T03:20:27.046207446Z
+state_reason: null
+synced_at: 2026-09-30T06:26:06.42575626Z
 info:
     author: spencer-life
     created_at: 2026-09-29T18:22:47Z
-    updated_at: 2026-09-29T21:45:08Z
+    updated_at: 2026-09-30T03:20:26Z
 ---
 
 ## Context

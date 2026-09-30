@@ -5,12 +5,61 @@ Updated 2026-09-29. This brief is the starting point for a new coding session.
 ## Project and source
 
 - Public development repository: https://github.com/spencer-life/viperpilot
-- Current implementation PR: https://github.com/spencer-life/viperpilot/pull/3
+- Current top/catalog PR: https://github.com/spencer-life/viperpilot/pull/3; the focused implementation stack is listed below.
 - Starting branch: `codex/sanitized-quick-switch`; fetch and reconcile the latest remote head before editing. The historical software checkpoint is `7cb0440a8b21f54154c1042757c810f3b9552c24`. Issue #12 adds a later local editor implementation; use the validation record below and reconcile the latest head rather than treating historical checks as validation of new code.
-- PR #3 is stacked on the foundation branch `feat/quick-switch-profiles`: https://github.com/spencer-life/viperpilot/pull/1
+- PR #3 now targets `codex/profile-capabilities` (PR #16). The stack ultimately targets `main` through the original foundation PR #1.
 - This is in-progress development. Keep PR #3 in draft until its documented gates pass. Do not merge, release, install the tray, enable startup, or reapply the historical ZIP as part of resuming work.
 
 GitHub is the implementation source. A preserved original checkout or installed fixed-profile executable may be older. Verify the repository URL and branch before coding; do not assume a similarly named local folder is the current app source. The public repository is the primary development tracker; explicit issue mirrors do not make private/public repositories automatically synchronized.
+
+## Focused review stack — 2026-09-29
+
+The owner requested smaller PRs. Existing feature checkpoints were published as
+prefix branches and linked with GitHub's official `gh-stack` extension. The
+split preserves all existing commits and the runtime source tree; only branch
+boundaries, PR bases, descriptions and this handoff were reorganized. No merge,
+release or hardware operation occurred. PR #3 and all three new PRs remain draft.
+
+| Order | PR | Branch | Scope / split checkpoint |
+| --- | --- | --- | --- |
+| 1 | [#1](https://github.com/spencer-life/viperpilot/pull/1) | `feat/quick-switch-profiles` | Existing saved-profile foundations; `a299997` |
+| 2 | [#14](https://github.com/spencer-life/viperpilot/pull/14) | `codex/guarded-switch-foundation` | Sanitized guarded native switching, preview/model foundations and tracking docs; `462636f` |
+| 3 | [#15](https://github.com/spencer-life/viperpilot/pull/15) | `codex/local-profile-drafts` | Persisted editable draft CRUD, issue #12; `6406e17` |
+| 4 | [#16](https://github.com/spencer-life/viperpilot/pull/16) | `codex/profile-capabilities` | Read-only capability contract/evidence, issue #4, plus shared Core check-name alignment; `aa17779` |
+| 5 | [#3](https://github.com/spencer-life/viperpilot/pull/3) | `codex/sanitized-quick-switch` | Offline catalog preview/export, issue #13 software slice, and continuation/gate documentation; runtime checkpoint `4ed29f1` |
+
+Official [stack #17](https://github.com/spencer-life/viperpilot/pull/3) is
+registered on GitHub. The first sanitized import is still broad; its original
+single sync commit is preserved rather than claiming every layer is small.
+Editor, capability and catalog reviewers now see only their own layer's diff.
+Renovate PR #2 is independent and is not part of this feature stack.
+
+Use the layer table to choose the owning branch before editing. A new independent
+concern should start a separate PR; a dependent concern should become a new layer.
+Keep the immutable baseline and existing Apply, tray-release and manual validation
+gates. Review/delivery can progress by layer; closing an issue still requires its
+actual acceptance criteria, including owner-observed evidence where specified.
+
+The extension and official agent skill are pinned to `v0.1.1` on the current
+machine. A fresh environment can install them with:
+
+```sh
+gh extension install github/gh-stack --pin v0.1.1
+gh skill install github/gh-stack --agent codex --scope user --pin v0.1.1
+```
+
+[Official skill and command guidance](https://github.com/github/gh-stack/tree/v0.1.1/skills/gh-stack)
+describe safe non-interactive flags. The current registration used
+`gh stack link` with existing PR URLs, without local stack tracking, rebasing,
+force pushes or marking drafts ready. Local navigation requires a clean checkout
+and adoption with `gh stack checkout` first. Do not run stack merge during
+continuation. Rollback of this metadata-only split is to dissolve the stack,
+restore PR #3's original base `feat/quick-switch-profiles` and its saved description,
+and close the added PRs; retain branch commits until cleanup is authorized.
+
+Hosted results below remain checkpoint-specific. Newly created PRs and the
+changed PR #3 base have their own checks; do not inherit a green status solely
+because a head commit or runtime source was previously tested.
 
 ## What the owner wants
 

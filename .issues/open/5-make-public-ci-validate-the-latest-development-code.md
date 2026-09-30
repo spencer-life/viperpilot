@@ -3,13 +3,15 @@ title: Make public CI validate the latest development code
 labels:
     - codex-created
     - enhancement
+projects:
+    - ViperPilot dashboard
 state: open
-state_reason: ""
-synced_at: 2026-09-30T03:20:21.107116521Z
+state_reason: null
+synced_at: 2026-09-30T06:30:19.763636374Z
 info:
     author: spencer-life
     created_at: 2026-09-29T18:22:39Z
-    updated_at: 2026-09-29T21:45:06Z
+    updated_at: 2026-09-30T03:20:20Z
 ---
 
 ## Context
@@ -40,3 +42,9 @@ Hosted Linux/Windows Core checks passed at `1db3cc7` ([run](https://github.com/s
 Core job names are aligned with foundation PR #1: `ci (ubuntu-24.04)` and `ci (windows-2025)`, so a main-only requirement can serve both stacked PRs. Workflow triggers, native host/local tasks, checkout behavior, stable contexts and staged merge order are recorded in [CI and merge gates](https://github.com/spencer-life/viperpilot/blob/codex/sanitized-quick-switch/docs/ci-and-merge-gates.md). Security must be added as a requirement after #1 merges and before #3 is merged; #1's historical head does not emit it. No merge queue or merge is enabled.
 
 A minimal two-Core-check ruleset was prepared and independently reviewed, with requirements bound to the observed GitHub Actions integration, no bypass actors, and a captured empty-rule rollback baseline. Automatic approval review rejected activating it because explicit authorization is required for the persistent settings change and its ability to block main updates. No repository settings changed; authorization is pending. This issue remains open.
+
+## Focused PR ownership — 2026-09-29
+
+The official review stack is PR #1 → #14 → #15 → #16 → #3. The shared Core check-name alignment is in #16; enforcement still follows the staged policy and requires explicit settings authorization. Existing commits and runtime behavior were preserved when the owner requested smaller PRs. PR #3 and the new PRs remain draft; issues stay open until their delivery and validation criteria pass. No merge, release or mouse operation occurred. Earlier references to the combined PR #3 describe historical checkpoints.
+
+The split exposes a check-name mismatch: preserved #14/#15 heads emit `Core CI (...)`, while #1/#16/#3 emit `ci (...)`. The earlier two-PR ruleset proposal must be revised or contexts normalized and validated before activation across the official stack. Do not enable known-missing checks. Updated policy: [CI and merge gates](https://github.com/spencer-life/viperpilot/blob/codex/sanitized-quick-switch/docs/ci-and-merge-gates.md).

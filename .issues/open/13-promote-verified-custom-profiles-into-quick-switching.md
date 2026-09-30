@@ -3,13 +3,15 @@ title: Promote verified custom profiles into quick switching
 labels:
     - codex-created
     - enhancement
+projects:
+    - ViperPilot dashboard
 state: open
-state_reason: ""
-synced_at: 2026-09-30T03:20:14.758965643Z
+state_reason: null
+synced_at: 2026-09-30T06:28:40.670277323Z
 info:
     author: spencer-life
     created_at: 2026-09-29T18:22:56Z
-    updated_at: 2026-09-29T21:45:05Z
+    updated_at: 2026-09-30T03:20:13Z
 ---
 
 ## Context
@@ -41,3 +43,7 @@ Implemented the reversible software portion in draft PR #3: a separate strict V1
 Software source `26da843`, with Windows-only import correction `b034547`: core CI passed 122 library + 2 CLI + 3 capability + 6 catalog integration tests, strict Clippy/formatting/native build/help; feature CI passed 128 library + 2 CLI + 9 editor + 3 capability + 6 catalog integration tests. Sequential production/editor Windows MSVC release cross-builds passed after that correction. Independent implementation review found no material findings. Integration cases cover actual CLI subprocesses, protected built-ins, draft-pair rejection, nested unknown fields, unchanged source/config/baseline bytes, existing-output preservation and concurrent exactly-one-winner export. Default dependencies exclude egui/eframe.
 
 All custom preflights still reject; no WritePlan/setter, device encoder, Apply or custom quick-switch integration was added. Supplied snapshots do not prove fresh GET, immutable baseline or full identity review. No manual Windows, startup or mouse operation ran. Keep PR #3 draft and this issue open: actual promotion remains blocked pending complete-profile, readback, recovery, process-exit and power-cycle evidence.
+
+## Focused PR ownership — 2026-09-29
+
+Offline catalog preview/export remains in [PR #3](https://github.com/spencer-life/viperpilot/pull/3), now based on capability checks [PR #16](https://github.com/spencer-life/viperpilot/pull/16). Existing commits and runtime behavior were preserved when the owner requested smaller PRs. PR #3 and the new PRs remain draft; issues stay open until their delivery and validation criteria pass. No merge, release or mouse operation occurred. Earlier references to the combined PR #3 describe historical checkpoints.

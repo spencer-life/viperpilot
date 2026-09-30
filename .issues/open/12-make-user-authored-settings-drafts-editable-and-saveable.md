@@ -3,13 +3,15 @@ title: Make user-authored settings drafts editable and saveable
 labels:
     - codex-created
     - enhancement
+projects:
+    - ViperPilot dashboard
 state: open
-state_reason: ""
-synced_at: 2026-09-30T00:06:58.441749214Z
+state_reason: null
+synced_at: 2026-09-30T06:28:40.111447291Z
 info:
     author: spencer-life
     created_at: 2026-09-29T18:22:54Z
-    updated_at: 2026-09-29T21:45:05Z
+    updated_at: 2026-09-30T00:06:57Z
 ---
 
 ## Context
@@ -35,3 +37,7 @@ Software implemented in the same draft PR #3: local create, edit/rename, duplica
 Validation and review results are recorded in [the local editor document](https://github.com/spencer-life/viperpilot/blob/codex/sanitized-quick-switch/docs/local-draft-editor.md) and [the continuation brief](https://github.com/spencer-life/viperpilot/blob/codex/sanitized-quick-switch/docs/continue-here.md). This issue remains open while the implementation PR is draft. The next software slice is capability contract #4, followed by hardware-gated promotion #13. No manual Windows UI, production tray/hotkey, installation/startup or physical-device tests were run; the owner remains away from the PC.
 
 Software checkpoint `6792c6f`: `mise run ci` passed 108 core tests and lint/build/smoke; `mise run ci-preview` passed strict Clippy, 114 library tests and seven editor tests. Production and editor Windows cross-builds passed without launching. Independent review found no remaining material findings. These are local software results; hosted CI for the new head must be checked separately.
+
+## Focused PR ownership — 2026-09-29
+
+Editable persisted drafts are now isolated in [PR #15](https://github.com/spencer-life/viperpilot/pull/15), based on guarded switching [PR #14](https://github.com/spencer-life/viperpilot/pull/14). Existing commits and runtime behavior were preserved when the owner requested smaller PRs. PR #3 and the new PRs remain draft; issues stay open until their delivery and validation criteria pass. No merge, release or mouse operation occurred. Earlier references to the combined PR #3 describe historical checkpoints.
