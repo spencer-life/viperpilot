@@ -360,7 +360,8 @@ try {
     [void](Assert-Button -ControlId 2001 -ExpectedName 'Apply Developer recovery preset' -ExpectedEnabled $true)
     [void](Assert-Button -ControlId 2002 -ExpectedName 'Apply Gaming recovery preset' -ExpectedEnabled $true)
     [void](Assert-Button -ControlId 2003 -ExpectedName 'Quick switch' -ExpectedEnabled $true)
-    $hotspotNames = @('Left click', 'Right click', 'Middle click', 'Rear side · Mouse 4', 'Front side · Mouse 5', 'DPI button')
+    # 2026-09-30: ASCII source also works in Windows PowerShell 5.1 without a UTF-8 BOM.
+    $hotspotNames = @('Left click', 'Right click', 'Middle click', ('Rear side {0} Mouse 4' -f [char]0x00b7), ('Front side {0} Mouse 5' -f [char]0x00b7), 'DPI button')
     for ($hotspot = 1; $hotspot -le 6; $hotspot++) {
         [void](Assert-Button -ControlId (2100 + $hotspot) -ExpectedName $hotspotNames[$hotspot - 1] -ExpectedEnabled $true)
     }
