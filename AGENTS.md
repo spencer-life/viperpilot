@@ -69,6 +69,29 @@ adopted, and its embedded Rust library was not compiled or benchmarked.
 that a capability is supported. Update the roadmap and its validation gates as
 measured support changes.
 
+## Small PRs and stacked work
+
+2026-09-29: the owner requested focused PRs so each feature can be reviewed and
+fixed independently. Use GitHub's official `gh-stack` skill and `github/gh-stack`
+CLI extension when creating or changing dependent PR layers. Read the skill before
+stack operations; if it is unavailable locally, consult the
+[official skill](https://github.com/github/gh-stack/blob/v0.1.1/skills/gh-stack/SKILL.md).
+
+- Keep one coherent concern per PR. Independent work gets a separate branch/PR;
+  dependent work gets a focused layer based on the preceding branch.
+- Reconcile current GitHub heads and stack membership before editing. Use the
+  ownership table in `docs/continue-here.md`, and make fixes on the layer that
+  owns them. Preserve upper-layer work when reconciling dependencies.
+- Use explicit non-interactive flags and the intended remote. For existing PRs
+  across worktrees, `gh stack link` with full PR URLs registers the chain without
+  rewriting commits; local navigation needs local stack tracking first.
+- Preserve draft states and existing write/merge authorization. Do not use
+  `--open` to mark drafts ready, force-push, or merge as an incidental stack step.
+  A stack merge can include every unmerged layer below its target.
+- Verify current integration checks after bases or heads change. Keep issue
+  ownership and the existing Project dashboard current. Small PRs do not relax
+  Apply, immutable-baseline, manual Windows/mouse or tray-release gates.
+
 ## Public issue tracking
 
 Track development work in the public issue tracker at
