@@ -6,7 +6,7 @@ Updated 2026-09-30. This brief is the starting point for a new coding session.
 
 - Public development repository: https://github.com/spencer-life/viperpilot
 - Catalog PR: https://github.com/spencer-life/viperpilot/pull/3; the focused implementation stack is listed below.
-- Choose the owning branch from the table below; the current reviewed UI/readiness work starts on `codex/native-button-accessibility`. Fetch and reconcile the latest remote head before editing. The historical software checkpoint is `7cb0440a8b21f54154c1042757c810f3b9552c24`. Issue #12 adds a later local editor implementation; use the validation record below and reconcile the latest head rather than treating historical checks as validation of new code.
+- Choose the owning branch from the table below; the current integration top is `codex/development-check-tasks` (tooling); UI/accessibility source remains on `codex/native-button-accessibility`. Fetch and reconcile the latest remote head before editing. The historical software checkpoint is `7cb0440a8b21f54154c1042757c810f3b9552c24`. Issue #12 adds a later local editor implementation; use the validation record below and reconcile the latest head rather than treating historical checks as validation of new code.
 - PR #3 now targets `codex/profile-capabilities` (PR #16). The stack ultimately targets `main` through the original foundation PR #1.
 - This is in-progress development. Keep PR #3 in draft until its documented gates pass. Do not merge, release, install the tray, enable startup, or reapply the historical ZIP as part of resuming work.
 
@@ -27,15 +27,12 @@ release or hardware operation occurred. PR #3 and all new implementation PRs rem
 | 3 | [#15](https://github.com/spencer-life/viperpilot/pull/15) | `codex/local-profile-drafts` | Persisted editable draft CRUD, issue #12; `6406e17` |
 | 4 | [#16](https://github.com/spencer-life/viperpilot/pull/16) | `codex/profile-capabilities` | Read-only capability contract/evidence, issue #4, plus shared Core check-name alignment; `aa17779` |
 | 5 | [#3](https://github.com/spencer-life/viperpilot/pull/3) | `codex/sanitized-quick-switch` | Offline catalog preview/export, issue #13 software slice, and continuation/gate documentation; runtime checkpoint `4ed29f1` |
-
 | 6 | [#18](https://github.com/spencer-life/viperpilot/pull/18) | `codex/development-isolation` | Separate default data and block installer/tray effects before touching the legacy app; `25ab4fb` |
-
 | 7 | [Current-state verification](https://github.com/spencer-life/viperpilot/tree/codex/current-state-verification) | `codex/current-state-verification` | Fresh final-read reporting and unavailable/wrong-device UI after failed verification; separate draft safety follow-up |
-
 | 8 | [#21](https://github.com/spencer-life/viperpilot/pull/21) | `codex/development-identities` | Separate Windows identities and corrected isolated manual checklist; `e84f21e` |
 | 9 | [UI readiness](https://github.com/spencer-life/viperpilot/tree/codex/ui-readiness) | `codex/ui-readiness` | Fail-closed generic worker errors, accessible editor controls and manual handoff |
-
-| 10 | [Native accessibility](https://github.com/spencer-life/viperpilot/tree/codex/native-button-accessibility) | `codex/native-button-accessibility` | Standard Windows buttons, semantic hotspot names and strict manual UIA checks |
+| 10 | [#23](https://github.com/spencer-life/viperpilot/pull/23) | `codex/native-button-accessibility` | Standard Windows buttons, semantic hotspot names and strict manual UIA checks |
+| 11 | [Development checks](https://github.com/spencer-life/viperpilot/tree/codex/development-check-tasks) | `codex/development-check-tasks` | Linux core/editor aggregate and sequential Windows cross-lint/build tasks |
 
 Official [stack #17](https://github.com/spencer-life/viperpilot/pull/3) is
 registered on GitHub. The first sanitized import is still broad; its original
@@ -209,12 +206,20 @@ and field experiments #10/#11 retain their original manual gates.
 Use the existing task entrypoints after inspecting their definitions in `mise.toml`:
 
 ```sh
-mise run ci
-mise run ci-preview
+mise run verify-linux
+mise run verify-windows-cross
 mise tasks validate
 ```
 
-On this local environment, `--skip-tools` plus disabled auto-install was used for isolated hardware-free measurements; it does not change the tasks' commands. Windows cross-build tasks are available but do not validate Windows interaction. `install-windows`, interactive preview tasks and device commands have side effects; do not include them in an unattended check run.
+See [development commands](tooling-decision.md#development-commands) for formatting,
+quick checks, Windows host checks and security scanning. The 2026-09-30 aggregates
+reuse existing tasks sequentially and keep GUI/install/device actions separate.
+On this local environment, `--skip-tools` plus disabled auto-install was used for
+isolated hardware-free measurements; it does not change the tasks' commands.
+Nested `mise exec` also needs `MISE_EXEC_AUTO_INSTALL=false` when tools are already
+prepared. Cross-build tasks do not validate Windows interaction. `install-windows`,
+interactive preview tasks and device commands have side effects; do not include
+them in an unattended check run.
 
 At checkpoint `7cb0440`, fresh Linux checks passed 108 core and three egui tests plus formatting, lint and native build. Hosted checks passed:
 
