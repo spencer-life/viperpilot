@@ -86,8 +86,17 @@ processes were closed; fixture data and the owner's Windows session were preserv
 
 Final Windows editor SHA-256:
 `810f93162f06978630671fd92fab1ef862e31adca111444a49ae5a0c62aeefcc`.
-This executable has been built, not launched on Windows in this styling slice.
-The owner-present focus/persistence observations above belong to the prior binary.
-Windows visual/focus/scaling checks on this new binary remain open. This improves
+After the owner closed the prior preview, this hash-checked executable launched
+from a new temporary staging folder using the preserved temporary draft library.
+Actual Windows UIA confirmed `Manual Test`, DPI X/Y `1200 DPI`/`1200 DPI`,
+enabled Save draft and disabled Apply. The first read occurred before the main
+window was ready; a fresh owned-process read established these values.
+The first screen capture was occluded by Codex and does not prove appearance.
+The owner-present focus observations above belong to the prior binary. After the owner brought the new preview to the foreground, a private actual
+Windows capture at 2576×1408 showed the palette, consistent card widths, all
+profile/action controls and bottom Save/disabled Apply rendering legibly without
+overlap. The bounded form leaves substantial empty space when maximized; this is
+not pixel parity with the compact raster concept. New-build keyboard focus and
+other display scales remain unobserved. This improves
 the reference palette, type size and control layout; it does not claim pixel
 parity with the raster concepts or completion of compact/detailed view alignment.
