@@ -12,7 +12,7 @@
 //! not proof of a change from another DPI. Per-field evidence does not prove an
 //! arbitrary combination of fields is safe as one profile.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 pub const PROFILE_INTENT_SCHEMA_VERSION: u32 = 1;
 const MAX_PROFILE_NAME_CHARS: usize = 64;
@@ -64,33 +64,30 @@ impl ProfileIntentV1 {
     /// returned fields do not establish that their combination is safe to apply.
     pub fn assess_fields(&self, target: CapabilityTarget) -> Result<FieldAssessments, String> {
         self.validate()?;
-        if target == CapabilityTarget::MEASURED_WIRELESS_VIPER_V4_PRO_FW_1_4_MI_03 {
-            Ok(FieldAssessments {
-                target,
-                name: FieldCapability::LocalOnly,
-                dpi: if self.dpi == (DpiTarget { x: 1600, y: 1600 }) {
-                    FieldCapability::ObservedValueOnly
-                } else {
-                    FieldCapability::ResearchRequired
-                },
-                polling: if matches!(self.polling_hz, 1000 | 4000) {
-                    FieldCapability::MeasuredTransition
-                } else {
-                    FieldCapability::ResearchRequired
-                },
-                mouse4: assess_action(&self.mouse4, MeasuredButton::Mouse4),
-                mouse5: assess_action(&self.mouse5, MeasuredButton::Mouse5),
-            })
-        } else {
-            Ok(FieldAssessments {
+        let Some(transport) = crate::model::TransportKind::for_product_id(target.product_id).ok()
+        else {
+            return Ok(FieldAssessments {
                 target,
                 name: FieldCapability::LocalOnly,
                 dpi: FieldCapability::ResearchRequired,
                 polling: FieldCapability::ResearchRequired,
                 mouse4: FieldCapability::ResearchRequired,
                 mouse5: FieldCapability::ResearchRequired,
-            })
-        }
+            });
+        };
+        Ok(crate::capability::classify_intent(
+            self,
+            Some(crate::capability::CapabilityScope {
+                vendor_id: target.vendor_id,
+                product_id: target.product_id,
+                firmware_major: target.firmware_major,
+                firmware_minor: target.firmware_minor,
+                transport,
+                interface_number: target.interface_number,
+                usage_page: target.usage_page,
+                usage: target.usage,
+            }),
+        ))
     }
 }
 
@@ -102,7 +99,7 @@ pub struct DpiTarget {
 }
 
 /// Semantic actions a user can express without storing or accepting raw HID bytes.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ButtonActionIntent {
     /// Keep the button's native mouse-button behavior.
@@ -119,6 +116,59 @@ pub enum ButtonActionIntent {
     Unassigned,
     /// Preserve an idea this schema cannot model yet; always research-only.
     Unmodeled { description: String },
+}
+
+// Serde's internally tagged unit-variant visitor ignores extra map entries,
+// even when `deny_unknown_fields` is set on the enum. Decode unit cases through
+// strict empty structs so malformed/future action properties are rejected while
+// the public enum and serialized JSON shape remain unchanged.
+#[derive(Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+enum StrictButtonActionIntent {
+    PassThrough(StrictEmptyAction),
+    KeyboardShortcut {
+        control: bool,
+        alt: bool,
+        shift: bool,
+        windows: bool,
+        key: KeyboardKey,
+    },
+    Unassigned(StrictEmptyAction),
+    Unmodeled {
+        description: String,
+    },
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StrictEmptyAction {}
+
+impl<'de> Deserialize<'de> for ButtonActionIntent {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match StrictButtonActionIntent::deserialize(deserializer)? {
+            StrictButtonActionIntent::PassThrough(StrictEmptyAction {}) => Ok(Self::PassThrough),
+            StrictButtonActionIntent::KeyboardShortcut {
+                control,
+                alt,
+                shift,
+                windows,
+                key,
+            } => Ok(Self::KeyboardShortcut {
+                control,
+                alt,
+                shift,
+                windows,
+                key,
+            }),
+            StrictButtonActionIntent::Unassigned(StrictEmptyAction {}) => Ok(Self::Unassigned),
+            StrictButtonActionIntent::Unmodeled { description } => {
+                Ok(Self::Unmodeled { description })
+            }
+        }
+    }
 }
 
 /// Semantic key names allow a broad set of user choices without raw key bytes.
@@ -265,45 +315,6 @@ pub struct FieldAssessments {
     pub polling: FieldCapability,
     pub mouse4: FieldCapability,
     pub mouse5: FieldCapability,
-}
-
-#[derive(Clone, Copy)]
-enum MeasuredButton {
-    Mouse4,
-    Mouse5,
-}
-
-fn assess_action(action: &ButtonActionIntent, button: MeasuredButton) -> FieldCapability {
-    let measured = matches!(
-        (button, action),
-        (
-            MeasuredButton::Mouse4 | MeasuredButton::Mouse5,
-            ButtonActionIntent::PassThrough
-        ) | (
-            MeasuredButton::Mouse4,
-            ButtonActionIntent::KeyboardShortcut {
-                control: true,
-                alt: true,
-                shift: false,
-                windows: false,
-                key: KeyboardKey::F10,
-            }
-        ) | (
-            MeasuredButton::Mouse5,
-            ButtonActionIntent::KeyboardShortcut {
-                control: true,
-                alt: true,
-                shift: false,
-                windows: false,
-                key: KeyboardKey::F11,
-            }
-        )
-    );
-    if measured {
-        FieldCapability::MeasuredTransition
-    } else {
-        FieldCapability::ResearchRequired
-    }
 }
 
 fn validate_action(action: &ButtonActionIntent) -> Result<(), String> {
