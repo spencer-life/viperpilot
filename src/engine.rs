@@ -131,6 +131,7 @@ pub fn apply_write_plan<D: DeviceControl>(device: &mut D, plan: &WritePlan) -> V
     };
 
     if plan.is_noop() {
+        let observed_before_verification = report.values_observed.len();
         match verify_noop_state(device, plan, &mut report.values_observed) {
             Ok(snapshot) => {
                 report.final_state = Some(snapshot);
@@ -138,7 +139,12 @@ pub fn apply_write_plan<D: DeviceControl>(device: &mut D, plan: &WritePlan) -> V
             }
             Err(error) => {
                 report.mismatches.push(error);
-                report.final_state = report.values_observed.last().cloned();
+                // 2026-09-29: values_observed is an audit trail; preserve a
+                // mismatched fresh read, but never treat history as current state.
+                report.final_state = report
+                    .values_observed
+                    .get(observed_before_verification)
+                    .cloned();
             }
         }
         return report;
@@ -164,15 +170,16 @@ pub fn apply_write_plan<D: DeviceControl>(device: &mut D, plan: &WritePlan) -> V
                 }
                 report.writes_attempted.push(failure.attempt);
                 report.mismatches.push(failure.message);
-                report.rollback_result = Some(rollback(
+                let (rollback_result, final_state) = rollback(
                     device,
                     &attempted_operations,
                     &plan.before,
                     &mut report.values_observed,
                     failure.force_current_rollback,
                     failure.stop_transaction_writes,
-                ));
-                report.final_state = report.values_observed.last().cloned();
+                );
+                report.rollback_result = Some(rollback_result);
+                report.final_state = final_state;
                 return report;
             }
         }
@@ -205,15 +212,16 @@ pub fn apply_write_plan<D: DeviceControl>(device: &mut D, plan: &WritePlan) -> V
         }
     }
     if !report.success {
-        report.rollback_result = Some(rollback(
+        let (rollback_result, final_state) = rollback(
             device,
             &attempted_operations,
             &plan.before,
             &mut report.values_observed,
             false,
             stop_rollback_writes,
-        ));
-        report.final_state = report.values_observed.last().cloned();
+        );
+        report.rollback_result = Some(rollback_result);
+        report.final_state = final_state;
     }
     report
 }
@@ -535,7 +543,7 @@ fn rollback<D: DeviceControl>(
     observations: &mut Vec<DeviceSnapshotV1>,
     force_current_rollback: bool,
     stop_transaction_writes: bool,
-) -> RollbackResult {
+) -> (RollbackResult, Option<DeviceSnapshotV1>) {
     let mut result = RollbackResult {
         attempted_fields: Vec::new(),
         verified_fields: Vec::new(),
@@ -582,12 +590,12 @@ fn rollback<D: DeviceControl>(
             }
         }
     }
-    match device.read_snapshot() {
+    let final_state = match device.read_snapshot() {
         Ok(final_state) => {
             let identity_error = validate_identity(&final_state, original).err();
             let identity_matches = identity_error.is_none();
             let configuration_matches = equivalent_config(&final_state, original);
-            observations.push(final_state);
+            observations.push(final_state.clone());
             if let Some(error) = identity_error {
                 result.errors.push(error);
             } else if !configuration_matches {
@@ -597,12 +605,16 @@ fn rollback<D: DeviceControl>(
             }
             result.final_state_restored =
                 identity_matches && configuration_matches && result.errors.is_empty();
+            Some(final_state)
         }
-        Err(error) => result
-            .errors
-            .push(format!("rollback final verification read failed: {error}")),
-    }
-    result
+        Err(error) => {
+            result
+                .errors
+                .push(format!("rollback final verification read failed: {error}"));
+            None
+        }
+    };
+    (result, final_state)
 }
 
 fn read_validated<D: DeviceControl>(
@@ -681,6 +693,7 @@ mod tests {
         RejectThirdValue,
         ApplyThenChangeIdentity,
         Disconnect,
+        GetFail,
         UnverifiablePartial,
     }
 
@@ -695,6 +708,10 @@ mod tests {
         fn read_snapshot(&mut self) -> Result<DeviceSnapshotV1, String> {
             if self.disconnected {
                 return Err("device disconnected".to_owned());
+            }
+            if matches!(self.behaviors.front(), Some(Behavior::GetFail)) {
+                self.behaviors.pop_front();
+                return Err("mock GET failed".to_owned());
             }
             Ok(self.state.clone())
         }
@@ -747,10 +764,31 @@ mod tests {
                     self.disconnected = true;
                     Err(WriteFailure::ambiguous("device disconnected during write"))
                 }
+                Behavior::GetFail => panic!("GET failure behavior cannot be used as a write"),
                 Behavior::UnverifiablePartial => Err(WriteFailure::unverifiable_partial(
                     "second V2 polling report had an ambiguous result",
                 )),
             }
+        }
+    }
+
+    struct ScriptedReadFailures {
+        inner: MockDevice,
+        read_count: usize,
+        fail_at_reads: Vec<usize>,
+    }
+
+    impl DeviceControl for ScriptedReadFailures {
+        fn read_snapshot(&mut self) -> Result<DeviceSnapshotV1, String> {
+            self.read_count += 1;
+            if self.fail_at_reads.contains(&self.read_count) {
+                return Err("scripted GET failure".to_owned());
+            }
+            self.inner.read_snapshot()
+        }
+
+        fn write_operation(&mut self, operation: &WriteOperation) -> Result<(), WriteFailure> {
+            self.inner.write_operation(operation)
         }
     }
 
@@ -1192,6 +1230,92 @@ mod tests {
                 .iter()
                 .any(|message| message.contains("disconnected"))
         );
+        assert_eq!(report.final_state, None);
+    }
+
+    #[test]
+    fn failed_final_and_rollback_gets_do_not_promote_historical_write_readbacks() {
+        let before = base_snapshot();
+        let plan = plan_profile(&before, ProfileName::Developer).expect("valid plan");
+
+        // Count the normal transaction's reads so the script fails only the
+        // complete-target final verification GET and rollback's final GET.
+        let mut counting_device = ScriptedReadFailures {
+            inner: MockDevice {
+                state: before.clone(),
+                behaviors: VecDeque::new(),
+                writes: 0,
+                disconnected: false,
+            },
+            read_count: 0,
+            fail_at_reads: Vec::new(),
+        };
+        assert!(apply_write_plan(&mut counting_device, &plan).success);
+        let normal_read_count = counting_device.read_count;
+
+        let mut device = ScriptedReadFailures {
+            inner: MockDevice {
+                state: before,
+                behaviors: VecDeque::new(),
+                writes: 0,
+                disconnected: false,
+            },
+            read_count: 0,
+            fail_at_reads: vec![normal_read_count, normal_read_count + 1],
+        };
+        let report = apply_write_plan(&mut device, &plan);
+
+        assert!(!report.success);
+        assert_eq!(device.inner.writes, plan.ordered_operations.len());
+        assert_eq!(report.writes_attempted.len(), plan.ordered_operations.len());
+        assert!(
+            report
+                .writes_attempted
+                .iter()
+                .all(|attempt| attempt.verified)
+        );
+        assert!(
+            report
+                .values_observed
+                .iter()
+                .any(|snapshot| target_matches(snapshot, &plan))
+        );
+        assert_eq!(report.final_state, None);
+        assert_eq!(device.read_count, normal_read_count + 1);
+        assert!(
+            report
+                .rollback_result
+                .expect("rollback report")
+                .errors
+                .iter()
+                .any(|error| error.contains("rollback final verification read failed"))
+        );
+    }
+
+    #[test]
+    fn noop_get_failure_does_not_report_the_planning_snapshot_as_current() {
+        let before = base_snapshot();
+        let initial_plan = plan_profile(&before, ProfileName::Developer).expect("valid plan");
+        let mut target = before;
+        for operation in &initial_plan.ordered_operations {
+            mutate(&mut target, operation);
+        }
+        let plan = crate::planning::plan_profile(&target, ProfileName::Developer)
+            .expect("valid no-op plan");
+        assert!(plan.is_noop());
+        let mut device = MockDevice {
+            state: target.clone(),
+            behaviors: VecDeque::from([Behavior::GetFail]),
+            writes: 0,
+            disconnected: false,
+        };
+
+        let report = apply_write_plan(&mut device, &plan);
+
+        assert!(!report.success);
+        assert_eq!(device.writes, 0);
+        assert_eq!(report.values_observed, vec![target]);
+        assert_eq!(report.final_state, None);
     }
 
     #[test]

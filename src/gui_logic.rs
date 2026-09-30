@@ -38,8 +38,25 @@ pub enum BusyKind {
 pub enum ConnectionStatus {
     Connected,
     Disconnected,
+    /// The last device read failed, so current values cannot be shown safely.
+    Unavailable,
     /// A device answered, but identity was ambiguous or not the supported mouse.
     WrongDevice,
+}
+
+/// Derives the tray's trust in a failed apply's final device state.
+#[must_use]
+pub const fn failure_connection_status(
+    final_state_available: bool,
+    profile_classified: bool,
+) -> ConnectionStatus {
+    if !final_state_available {
+        ConnectionStatus::Unavailable
+    } else if profile_classified {
+        ConnectionStatus::Connected
+    } else {
+        ConnectionStatus::WrongDevice
+    }
 }
 
 /// Rendering hint for a status value; the Win32 layer maps these to colors.
@@ -328,6 +345,7 @@ pub fn present(state: &GuiState) -> StatusPresentation {
     let (connection_line, connection_tone) = match state.connection {
         ConnectionStatus::Connected => ("Connected".to_owned(), Tone::Neutral),
         ConnectionStatus::Disconnected => ("Disconnected".to_owned(), Tone::Error),
+        ConnectionStatus::Unavailable => ("Unavailable".to_owned(), Tone::Error),
         ConnectionStatus::WrongDevice => ("Wrong or ambiguous device".to_owned(), Tone::Error),
     };
     let (verification_text, verification_tone) = match (&state.last_error, &state.last_verification)
@@ -401,6 +419,15 @@ pub fn failure_detail(
     rollback_restored: Option<bool>,
     final_profile: Option<ProfileMatch>,
 ) -> String {
+    failure_detail_for_final_state(rollback_restored, final_profile, false)
+}
+
+#[must_use]
+pub fn failure_detail_for_final_state(
+    rollback_restored: Option<bool>,
+    final_profile: Option<ProfileMatch>,
+    final_state_available: bool,
+) -> String {
     let base = match rollback_restored {
         Some(true) => "The change did not verify, so the previous settings were restored.",
         Some(false) => "The change did not verify and automatic restore also failed.",
@@ -410,6 +437,9 @@ pub fn failure_detail(
         Some(ProfileMatch::Developer) => " The mouse is now on Developer.",
         Some(ProfileMatch::Gaming) => " The mouse is now on Gaming.",
         Some(ProfileMatch::OutOfSync) => " The mouse is out of sync.",
+        None if final_state_available => {
+            " The final device state was read, but its supported profile could not be confirmed."
+        }
         None => " The final mouse state could not be read.",
     };
     format!("{base}{final_state}")
@@ -650,6 +680,41 @@ mod tests {
     }
 
     #[test]
+    fn unavailable_current_state_shows_unknown_profile_and_disables_controls() {
+        let mut state = idle_state();
+        state.profile = ProfileMatch::OutOfSync;
+        state.connection = ConnectionStatus::Unavailable;
+        state.polling_hz = None;
+        state.dpi = None;
+        state.power = None;
+
+        let presentation = present(&state);
+
+        assert_eq!(presentation.profile_line, "Unknown");
+        assert_eq!(presentation.polling_line, "Unknown");
+        assert_eq!(presentation.dpi_line, "Unavailable");
+        assert_eq!(presentation.battery_line, "Unavailable");
+        assert_eq!(presentation.connection_line, "Unavailable");
+        assert!(!presentation.buttons_enabled);
+    }
+
+    #[test]
+    fn failed_apply_connection_requires_a_fresh_classifiable_state() {
+        assert_eq!(
+            failure_connection_status(false, false),
+            ConnectionStatus::Unavailable
+        );
+        assert_eq!(
+            failure_connection_status(true, false),
+            ConnectionStatus::WrongDevice
+        );
+        assert_eq!(
+            failure_connection_status(true, true),
+            ConnectionStatus::Connected
+        );
+    }
+
+    #[test]
     fn wrong_device_state_is_labelled_and_disables_buttons() {
         let mut state = idle_state();
         state.connection = ConnectionStatus::WrongDevice;
@@ -703,6 +768,10 @@ mod tests {
         assert_eq!(
             failure_detail(None, None),
             "The change did not verify. The final mouse state could not be read."
+        );
+        assert_eq!(
+            failure_detail_for_final_state(Some(false), None, true),
+            "The change did not verify and automatic restore also failed. The final device state was read, but its supported profile could not be confirmed."
         );
     }
 

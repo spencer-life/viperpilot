@@ -88,3 +88,7 @@ commit. Newly created PRs and changed bases have their own checks.
 GitHub's [native stack requirements](https://docs.github.com/en/pull-requests/reference/stacked-pull-requests)
 explain trunk-based enforcement and cascading merge/rebase behavior. No repository
 rules, merge queue or App permissions changed during this split.
+
+## Revised concrete proposal — 2026-09-29
+
+Independent draft [PR #19](https://github.com/spencer-life/viperpilot/pull/19) now provides the alternative staged policy and exact JSON: A requires `ci (...)` for #1; B, only after #1 merges, requires `Core CI (...)` plus Security for #14/#15; C, only after both #14/#15 merge, requires `ci (...)` plus Security for remaining compatible layers. Each phase updates the same main-only ruleset after separate authorization and fresh checks. This supersedes the earlier two-PR proposal without rewriting commits. No protection was activated. See [the proposal](https://github.com/spencer-life/viperpilot/blob/codex/ci-enforcement-plan/docs/ci-enforcement-plan.md) for checkpoints and rollback.
