@@ -1,6 +1,6 @@
 # Quick-switch implementation and validation status
 
-Updated 2026-09-29. The software checkpoint below is public commit `7cb0440a8b21f54154c1042757c810f3b9552c24` in [draft PR #3](https://github.com/spencer-life/viperpilot/pull/3), branch `codex/sanitized-quick-switch`. Its hosted software checks passed; it is not release approval or physical-device validation. Later documentation-only commits do not imply a new validation result. Start a new session with [the continuation brief](continue-here.md) and track open work in the [public issue tracker](https://github.com/spencer-life/viperpilot/issues). GitHub is the implementation source; the old ZIP patch must not be reapplied.
+Updated 2026-09-29. The historical foundation checkpoint below is public commit `7cb0440a8b21f54154c1042757c810f3b9552c24` in [draft PR #3](https://github.com/spencer-life/viperpilot/pull/3), branch `codex/sanitized-quick-switch`. Its hosted software checks passed; it is not release approval or physical-device validation. The issue #12 local editor now has a later software checkpoint; neither checkpoint is manual validation. Start a new session with [the continuation brief](continue-here.md) and track open work in the [public issue tracker](https://github.com/spencer-life/viperpilot/issues). GitHub is the implementation source; the old ZIP patch must not be reapplied.
 
 ## Goal and scope
 
@@ -13,7 +13,7 @@ The application currently supports only its documented Viper V4 Pro device and f
 - A validated local profile-alias library supports protected built-ins, user-named aliases, and a two-entry quick-switch selection.
 - Tray actions and the global hotkey reload the selection, verify current device state, and use the existing guarded profile-apply path. Pair selection and library reload do not write to the device.
 - The native compact switcher opens first, with a Details view for the existing read-only inspector and recovery actions. The UI preview is isolated from the production tray and hardware worker.
-- User-authored profile intent has a versioned local draft model and storage separate from complete-preset aliases and device baselines. The egui editor remains a synthetic preview; its Save and Apply controls are disabled. The user-facing draft editor is incomplete.
+- User-authored profile intent has versioned local draft storage separate from complete-preset aliases and device baselines. The optional egui editor now supports local create/edit/rename/duplicate/delete/save/reopen. Apply stays disabled. Default tray builds exclude both the editor session and eframe. Windows interaction is still unverified.
 - Hardware-free tasks cover formatting, lint, tests, native build, and CLI smoke. Separate preview tasks exercise synthetic UI states and Windows accessibility metadata.
 
 The guarded write engine also checks each planned field against the last trusted snapshot before writing, advances that snapshot only after a complete validated readback, verifies device identity on readback, and stops when identity or field state is ambiguous. A rejected write is classified using readback; an ambiguous acknowledgement cannot be treated as proof that an equal-value DPI write succeeded. These checks reduce stale-plan and rollback risk. They do not establish additional device support or authorize new writes.
@@ -30,9 +30,38 @@ The preview UI's accessible names and enabled states were checked with Windows U
 
 No physical-device validation of the new tray pair-selection or hotkey path is recorded here. A build, unit test, UI preview, GET result, or planned write is not evidence that a hardware write succeeded. Use the [supervised validation checklist](quick-switch-supervised-checklist.md) when an owner can observe the Windows device session. Keep serials, local paths, raw reports, and screenshots containing private information in local evidence storage rather than this repository.
 
+## Issue #12 software checkpoint — 2026-09-29
+
+Source checkpoint [`6792c6f`](https://github.com/spencer-life/viperpilot/commit/6792c6fe8bc3774ab133a0b830fac8796b421e9d)
+adds the persisted local editor, following session commit `f2273e5`.
+
+- `mise run ci` passed formatting, strict default Clippy, **108 core tests**,
+  native release build and CLI help smoke.
+- `mise run ci-preview` passed strict feature-enabled Clippy, **114 library
+  tests** (including six session tests) and **7 headless editor tests**.
+  The editor tests include actual text editing and Save, disk reopen, disabled
+  Apply, preservation of loaded values, modal isolation, dirty reload, failed
+  save feedback and confirmed close state.
+- `mise run build-windows` and `mise run build-egui-preview-windows` passed
+  without launching either executable. Final `fmt-check`, whitespace and
+  task validation passed (25 repository tasks; 30 including inherited tasks).
+- Default normal dependencies exclude egui/eframe, and the editor session is
+  feature-gated. Native tray, worker, planner, device support and Cargo
+  dependencies are unchanged. Independent review found no remaining material
+  findings after correcting confirmation isolation and dialog error feedback.
+
+These commands used process-scoped mise trust and disabled automatic tool
+installation. Concurrent xwin setup initially failed at a shared clang-cl
+symlink; sequential cross-builds succeeded. Run the cross-builds sequentially.
+The updated PowerShell scripts received static review only; no PowerShell
+parser was available. Hosted checks for this new head must be checked separately
+from historical green runs. No manual Windows UI, production tray/hotkey,
+installation/startup, performance or physical-device test was run. PR #3 remains
+draft, and issue #12 remains open pending delivery and owner-observed UI checks.
+
 ## Next work and deferred tests
 
-- [Issue #12](https://github.com/spencer-life/viperpilot/issues/12): connect real editor values to the local draft store, with create/edit/duplicate/rename/delete/reopen behavior and clear draft-only status. Match enabled settings to what can actually round-trip; do not silently discard preview-only fields.
+- [Issue #12](https://github.com/spencer-life/viperpilot/issues/12): local editing and persistence are implemented in the optional editor; review software checks and complete deferred owner-observed Windows UI validation. Every enabled setting maps to V1 intent; unsupported settings are explicitly unsavable.
 - [Issue #4](https://github.com/spencer-life/viperpilot/issues/4): define device-scoped capabilities and the safe request/write contract; it does not broaden the hardware allowlist by itself.
 - [Issue #13](https://github.com/spencer-life/viperpilot/issues/13): later promote proven custom settings into quick switching, after storage, contract, field and combination evidence gates pass.
 - [Issue #5](https://github.com/spencer-life/viperpilot/issues/5): software CI is green at the recorded checkpoint; required-check enforcement and the stacked PR merge order remain open. Public `main` was unprotected with no rulesets when rechecked on 2026-09-29.

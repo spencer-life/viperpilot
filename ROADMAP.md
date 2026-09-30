@@ -22,13 +22,13 @@ The product's device scope is the Razer Viper V4 Pro and the field-level capabil
 | **Research** | A field or transport needs additional evidence; no write support is implied. |
 | **Blocked** | Do not ship or enable until the named gate passes. |
 
-Foundation sources compile and their software suites pass: 108 core tests plus 3 egui preview tests have been reported, alongside the candidate's local build checks. Hosted Linux and Windows Core CI plus Security also pass for PR 3. These checks do not count as mouse tests. The production tray and hotkey have not passed their owner-present manual gate, and the synthetic egui editor does not yet save user drafts.
+Historical foundation sources compile and their software suites pass: 108 core tests plus 3 egui preview tests have been reported, alongside the candidate's local build checks. Hosted Linux and Windows Core CI plus Security passed at checkpoint `7cb0440`. These checks do not count as mouse tests. The production tray and hotkey have not passed their owner-present manual gate, and the optional egui editor now saves local drafts; its Windows UI validation remains open.
 
 ## Current priority
 
 The next software work follows the public issue sequence:
 
-1. [#12 — persist profile drafts offline](https://github.com/spencer-life/viperpilot/issues/12): complete draft-only user workflows and persistence, with no device planner or HID path.
+1. [#12 — persist profile drafts offline](https://github.com/spencer-life/viperpilot/issues/12): software implemented in the draft PR; review and owner-observed Windows UI checks remain, with no device planner or HID path.
 2. [#4 — define per-field capability contracts](https://github.com/spencer-life/viperpilot/issues/4): make supported values, device scope, and evidence requirements explicit before any new writable field can be exposed.
 3. [#13 — add guarded promotion to the device path](https://github.com/spencer-life/viperpilot/issues/13): connect only contract-approved intents to inspectable plans and the existing guarded worker, preserving independent readback and rollback checks.
 
@@ -45,13 +45,13 @@ Owner-present checkpoints remain pending: [#6 compact switcher accessibility](ht
 
 **Exit gate:** Hardware-free checks remain green, then the owner-present tray checkpoints #6, #7 and #9 pass with recorded Windows conditions. Complete-profile and hotkey device regressions still require their own supervised evidence.
 
-### M1 — Offline user-authored profile drafts · next
+### M1 — Offline user-authored profile drafts · software checked, manual gates open
 
 - Let a user create, name, edit, duplicate, and delete semantic profile drafts offline. Preserve Developer and Gaming as protected recovery profiles.
 - Persist validated drafts separately from complete-preset aliases, device configuration, reports, and the immutable first baseline. Preserve previous valid data on failed writes and reject corrupt or future schemas without silently resetting them.
-- Keep the synthetic egui preview isolated. Its Save and Apply actions remain disabled until the actual editor and safe boundaries are implemented.
+- Keep the optional editor isolated from the resident tray. Save persists local drafts; Apply remains disabled until device-specific evidence and promotion gates pass.
 
-**Exit gate:** Issue #12 passes hardware-free round-trip, invalid-data, rollback, and isolation checks. Saving intent does not invoke a planner or HID operation.
+**Exit gate:** Issue #12 hardware-free round-trip, invalid-data, failure-retention and isolation checks pass at source `6792c6f`; owner-observed Windows editor validation remains pending. Saving intent does not invoke a planner or HID operation.
 
 ### M2 — Per-field capability contracts · planned
 
