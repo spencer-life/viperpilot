@@ -112,3 +112,47 @@ Profile name/Edit value. DPI X/Y remained 1200/1200 and Apply remained disabled.
 This validates the requested paste/name persistence case, not IME composition or
 screen-reader speech. The owner also confirmed visible keyboard focus on this
 styled build. Narrow-window/other-scale and reader/IME checks remain open.
+
+### Owner minimum-window screenshots — 2026-09-30
+
+Owner-provided Windows screenshots at 850×640 show Save and disabled Apply
+contained at the bottom in both initial and scrolled states. Mouse5 is reachable
+by scrolling. These establish the observed minimum-window layout at this
+display scale, not other DPI scales.
+
+The same screenshots expose missing Japanese glyphs: `日本語` renders as boxes
+in the name input, navigation and status. The exact Unicode storage/UIA round
+trip passed, but visual non-Latin name support failed. Do not describe the
+persistence result as a complete input/rendering pass. Windows lists installed
+MS Gothic and Yu Gothic font collections; an editor-only font fallback fix is
+being investigated. IME composition and screen-reader speech remain unobserved.
+
+### Missing-glyph correction — 2026-09-30
+
+The Windows editor appends one locally installed, glyph-validated Japanese font
+to the bundled proportional/monospace fallback chains. Latin fonts and type sizes
+are preserved. Font reads are bounded to 64 MiB; missing, unreadable or malformed
+fonts retain defaults. Validation occurs in an isolated context; real eframe
+initialization only receives the validated definitions, preserving texture uploads.
+A rendering warning appears only when the selected name has missing glyphs and
+the fallback was unavailable. No font was installed, redistributed or added to
+the resident tray. This is not a claim of universal Unicode glyph coverage.
+
+Strict preview Clippy and 159 tests (13 editor tests), Windows cross-lint, release
+build, formatting/whitespace and independent review passed. Initial checks caught
+unused mutability and excessive boolean state; these were corrected. Review also
+removed an extra real-context startup pass before launch to avoid discarding atlas
+updates. Corrupt-font rejection and preserved default family order are tested.
+
+The hash-checked build launched with the same preserved temporary library. Actual
+Windows UIA still read exactly `Test – 日本語 – café`, DPI X/Y 1200/1200 and
+disabled Apply. Normal and minimum-size owned-window PrintWindow captures showed
+the Japanese glyphs correctly in the input, navigation and status; Save/Apply
+were contained. This background capture succeeded without foreground manipulation.
+An initial redirected readback used the Windows legacy output encoding; selecting
+UTF-8 output corrected the capture of values, with no app/data mutation. Raw
+captures stay private; capture margins do not establish pixel parity or other
+DPI-scale behavior. IME composition and screen-reader speech remain unobserved.
+
+Font-fixed Windows binary SHA-256:
+`e15529a64537c2dafacf1941241a75eccc996135f02b6b05a5d77fa84a70f870`.
