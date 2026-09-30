@@ -14,12 +14,17 @@ use viper_v4_utility::profile_intent::{
 };
 use viper_v4_utility::storage::StoragePaths;
 
-const ROSE: Color32 = Color32::from_rgb(255, 91, 151);
-const ROSE_DARK: Color32 = Color32::from_rgb(105, 39, 67);
-const CANVAS: Color32 = Color32::from_rgb(19, 20, 25);
-const PANEL: Color32 = Color32::from_rgb(28, 30, 37);
-const PANEL_RAISED: Color32 = Color32::from_rgb(38, 40, 49);
-const MUTED: Color32 = Color32::from_rgb(156, 160, 174);
+// 2026-09-30: align editor palette and type scale with Figma Ujs2cpFXYNnSI2YquOG1jF nodes 3:2, 3:3, and 3:6.
+// The referenced frames are raster concepts; these explicit tokens are the styling spec, not image assets.
+const ROSE: Color32 = Color32::from_rgb(232, 125, 145);
+const ROSE_DARK: Color32 = Color32::from_rgb(162, 75, 92);
+const CANVAS: Color32 = Color32::from_rgb(15, 20, 25);
+const PANEL: Color32 = Color32::from_rgb(26, 31, 36);
+const PANEL_RAISED: Color32 = Color32::from_rgb(35, 41, 50);
+const BORDER: Color32 = Color32::from_rgb(58, 65, 75);
+const PRIMARY_TEXT: Color32 = Color32::from_rgb(234, 239, 244);
+const MUTED: Color32 = Color32::from_rgb(163, 172, 183);
+const SUCCESS: Color32 = Color32::from_rgb(60, 203, 143);
 const POLLING_PRESETS: [u16; 7] = [125, 250, 500, 1_000, 2_000, 4_000, 8_000];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -291,16 +296,31 @@ impl EguiPreview {
         egui::Panel::left("draft_navigation")
             .exact_size(245.0)
             .show(ui, |ui| self.navigation(ui));
+        egui::Panel::bottom("editor_footer")
+            .frame(egui::Frame::NONE)
+            .show(ui, |ui| self.editor_footer(ui));
         egui::CentralPanel::default().show(ui, |ui| self.editor_panel(ui));
         self.dialogs(&context);
     }
 
     fn navigation(&mut self, ui: &mut egui::Ui) {
+        egui::Panel::bottom("draft_navigation_status")
+            .frame(egui::Frame::NONE)
+            .show(ui, |ui| {
+                ui.label(
+                    RichText::new("No hardware connection · Apply disabled")
+                        .size(12.0)
+                        .color(MUTED),
+                );
+            });
+        egui::ScrollArea::vertical()
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
         ui.add_space(10.0);
         ui.label(
             RichText::new("LOCAL PROFILE DRAFTS")
                 .strong()
-                .size(10.0)
+                .size(12.0)
                 .color(MUTED),
         );
         ui.add_space(8.0);
@@ -312,18 +332,14 @@ impl EguiPreview {
                 .map(|draft| (draft.id().to_owned(), draft.intent().name.clone()))
                 .collect()
         });
-        egui::ScrollArea::vertical()
-            .max_height(250.0)
-            .show(ui, |ui| {
-                for (id, name) in rows {
-                    let selected = self.selected_id.as_deref() == Some(id.as_str());
-                    ui.push_id(&id, |ui| {
-                        if ui.selectable_label(selected, name).clicked() && !selected {
-                            self.request_action(DeferredAction::Select(id.clone()));
-                        }
-                    });
+        for (id, name) in rows {
+            let selected = self.selected_id.as_deref() == Some(id.as_str());
+            ui.push_id(&id, |ui| {
+                if ui.selectable_label(selected, name).clicked() && !selected {
+                    self.request_action(DeferredAction::Select(id.clone()));
                 }
             });
+        }
         if self.selected_id.is_none() && self.editor.is_some() {
             ui.label(RichText::new("New unsaved draft").color(ROSE));
         }
@@ -371,82 +387,107 @@ impl EguiPreview {
         ui.label(
             RichText::new("UNVERIFIED SETTINGS")
                 .strong()
-                .size(10.0)
+                .size(12.0)
                 .color(ROSE),
         );
-        ui.label(RichText::new("Drafts are saved only on this PC. DPI changes, arbitrary polling values, keyboard actions and action combinations need device evidence.").size(11.0).color(MUTED));
+        ui.label(RichText::new("Drafts are saved only on this PC. DPI changes, arbitrary polling values, keyboard actions and action combinations need device evidence.").size(12.0).color(MUTED));
         ui.add_space(8.0);
         ui.label(
             RichText::new(
                 "DPI stages, other buttons, lift-off and sleep are not editable or saved here.",
             )
-            .size(10.0)
+            .size(12.0)
             .color(MUTED),
         );
-        ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
-            ui.label(
-                RichText::new("No hardware connection · Apply disabled")
-                    .size(10.0)
-                    .color(MUTED),
-            );
         });
     }
 
     fn editor_panel(&mut self, ui: &mut egui::Ui) {
-        egui::Frame::new().fill(CANVAS).inner_margin(egui::Margin::same(24)).show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.vertical(|ui| {
-                    ui.label(RichText::new("Profile drafts").strong().size(26.0));
-                    ui.label(RichText::new("Edit local intent and save it for later review.").size(12.0).color(MUTED));
-                });
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let state = if self.is_dirty() {
-                        "UNSAVED CHANGES"
-                    } else if self.selected_id.is_some() {
-                        "SAVED DRAFT"
-                    } else {
-                        "NEW DRAFT"
-                    };
-                    ui.label(RichText::new(state).strong().size(10.0).color(ROSE));
-                });
-            });
-            ui.add_space(16.0);
-            if let Some(error) = &self.error {
-                error_banner(ui, error);
-                if self.editor.is_none() && ui.button("Retry opening draft library").clicked() {
-                    self.retry_open();
-                }
-                if self.editor.is_none() { return; }
-            }
-            egui::ScrollArea::vertical()
-                .max_height((ui.available_height() - 104.0).max(160.0))
-                .auto_shrink([false, false]).show(ui, |ui| {
-                profile_fields(ui, &mut self.buffer);
-                ui.add_space(14.0);
-                action_fields(ui, "Mouse4", &mut self.buffer.mouse4);
-                ui.add_space(12.0);
-                action_fields(ui, "Mouse5", &mut self.buffer.mouse5);
-                ui.add_space(12.0);
-                capability_evidence(ui, &self.buffer);
-            });
-            ui.add_space(10.0);
-            if let Err(error) = self.buffer.validate() {
-                ui.label(RichText::new(error).size(10.0).color(ROSE));
-            }
-            egui::Frame::new().fill(PANEL).inner_margin(egui::Margin::same(12)).corner_radius(9).show(ui, |ui| {
+        egui::Frame::new()
+            .fill(CANVAS)
+            .inner_margin(egui::Margin::same(24))
+            .show(ui, |ui| {
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
-                        ui.label(RichText::new("Apply changes").strong().size(12.0));
-                        ui.label(RichText::new("No connected device or complete draft has been verified for Apply.").size(10.0).color(MUTED));
+                        ui.label(RichText::new("Profile drafts").strong().size(24.0));
+                        ui.label(
+                            RichText::new("Edit local intent and save it for later review.")
+                                .size(14.0)
+                                .color(MUTED),
+                        );
                     });
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.add_enabled(false, egui::Button::new("Apply changes"));
-                        let valid = self.buffer.validate().is_ok() && self.editor.is_some();
-                        if ui.add_enabled(valid, egui::Button::new("Save draft").fill(ROSE_DARK)).clicked() { self.save_draft(); }
+                        let state = if self.is_dirty() {
+                            "UNSAVED CHANGES"
+                        } else if self.selected_id.is_some() {
+                            "SAVED DRAFT"
+                        } else {
+                            "NEW DRAFT"
+                        };
+                        let state_color = if self.is_dirty() {
+                            ROSE
+                        } else if self.selected_id.is_some() {
+                            SUCCESS
+                        } else {
+                            MUTED
+                        };
+                        ui.label(RichText::new(state).strong().size(12.0).color(state_color));
                     });
                 });
+                ui.add_space(16.0);
+                if let Some(error) = &self.error {
+                    error_banner(ui, error);
+                    if self.editor.is_none() && ui.button("Retry opening draft library").clicked() {
+                        self.retry_open();
+                    }
+                    if self.editor.is_none() {
+                        return;
+                    }
+                }
+                egui::ScrollArea::vertical()
+                    .max_height(ui.available_height())
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        let width = ui.available_width().min(680.0);
+                        ui.set_max_width(width);
+                        ui.set_width(width);
+                        profile_fields(ui, &mut self.buffer);
+                        ui.add_space(14.0);
+                        action_fields(ui, "Mouse4", &mut self.buffer.mouse4);
+                        ui.add_space(12.0);
+                        action_fields(ui, "Mouse5", &mut self.buffer.mouse5);
+                        ui.add_space(12.0);
+                        capability_evidence(ui, &self.buffer);
+                    });
             });
-        });
+    }
+
+    fn editor_footer(&mut self, ui: &mut egui::Ui) {
+        egui::Frame::new()
+            .fill(CANVAS)
+            .inner_margin(egui::Margin::symmetric(24, 8))
+            .show(ui, |ui| {
+                if let Err(error) = self.buffer.validate() {
+                    ui.label(RichText::new(error).size(12.0).color(ROSE));
+                    ui.add_space(6.0);
+                }
+                egui::Frame::new()
+                    .fill(PANEL)
+                    .stroke(Stroke::new(1.0, BORDER))
+                    .inner_margin(egui::Margin::same(12))
+                    .corner_radius(12)
+                    .show(ui, |ui| {
+                        ui.vertical(|ui| {
+                            ui.label(RichText::new("Apply changes").strong().size(14.0));
+                            ui.label(RichText::new("No connected device or complete draft has been verified for Apply.").size(12.0).color(MUTED));
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                ui.add_enabled(false, egui::Button::new("Apply changes"));
+                                let valid = self.buffer.validate().is_ok() && self.editor.is_some();
+                                if ui.add_enabled(valid, egui::Button::new("Save draft").fill(ROSE_DARK)).clicked() { self.save_draft(); }
+                            });
+                        });
+                    });
+            });
     }
 
     fn dialogs(&mut self, context: &egui::Context) {
@@ -544,14 +585,14 @@ fn capability_evidence(ui: &mut egui::Ui, intent: &ProfileIntentV1) {
                 RichText::new(
                     "This report uses no device identity, serial, firmware, or transport data.",
                 )
-                .size(10.0)
+                .size(12.0)
                 .color(MUTED),
             );
             ui.label(
                 RichText::new(
                     "Per-field evidence does not verify the full profile combination; promotion remains blocked.",
                 )
-                .size(10.0)
+                .size(12.0)
                 .color(MUTED),
             );
 
@@ -563,7 +604,7 @@ fn capability_evidence(ui: &mut egui::Ui, intent: &ProfileIntentV1) {
                             "Recorded scope reference only: {}",
                             recorded_evidence_summary()
                         ))
-                        .size(10.0)
+                        .size(12.0)
                         .color(MUTED),
                     );
 
@@ -576,17 +617,17 @@ fn capability_evidence(ui: &mut egui::Ui, intent: &ProfileIntentV1) {
                                 capability_label(field.evidence)
                             ))
                             .strong()
-                            .size(11.0),
+                            .size(12.0),
                         );
-                        ui.label(RichText::new(field.reason).size(10.0).color(MUTED));
+                        ui.label(RichText::new(field.reason).size(12.0).color(MUTED));
                     }
                     if !report.blockers.is_empty() {
                         ui.add_space(6.0);
-                        ui.label(RichText::new("Blockers").strong().size(11.0));
+                        ui.label(RichText::new("Blockers").strong().size(12.0));
                         for blocker in report.blockers {
                             ui.label(
                                 RichText::new(format!("• {blocker}"))
-                                    .size(10.0)
+                                    .size(12.0)
                                     .color(MUTED),
                             );
                         }
@@ -595,14 +636,14 @@ fn capability_evidence(ui: &mut egui::Ui, intent: &ProfileIntentV1) {
                 Err(error) => {
                     ui.label(
                         RichText::new(format!("Evidence report unavailable: {error}"))
-                            .size(10.0)
+                            .size(12.0)
                             .color(ROSE),
                     );
                 }
             }
             ui.label(
                 RichText::new("Apply is disabled in this editor. Saving a valid local draft is independent of this report.")
-                    .size(10.0)
+                    .size(12.0)
                     .color(MUTED),
             );
         });
@@ -650,10 +691,10 @@ fn top_bar(ui: &mut egui::Ui, status: &str) {
             ui.horizontal(|ui| {
                 ui.label(RichText::new("V").strong().size(23.0).color(ROSE));
                 ui.vertical(|ui| {
-                    ui.label(RichText::new("ViperPilot").strong().size(16.0));
+                    ui.label(RichText::new("ViperPilot").strong().size(20.0));
                     ui.label(
                         RichText::new("PROFILE DRAFT EDITOR PREVIEW")
-                            .size(10.0)
+                            .size(12.0)
                             .color(MUTED),
                     );
                 });
@@ -661,11 +702,11 @@ fn top_bar(ui: &mut egui::Ui, status: &str) {
                     ui.label(
                         RichText::new("PREVIEW · NO DEVICE WRITES")
                             .strong()
-                            .size(10.0)
+                            .size(12.0)
                             .color(ROSE),
                     );
                     ui.separator();
-                    ui.label(RichText::new(status).size(10.0).color(MUTED));
+                    ui.label(RichText::new(status).size(12.0).color(MUTED));
                 });
             });
         });
@@ -678,12 +719,12 @@ fn profile_fields(ui: &mut egui::Ui, intent: &mut ProfileIntentV1) {
         let name_label = ui.label(
             RichText::new("PROFILE NAME")
                 .strong()
-                .size(10.0)
+                .size(12.0)
                 .color(MUTED),
         );
         let name_input = ui.add(
             egui::TextEdit::singleline(&mut intent.name)
-                .desired_width(420.0)
+                .desired_width(f32::INFINITY)
                 .hint_text("Name this draft"),
         );
         name_input.clone().labelled_by(name_label.id);
@@ -730,7 +771,7 @@ fn profile_fields(ui: &mut egui::Ui, intent: &mut ProfileIntentV1) {
         });
         ui.label(
             RichText::new("Current non-preset values remain unchanged until you choose a preset.")
-                .size(10.0)
+                .size(12.0)
                 .color(MUTED),
         );
     });
@@ -796,12 +837,12 @@ fn action_fields(ui: &mut egui::Ui, button: &str, action: &mut ButtonActionInten
                     .response
                     .labelled_by(key_label.id);
             });
-            ui.label(RichText::new("Every named key and modifier combination is preserved as intent; support is unverified.").size(10.0).color(MUTED));
+            ui.label(RichText::new("Every named key and modifier combination is preserved as intent; support is unverified.").size(12.0).color(MUTED));
         }
         if let ButtonActionIntent::Unmodeled { description } = &mut next {
             ui.label(
                 RichText::new("Research-only text; never mapped to a device action.")
-                    .size(10.0)
+                    .size(12.0)
                     .color(MUTED),
             );
             let description_label = ui.label(format!("{button} description"));
@@ -908,16 +949,19 @@ fn keyboard_keys() -> &'static [KeyboardKey] {
 
 fn card(ui: &mut egui::Ui, content: impl FnOnce(&mut egui::Ui)) {
     egui::Frame::new()
-        .fill(PANEL)
-        .stroke(Stroke::new(1.0, Color32::from_rgb(53, 55, 64)))
+        .fill(PANEL_RAISED)
+        .stroke(Stroke::new(1.0, BORDER))
         .inner_margin(egui::Margin::same(16))
         .corner_radius(12)
-        .show(ui, content);
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            content(ui);
+        });
 }
 
 fn section_header(ui: &mut egui::Ui, title: &str, detail: &str) {
     ui.label(RichText::new(title).strong().size(14.0));
-    ui.label(RichText::new(detail).size(10.0).color(MUTED));
+    ui.label(RichText::new(detail).size(12.0).color(MUTED));
 }
 
 fn error_banner(ui: &mut egui::Ui, error: &str) {
@@ -936,7 +980,7 @@ fn modal_error(ui: &mut egui::Ui, error: Option<&str>) {
     if let Some(error) = error {
         ui.label(
             RichText::new(format!("Could not continue: {error}"))
-                .size(11.0)
+                .size(12.0)
                 .color(ROSE),
         );
     }
@@ -946,20 +990,45 @@ fn configure_theme(context: &egui::Context) {
     let mut visuals = Visuals::dark();
     visuals.panel_fill = CANVAS;
     visuals.window_fill = PANEL;
-    visuals.extreme_bg_color = Color32::from_rgb(15, 16, 20);
+    visuals.extreme_bg_color = PANEL_RAISED;
     visuals.faint_bg_color = PANEL_RAISED;
     visuals.widgets.noninteractive.bg_fill = PANEL;
+    visuals.widgets.noninteractive.fg_stroke.color = PRIMARY_TEXT;
+    visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0, BORDER);
     visuals.widgets.inactive.bg_fill = PANEL_RAISED;
-    visuals.widgets.hovered.bg_fill = Color32::from_rgb(57, 44, 55);
+    visuals.widgets.inactive.bg_stroke = Stroke::new(1.0, BORDER);
+    visuals.widgets.hovered.bg_fill = Color32::from_rgb(55, 47, 53);
     visuals.widgets.active.bg_fill = ROSE_DARK;
+    visuals.widgets.open.bg_fill = PANEL_RAISED;
+    visuals.window_stroke = Stroke::new(1.0, BORDER);
+    visuals.widgets.inactive.corner_radius = egui::CornerRadius::same(8);
+    visuals.widgets.hovered.corner_radius = egui::CornerRadius::same(8);
+    visuals.widgets.active.corner_radius = egui::CornerRadius::same(8);
+    visuals.widgets.open.corner_radius = egui::CornerRadius::same(8);
     visuals.selection.bg_fill = ROSE_DARK;
-    visuals.selection.stroke = Stroke::new(1.0, ROSE);
-    visuals.widgets.inactive.fg_stroke.color = Color32::from_rgb(222, 224, 231);
-    visuals.widgets.hovered.fg_stroke.color = Color32::WHITE;
-    visuals.widgets.active.fg_stroke.color = Color32::WHITE;
+    visuals.selection.stroke = Stroke::new(1.0, PRIMARY_TEXT);
+    visuals.widgets.inactive.fg_stroke.color = PRIMARY_TEXT;
+    visuals.widgets.hovered.fg_stroke.color = PRIMARY_TEXT;
+    visuals.widgets.active.fg_stroke.color = PRIMARY_TEXT;
     visuals.hyperlink_color = ROSE;
     context.set_visuals(visuals);
-    context.global_style_mut(|style| style.spacing.item_spacing = Vec2::new(10.0, 9.0));
+    context.global_style_mut(|style| {
+        style
+            .text_styles
+            .insert(egui::TextStyle::Body, egui::FontId::proportional(14.0));
+        style
+            .text_styles
+            .insert(egui::TextStyle::Button, egui::FontId::proportional(14.0));
+        style
+            .text_styles
+            .insert(egui::TextStyle::Small, egui::FontId::proportional(12.0));
+        style
+            .text_styles
+            .insert(egui::TextStyle::Heading, egui::FontId::proportional(24.0));
+        style.spacing.item_spacing = Vec2::new(12.0, 10.0);
+        style.spacing.button_padding = Vec2::new(12.0, 8.0);
+        style.spacing.interact_size = Vec2::new(40.0, 36.0);
+    });
 }
 
 fn storage_paths_from_args(args: impl IntoIterator<Item = String>) -> Result<StoragePaths, String> {

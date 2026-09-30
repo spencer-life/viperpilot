@@ -7,7 +7,7 @@ projects:
     - ViperPilot dashboard
 state: open
 state_reason: null
-synced_at: 2026-09-30T09:12:58.957121038Z
+synced_at: 2026-09-30T09:22:48.030307461Z
 info:
     author: spencer-life
     created_at: 2026-09-29T18:22:54Z
@@ -49,3 +49,18 @@ with the same temporary draft library preserved `Manual Test`, DPI X/Y
 `1200`/`1200` and `1000 Hz` polling. Saved JSON and actual reopened UIA values
 agreed; Apply remained disabled. Keyboard, IME, screen-reader and scaling checks
 remain open. No legacy app or hardware state was changed.
+
+The owner then reported all requested controls reachable with visible focus
+using Tab/Shift+Tab: profile name, DPI X/Y, Mouse4, Mouse5 and Save draft. An
+owner-supplied screenshot showed Mouse5 and the pinned footer after scrolling.
+This observation applies to the original isolated editor hash recorded in the
+manual handoff; styling changes must preserve it and receive their own check.
+IME, screen-reader speech and scaling remain unobserved.
+
+The owner requested closer Figma alignment. A focused editor styling layer now
+uses the reference rose/charcoal palette, readable labels, consistent card widths,
+scrollable navigation and measured pinned footer layout. Linux offscreen renders
+at normal/minimum sizes, including an invalid draft and a populated library,
+were inspected. Strict preview checks and Windows cross-lint/build passed.
+The newly styled Windows binary still requires owner visual/focus validation;
+compact/detailed view alignment remains a separate check.
