@@ -5,6 +5,15 @@
 
 use std::path::PathBuf;
 
+#[cfg(windows)]
+use std::io::Read;
+
+#[cfg(any(windows, test))]
+use std::{
+    panic::{AssertUnwindSafe, catch_unwind},
+    sync::Arc,
+};
+
 use eframe::egui::{self, Color32, RichText, Stroke, Vec2, Visuals};
 use viper_v4_utility::capability::{assess_draft, recorded_evidence_summary};
 use viper_v4_utility::draft_editor::DraftEditor;
@@ -58,12 +67,21 @@ struct EguiPreview {
     show_delete_prompt: Option<String>,
     show_close_prompt: bool,
     allow_close: bool,
+    profile_font_warning: Option<&'static str>,
 }
 
 impl EguiPreview {
     fn new(context: &eframe::CreationContext<'_>, paths: Result<StoragePaths, String>) -> Self {
         configure_theme(&context.egui_ctx);
-        Self::from_paths(paths)
+        let app = Self::from_paths(paths);
+        #[cfg(windows)]
+        let app = {
+            let mut app = app;
+            app.profile_font_warning = install_japanese_fallback(&context.egui_ctx)
+                .then_some("Some characters in this profile name may not display correctly.");
+            app
+        };
+        app
     }
 
     fn from_paths(paths: Result<StoragePaths, String>) -> Self {
@@ -81,6 +99,7 @@ impl EguiPreview {
             show_delete_prompt: None,
             show_close_prompt: false,
             allow_close: false,
+            profile_font_warning: None,
         };
         app.retry_open();
         app
@@ -293,6 +312,15 @@ impl EguiPreview {
             self.show_close_prompt = true;
         }
         egui::Panel::top("top_bar").show(ui, |ui| top_bar(ui, &self.status));
+        if let Some(warning) = self.profile_font_warning
+            && !context.fonts_mut(|fonts| {
+                fonts.has_glyphs(&egui::FontId::proportional(14.0), &self.buffer.name)
+            })
+        {
+            egui::Panel::top("japanese_font_warning").show(ui, |ui| {
+                ui.label(RichText::new(warning).size(12.0).color(ROSE));
+            });
+        }
         egui::Panel::left("draft_navigation")
             .exact_size(245.0)
             .show(ui, |ui| self.navigation(ui));
@@ -976,6 +1004,85 @@ fn error_banner(ui: &mut egui::Ui, error: &str) {
         });
 }
 
+#[cfg(windows)]
+const MAX_SYSTEM_FONT_BYTES: u64 = 64 * 1024 * 1024;
+
+#[cfg(any(windows, test))]
+const JAPANESE_FONT_NAME: &str = "viperpilot_japanese_fallback";
+
+#[cfg(windows)]
+fn install_japanese_fallback(context: &egui::Context) -> bool {
+    // 2026-09-30: use an installed Japanese font as a last-resort glyph fallback after
+    // editor screenshots showed missing Japanese glyphs. The font stays local and is
+    // loaded only in this Windows preview; bundled Latin fonts and Figma type sizes remain.
+    for font_name in ["msgothic.ttc", "YuGothR.ttc"] {
+        for windows_dir in ["WINDIR", "SystemRoot"] {
+            let Some(windows_dir) = std::env::var_os(windows_dir) else {
+                continue;
+            };
+            let path = PathBuf::from(windows_dir).join("Fonts").join(font_name);
+            let Ok(file) = std::fs::File::open(path) else {
+                continue;
+            };
+            let mut bytes = Vec::new();
+            if file
+                .take(MAX_SYSTEM_FONT_BYTES + 1)
+                .read_to_end(&mut bytes)
+                .is_err()
+                || bytes.is_empty()
+                || bytes.len() as u64 > MAX_SYSTEM_FONT_BYTES
+            {
+                continue;
+            }
+
+            let mut definitions = egui::FontDefinitions::default();
+            if !append_japanese_fallback(&mut definitions, bytes) {
+                continue;
+            }
+            if !validates_japanese_glyphs(definitions.clone()) {
+                continue;
+            }
+
+            context.set_fonts(definitions);
+            return false;
+        }
+    }
+
+    true
+}
+
+#[cfg(any(windows, test))]
+fn append_japanese_fallback(definitions: &mut egui::FontDefinitions, bytes: Vec<u8>) -> bool {
+    definitions.font_data.insert(
+        JAPANESE_FONT_NAME.to_owned(),
+        Arc::new(egui::FontData::from_owned(bytes)),
+    );
+    for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
+        let Some(fonts) = definitions.families.get_mut(&family) else {
+            return false;
+        };
+        fonts.push(JAPANESE_FONT_NAME.to_owned());
+    }
+    true
+}
+
+#[cfg(any(windows, test))]
+fn validates_japanese_glyphs(definitions: egui::FontDefinitions) -> bool {
+    catch_unwind(AssertUnwindSafe(|| {
+        let context = egui::Context::default();
+        context.set_fonts(definitions);
+        let output = context.run_ui(egui::RawInput::default(), |ui| {
+            ui.label("日本語");
+        });
+        output.drop_without_applying_deltas();
+        context.fonts_mut(|fonts| {
+            fonts.has_glyphs(&egui::FontId::proportional(14.0), "日本語")
+                && fonts.has_glyphs(&egui::FontId::monospace(14.0), "日本語")
+        })
+    }))
+    .unwrap_or(false)
+}
+
 fn modal_error(ui: &mut egui::Ui, error: Option<&str>) {
     if let Some(error) = error {
         ui.label(
@@ -1077,6 +1184,51 @@ mod tests {
     };
     use std::fs;
     use std::sync::atomic::{AtomicU64, Ordering};
+
+    #[test]
+    fn japanese_fallback_preserves_default_font_family_order() {
+        let mut definitions = egui::FontDefinitions::default();
+        let proportional = definitions
+            .families
+            .get(&egui::FontFamily::Proportional)
+            .unwrap()
+            .clone();
+        let monospace = definitions
+            .families
+            .get(&egui::FontFamily::Monospace)
+            .unwrap()
+            .clone();
+
+        assert!(append_japanese_fallback(&mut definitions, vec![1, 2, 3]));
+
+        let proportional_with_fallback = definitions
+            .families
+            .get(&egui::FontFamily::Proportional)
+            .unwrap();
+        assert_eq!(
+            &proportional_with_fallback[..proportional.len()],
+            &proportional
+        );
+        assert_eq!(
+            proportional_with_fallback.last().unwrap(),
+            JAPANESE_FONT_NAME
+        );
+        let monospace_with_fallback = definitions
+            .families
+            .get(&egui::FontFamily::Monospace)
+            .unwrap();
+        assert_eq!(&monospace_with_fallback[..monospace.len()], &monospace);
+        assert_eq!(monospace_with_fallback.last().unwrap(), JAPANESE_FONT_NAME);
+    }
+
+    #[test]
+    fn japanese_font_validation_rejects_missing_and_malformed_glyphs() {
+        assert!(!validates_japanese_glyphs(egui::FontDefinitions::default()));
+
+        let mut definitions = egui::FontDefinitions::default();
+        assert!(append_japanese_fallback(&mut definitions, vec![0; 32]));
+        assert!(!validates_japanese_glyphs(definitions));
+    }
 
     fn temp_paths(label: &str) -> StoragePaths {
         static NEXT: AtomicU64 = AtomicU64::new(0);
