@@ -79,13 +79,16 @@ use crate::storage::{
 };
 use crate::windows::{RazerDevice, refuse_if_synapse_running};
 
-const WINDOW_CLASS: PCWSTR = w!("ViperV4UtilityTrayWindowV1");
-const PREVIEW_WINDOW_CLASS: PCWSTR = w!("ViperV4UtilityPreviewWindowV1");
+// 2026-09-30: reserve development-only Windows identities so future reviewed
+// launches cannot signal or reconcile startup for the installed legacy app.
+// The early production launch gate remains mandatory and unchanged.
+const WINDOW_CLASS: PCWSTR = w!("ViperPilotDevelopmentTrayWindowV1");
+const PREVIEW_WINDOW_CLASS: PCWSTR = w!("ViperPilotDevelopmentPreviewWindowV1");
 const WINDOW_TITLE: PCWSTR = w!("ViperPilot");
-const MUTEX_NAME: PCWSTR = w!("Local\\ViperV4UtilityTrayV1");
-const SHOW_MESSAGE_NAME: PCWSTR = w!("ViperV4UtilityShowWindowV1");
+const MUTEX_NAME: PCWSTR = w!("Local\\ViperPilotDevelopmentTrayV1");
+const SHOW_MESSAGE_NAME: PCWSTR = w!("ViperPilotDevelopmentShowWindowV1");
 const STARTUP_KEY: PCWSTR = w!("Software\\Microsoft\\Windows\\CurrentVersion\\Run");
-const STARTUP_VALUE: PCWSTR = w!("ViperV4Utility");
+const STARTUP_VALUE: PCWSTR = w!("ViperPilotDevelopment");
 const ICON_FILE_NAME: &str = "viper-utility-icon.ico";
 const DASHBOARD_MOUSE_BMP: &str = "viper-v4-black-dashboard.bmp";
 const COMPACT_MOUSE_BMP: &str = "viperpilot-mouse-silhouette.bmp";
