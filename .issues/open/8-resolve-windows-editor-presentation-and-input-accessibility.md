@@ -35,3 +35,9 @@ The optional editor's Windows presentation and real input/accessibility behavior
 ## Software readiness — 2026-09-30
 
 Independent source/UI audit found and fixed unnamed duplicate input and indistinct side-button controls. Headless tests confirm associated names/roles and duplicate-name editing; all 11 editor tests and strict preview checks pass. Actual Windows monitor/capture, screen reader, keyboard/IME/paste and scaling remain unobserved. See [manual handoff](https://github.com/spencer-life/viperpilot/blob/codex/ui-readiness/docs/manual-handoff.md). Installed app unchanged; no GUI/HID or startup operation ran. Issue remains open for its manual and delivery gates.
+
+## Owner-present editor smoke — 2026-09-30
+
+The isolated editor passed window rendering, screenshot pixel checks, actual UIA Profile name/Edit, enabled Save and disabled Apply, and exit code 0 on Windows 11 Pro build 26200. An owner-focused screen capture shows readable initial profile/sensitivity controls and visible Save/disabled Apply. The first screen capture was occluded; Windows rejected automatic foreground focus, and the owner brought the preview forward for the successful capture. Full images remain private.
+
+A dedicated temporary draft root is open for owner Save/reopen testing; that result is not recorded yet. Mouse5 needs scrolling in the initial viewport. Keyboard-only navigation, IME/paste/non-Latin names, screen-reader output, other scales/window sizes and production integration remain unverified. See [manual results](https://github.com/spencer-life/viperpilot/blob/codex/native-uia-test-client/docs/manual-handoff.md). No installed app or mouse change; issue remains open.

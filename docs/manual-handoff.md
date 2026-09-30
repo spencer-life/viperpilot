@@ -114,3 +114,57 @@ Accessibility resolved it. Independent review found no remaining material softwa
 blocker in the scoped delta. The headless core/editor results above are from
 `7f4dfac`; the final layer changes Windows-only controls and their manual script.
 PowerShell/UIA runtime validation is deferred; no script or GUI was launched.
+
+## First owner-present preview run — 2026-09-30
+
+The owner authorized isolated Windows preview/editor tests at source `09ffdab`.
+Conditions: Windows 11 Pro 64-bit, build 26200; Windows PowerShell
+5.1.26100.9444, STA. No production tray, installer, startup or device action ran.
+
+The native script opened its PREVIEW window and closed it during cleanup, but
+failed its first managed UIA assertion for control 2001: Pane rather than Button,
+without Invoke. No subsequent script assertions were exercised in that run.
+Read-only HWND diagnostics found class `Button`, style `0x50012000`, and the
+expected preview parent. An independent native `CUIAutomation` client inspecting
+that same HWND reported Button (`50000`) and Invoke support through Windows'
+MSAA/annotation proxies; the managed client continued reporting Pane/no-Invoke.
+The managed-only result therefore does not establish an app accessibility defect.
+Explicit managed provider/table registration attempts both failed with a null
+reference before inspecting a window. These failed experiments remain in private
+logs; no provider or OS configuration was changed.
+
+The editor smoke test passed actual window creation, screenshot pixel checks,
+UIA Profile name/Edit, enabled Save draft and disabled Apply changes, and clean
+exit. It staged a separate executable and GUID temporary draft root. Its script
+does not prove editing/persistence, keyboard, IME, screen-reader speech or visual
+legibility. A second isolated editor session preserves temporary data for the
+owner's Save/reopen check; those results must be recorded separately.
+
+Native preview binary SHA-256:
+`1c60cefc5d91b3809a1bd21ccbe060d68dcb47945bdc1340f873efd8637ed8e2`.
+Editor binary SHA-256:
+`68361a9f0eeb958d89dada5a2b6c84dbe2a43ad589760e231bf33ad4d56f6663`.
+The harness correction uses a separate native test client and keeps Button,
+Invoke, name and enabled-state requirements strict. Full scenario results belong
+to the corrected harness's tested head; do not infer them from the single-control
+diagnostic above. The production and physical mouse gates remain open.
+
+The corrected native harness passed all three actual Windows scenarios:
+default, reversed quick-switch pair and unavailable library. Strict native UIA
+Button/Invoke/name/enabled assertions, six semantic hotspot names, simulated
+profile commands, actual UIA Details invocation, repeated view transitions and
+exit code 0 all passed. Disabled compact actions remained disabled. Final helper
+process waits and UTF-8 output drains are bounded; rerunning all three scenarios
+after these guards passed. Windows-target Clippy and Linux all-target compilation
+of the `ui-preview` feature passed; independent review found no material issue.
+The test helper is excluded from default resident builds and validates preview
+class, expected PID, parent/child identity and allowed control IDs before Invoke.
+
+An owner-focused screen capture of the editor showed readable profile/sensitivity
+controls and visible Save/disabled Apply at the current window size; Mouse5 lies
+below the scroll area's initial viewport and still needs hands-on navigation.
+The initial capture was occluded by another window, and Windows rejected automatic
+foreground focus. The owner brought the editor forward for the successful capture.
+Screenshots and temporary manual draft data remain private. Save/reopen, keyboard,
+IME and screen-reader results are not yet recorded. No production gate is cleared
+by these preview results.

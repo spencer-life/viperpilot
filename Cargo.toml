@@ -29,6 +29,13 @@ name = "viperpilot-ui-preview"
 path = "src/bin/viperpilot-ui-preview.rs"
 required-features = ["ui-preview"]
 
+# 2026-09-30: native CUIAutomation client for the opt-in interactive preview
+# harness; this helper is excluded from default resident tray builds.
+[[bin]]
+name = "viperpilot-ui-test-client"
+path = "src/bin/viperpilot-ui-test-client.rs"
+required-features = ["ui-preview"]
+
 [[bin]]
 name = "viperpilot-egui-preview"
 path = "src/bin/viperpilot-egui-preview.rs"
