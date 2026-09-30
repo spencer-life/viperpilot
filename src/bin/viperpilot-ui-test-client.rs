@@ -18,13 +18,15 @@ mod windows_client {
             },
             WindowsAndMessaging::{
                 GetClassNameW, GetDlgCtrlID, GetDlgItem, GetParent, GetWindowThreadProcessId,
-                IsWindow,
+                IsWindow, IsWindowVisible,
             },
         },
     };
 
     const PREVIEW_CLASS: &str = "ViperPilotDevelopmentPreviewWindowV1";
-    const ALLOWED_CONTROLS: [i32; 9] = [2001, 2002, 2003, 2101, 2102, 2103, 2104, 2105, 2106];
+    const ALLOWED_CONTROLS: [i32; 11] = [
+        2001, 2002, 2003, 2004, 2005, 2101, 2102, 2103, 2104, 2105, 2106,
+    ];
 
     struct Apartment;
 
@@ -49,6 +51,7 @@ mod windows_client {
         enabled: bool,
         control_type_id: i32,
         invoke_available: bool,
+        visible: bool,
     }
 
     fn parse_number<T: std::str::FromStr>(name: &str, value: Option<String>) -> Result<T, String> {
@@ -143,7 +146,7 @@ mod windows_client {
         Ok(child)
     }
 
-    fn inspect(element: &IUIAutomationElement) -> windows::core::Result<Inspection> {
+    fn inspect(element: &IUIAutomationElement, child: HWND) -> windows::core::Result<Inspection> {
         let name = unsafe { element.CurrentName()? }.to_string();
         let enabled = unsafe { element.CurrentIsEnabled()? }.as_bool();
         let control_type_id = unsafe { element.CurrentControlType()? }.0;
@@ -153,6 +156,7 @@ mod windows_client {
             enabled,
             control_type_id,
             invoke_available,
+            visible: unsafe { IsWindowVisible(child) }.as_bool(),
         })
     }
 
@@ -165,9 +169,14 @@ mod windows_client {
                 .map_err(|error| error.to_string())?;
         let element =
             unsafe { automation.ElementFromHandle(child) }.map_err(|error| error.to_string())?;
-        let state = inspect(&element).map_err(|error| error.to_string())?;
+        let state = inspect(&element, child).map_err(|error| error.to_string())?;
 
         if action == "invoke" {
+            // 2026-09-30: dashboard/inspector controls stay alive but hidden;
+            // direct HWND access must not invoke a control outside its view.
+            if !state.visible {
+                return Err(format!("refusing to invoke hidden control ID {control_id}"));
+            }
             if state.control_type_id != UIA_ButtonControlTypeId.0 {
                 return Err(format!(
                     "control ID {control_id} is not exposed as a UIA Button"
