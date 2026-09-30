@@ -164,7 +164,7 @@ fn export_refuses_valid_sources_when_corrupt_output_already_exists() {
 #[test]
 fn concurrent_exports_publish_exactly_one_complete_catalog() {
     let root = temp_root("race");
-    write_valid_sources(&root);
+    let (aliases, drafts) = write_valid_sources(&root);
     let root = Arc::new(root);
     let start = Arc::new(Barrier::new(3));
     let workers = (0..2)
@@ -193,6 +193,11 @@ fn concurrent_exports_publish_exactly_one_complete_catalog() {
     );
     let encoded = fs::read_to_string(root.join("profile-catalog-v1.json")).unwrap();
     assert!(ProfileCatalogV1::from_json(&encoded).is_ok());
+    assert_eq!(fs::read(root.join("profiles-v1.json")).unwrap(), aliases);
+    assert_eq!(
+        fs::read(root.join("profile-drafts-v1.json")).unwrap(),
+        drafts
+    );
     let remaining_files = fs::read_dir(root.as_ref())
         .unwrap()
         .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
