@@ -58,7 +58,8 @@ Do not mistake local named configurations for independently stored onboard slots
 
 The local draft editor (#12) and read-only capability contract (#4) are
 implemented in the draft PR. Read `docs/capability-contract.md` before promotion
-work (#13). No custom combination is approved; Apply stays disabled until the
+work (#13), and `docs/profile-catalog.md` for the opt-in offline projection.
+Catalog export never replaces V1 production files. No custom combination is approved; Apply stays disabled until the
 documented device, field, recovery and complete-profile gates pass. See `docs/tooling-decision.md` for the Cargo/mise decision; Aube was not
 adopted, and its embedded Rust library was not compiled or benchmarked.
 

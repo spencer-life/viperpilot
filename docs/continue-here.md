@@ -33,7 +33,7 @@ The resident production path is native Win32. Egui/eframe 0.36.2 is a separate o
 
 ## Next code assignment
 
-Issue #12 now implements local create/edit/rename/duplicate/delete/save/reopen in the optional editor. Review [local editor details](local-draft-editor.md) and complete owner-observed Windows UI checks when available. Issue #4 now implements the [read-only capability contract](capability-contract.md); review and delivery remain. The next software slice is guarded promotion in issue #13, which remains hardware-gated. Keep the resident tray lightweight and the existing native architecture. Do not turn continued work into new hardware writes, extra onboard slots, broad mouse support, or a JavaScript migration.
+Issue #12 now implements local create/edit/rename/duplicate/delete/save/reopen in the optional editor. Review [local editor details](local-draft-editor.md) and complete owner-observed Windows UI checks when available. Issue #4 now implements the [read-only capability contract](capability-contract.md); review and delivery remain. Issue #13 now adds [offline catalog preview/export](profile-catalog.md); production promotion remains hardware-gated. Keep the resident tray lightweight and the existing native architecture. Do not turn continued work into new hardware writes, extra onboard slots, broad mouse support, or a JavaScript migration.
 
 Passing means:
 
@@ -43,7 +43,7 @@ Passing means:
 - Meaningful headless state/storage checks pass alongside the repository's relevant mise checks. Real keyboard, accessibility and Windows presentation remain separate manual gates.
 - Documentation and issue progress distinguish completed software work from still-open desktop/device checks. Commit coherent validated slices and update the same draft PR.
 
-Follow-on work is https://github.com/spencer-life/viperpilot/issues/13. Read the contract first: caller-supplied snapshots are not proof of a fresh GET, immutable baseline or full serial review. No custom combination is registered as approved. Do not connect drafts to setters or enable Apply until field, combination, readback and recovery evidence permits it. Other model owners or contributed supervised evidence are needed for other mice; the V4 Pro alone cannot validate them.
+Follow-on work is the hardware-gated remainder of https://github.com/spencer-life/viperpilot/issues/13. Opt-in catalog export preserves current production files and cannot admit a custom profile. Read the contract first: caller-supplied snapshots are not proof of a fresh GET, immutable baseline or full serial review. No custom combination is registered as approved. Do not connect drafts to setters or enable Apply until field, combination, readback and recovery evidence permits it. Other model owners or contributed supervised evidence are needed for other mice; the V4 Pro alone cannot validate them.
 
 ## Issue #12 software checkpoint — 2026-09-29
 
@@ -107,6 +107,44 @@ At head `6406e17df7a8c86b175613515b711d477379af10`, hosted
 and [Security](https://github.com/spencer-life/viperpilot/actions/runs/36648753154)
 passed. Those results validate the prior editor checkpoint, not subsequent
 capability code. Check the actual latest head separately.
+
+## Issue #13 offline software checkpoint — 2026-09-29
+
+Catalog source `26da843` adds frozen projection, preview and no-clobber export;
+`b034547` corrects a Windows-only duplicate path import. See [catalog and rollback](profile-catalog.md).
+
+- Core CI passed **122 library, 2 CLI, 3 capability integration and 6 catalog
+  integration tests**, formatting, strict Clippy, native release and CLI help.
+- Preview CI passed **128 library, 2 CLI, 9 editor, 3 capability integration
+  and 6 catalog integration tests**, with strict feature Clippy.
+- Sequential production and editor Windows MSVC release cross-builds passed
+  after the import correction. The initial production build failed with E0252;
+  this was a source import conflict, not protocol or mouse evidence. Linux code
+  was unaffected by the cfg-only correction, so its suites were not repeated.
+- Independent review found no material implementation findings. Distinct tests
+  cover actual CLI preview/export, existing-output preservation, source/config/
+  baseline isolation, strict catalog variants, protected built-ins, draft pair
+  rejection and concurrent one-winner publication. Default dependencies still
+  exclude egui/eframe.
+- Workflow actionlint and security analysis passed. CI contexts are aligned
+  with PR #1; see [CI and merge gates](ci-and-merge-gates.md). Required-check
+  activation remains pending explicit authorization after automatic review rejection.
+
+No automatic migration or production reader changed. No custom combination is
+approved; Apply remains disabled. No desktop, startup or mouse operation was run.
+Issues #6–#11 retain their owner-present gates; #13's production promotion remains
+blocked by device/combination/recovery evidence. Hosted checks for later heads
+must be assessed separately.
+
+## Software-only preparation and remaining gates
+
+[CI trigger/check names and the stacked merge policy](ci-and-merge-gates.md) are
+documented. Required-check enforcement is prepared but not enabled: automatic
+approval review requires explicit settings authorization. Keep PR #3 draft and
+do not merge PR #1 as part of this continuation. [Performance methodology](performance-validation.md)
+defines repeatable samples for a later owner-present session; no production
+measurement was run. Desktop issues #6/#8, tray/device issue #7, performance #9
+and field experiments #10/#11 retain their original manual gates.
 
 ## Tests available now
 

@@ -30,7 +30,7 @@ The next software work follows the public issue sequence:
 
 1. [#12 — persist profile drafts offline](https://github.com/spencer-life/viperpilot/issues/12): software implemented in the draft PR; review and owner-observed Windows UI checks remain, with no device planner or HID path.
 2. [#4 — define per-field capability contracts](https://github.com/spencer-life/viperpilot/issues/4): read-only exact-scope registry and fail-closed request preflight implemented in the draft PR; review and delivery remain. No custom combination is approved.
-3. [#13 — add guarded promotion to the device path](https://github.com/spencer-life/viperpilot/issues/13): connect only contract-approved intents to inspectable plans and the existing guarded worker, preserving independent readback and rollback checks.
+3. [#13 — add guarded promotion to the device path](https://github.com/spencer-life/viperpilot/issues/13): offline catalog preview/export and reversible frozen projection implemented; actual promotion remains blocked pending complete-profile evidence.
 
 Owner-present checkpoints remain pending: [#6 compact switcher accessibility](https://github.com/spencer-life/viperpilot/issues/6), [#7 production tray validation](https://github.com/spencer-life/viperpilot/issues/7), [#8 editor presentation](https://github.com/spencer-life/viperpilot/issues/8), [#9 production performance](https://github.com/spencer-life/viperpilot/issues/9), [#10 changed DPI values](https://github.com/spencer-life/viperpilot/issues/10), and [#11 additional button actions](https://github.com/spencer-life/viperpilot/issues/11). The field experiments for DPI and buttons remain isolated, one logical field at a time, with readback and baseline restoration. Software checks do not close these gates.
 
@@ -61,9 +61,10 @@ Owner-present checkpoints remain pending: [#6 compact switcher accessibility](ht
 
 **Exit gate:** Offline contract/rejection tests and both Windows cross-builds passed at `28b36f2`; review and deliver the [read-only contract](docs/capability-contract.md) in issue #4. Any new hardware capability remains unavailable until its own supervised single-field evidence is recorded. Draft request V1 does not migrate or rewrite draft library V1.
 
-### M3 — Guarded draft promotion · planned, hardware-gated
+### M3 — Guarded draft promotion · offline projection implemented, hardware-gated
 
-- Add a reviewed path from a draft to an inspectable change plan only for contract-approved fields and combinations.
+- Preview/export a separate [offline catalog](docs/profile-catalog.md), preserving alias IDs, built-ins, selected pair and original V1 files. Frozen draft copies cannot enter the production pair.
+- A later reviewed path to inspectable change plans must permit only contract-approved fields and combinations; no custom combination is approved now.
 - Keep identity checks, exact changed-field reporting, journaling, independent GET readback, partial-failure handling, and baseline restoration requirements.
 - Validate one logical field at a time against a complete immutable baseline. Review full VID/PID and serials, exact plan, and the required serial-suffix command guard before any authorized setter experiment.
 
