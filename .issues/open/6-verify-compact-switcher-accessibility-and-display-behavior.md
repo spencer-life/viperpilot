@@ -8,7 +8,7 @@ projects:
     - ViperPilot dashboard
 state: open
 state_reason: ""
-synced_at: 2026-09-30T09:02:33.488244733Z
+synced_at: 2026-09-30T10:20:26.815794778Z
 info:
     author: spencer-life
     created_at: 2026-09-29T18:22:41Z
@@ -53,3 +53,18 @@ app remains unchanged.
 Windows 11 Pro build 26200 / PowerShell 5.1 STA: all three isolated native scenarios now pass strict native UIA Button/Invoke, action names and enabled states, all six semantic hotspot names, actual UIA Details invocation, synthetic profile/view transitions and clean exit. The earlier managed-client Pane result alone was insufficient to attribute an app defect: the same current HWND reports Button/Invoke through native CUIAutomation. A separate feature-gated, PID/class/child/control-guarded native test client corrects the harness; process/output waits are bounded. Windows lint and independent review pass.
 
 See [tested harness and private-evidence summary](https://github.com/spencer-life/viperpilot/tree/codex/native-uia-test-client). Keyboard, screen-reader speech, contrast/scaling and production tray/device behavior remain separate manual gates. Installed app untouched; no production, startup or mouse action ran. Issue stays open.
+
+## Native visual alignment — 2026-09-30
+
+The [native visual layer](https://github.com/spencer-life/viperpilot/tree/codex/native-figma-polish)
+adds a preview-only Common Controls v6 manifest and supported custom drawing of
+standard buttons. Final strict Windows checks and all three isolated native UIA
+scenarios pass. Owned background captures show rose/charcoal controls, readable
+power labels, muted disabled states and visible focus. The invalid-HDC fallback
+test passes on Windows; independent review found no material issues. Earlier
+white corners and old blue emphasis were caught in captures and fixed.
+
+[Validation record](https://github.com/spencer-life/viperpilot/blob/codex/native-figma-polish/docs/native-visual-validation.md)
+retains failed experiments and limits. Keyboard activation, screen-reader speech,
+other DPI scales, high contrast and production tray remain separate gates. No
+installed app, startup or hardware operation occurred. Keep this issue open.
