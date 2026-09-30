@@ -165,6 +165,13 @@ controls and visible Save/disabled Apply at the current window size; Mouse5 lies
 below the scroll area's initial viewport and still needs hands-on navigation.
 The initial capture was occluded by another window, and Windows rejected automatic
 foreground focus. The owner brought the editor forward for the successful capture.
-Screenshots and temporary manual draft data remain private. Save/reopen, keyboard,
-IME and screen-reader results are not yet recorded. No production gate is cleared
+Screenshots and temporary manual draft data remain private. Keyboard, IME and
+screen-reader results are not yet recorded. No production gate is cleared
 by these preview results.
+
+The owner saved and closed the isolated editor, then the same hash-checked staged
+executable reopened with the same temporary draft root. Saved JSON and actual
+reopened UIA values independently agreed: profile name `Manual Test`, DPI X/Y
+`1200`/`1200`, polling `1000 Hz`. Apply changes remained disabled. This establishes
+this draft’s Save/reopen round trip; it does not establish keyboard navigation,
+IME, screen-reader speech, scaling or hardware support.

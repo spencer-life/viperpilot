@@ -7,7 +7,7 @@ projects:
     - ViperPilot dashboard
 state: open
 state_reason: null
-synced_at: 2026-09-30T06:28:40.111447291Z
+synced_at: 2026-09-30T09:12:58.957121038Z
 info:
     author: spencer-life
     created_at: 2026-09-29T18:22:54Z
@@ -41,3 +41,11 @@ Software checkpoint `6792c6f`: `mise run ci` passed 108 core tests and lint/buil
 ## Focused PR ownership — 2026-09-29
 
 Editable persisted drafts are now isolated in [PR #15](https://github.com/spencer-life/viperpilot/pull/15), based on guarded switching [PR #14](https://github.com/spencer-life/viperpilot/pull/14). Existing commits and runtime behavior were preserved when the owner requested smaller PRs. PR #3 and the new PRs remain draft; issues stay open until their delivery and validation criteria pass. No merge, release or mouse operation occurred. Earlier references to the combined PR #3 describe historical checkpoints.
+
+### Owner-present persistence result — 2026-09-30
+
+The owner saved and closed the isolated preview. Reopening the same staged editor
+with the same temporary draft library preserved `Manual Test`, DPI X/Y
+`1200`/`1200` and `1000 Hz` polling. Saved JSON and actual reopened UIA values
+agreed; Apply remained disabled. Keyboard, IME, screen-reader and scaling checks
+remain open. No legacy app or hardware state was changed.
