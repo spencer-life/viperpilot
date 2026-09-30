@@ -488,9 +488,10 @@ impl EguiPreview {
             egui::Modal::new(egui::Id::new("duplicate_draft_modal")).show(context, |ui| {
                 ui.set_min_width(340.0);
                 ui.heading("Duplicate profile draft");
-                ui.label("Name for the new local draft");
+                let name_label = ui.label("Name for the new local draft");
                 modal_error(ui, self.error.as_deref());
-                ui.text_edit_singleline(&mut self.duplicate_name);
+                ui.text_edit_singleline(&mut self.duplicate_name)
+                    .labelled_by(name_label.id);
                 ui.horizontal(|ui| {
                     if ui
                         .add_enabled(
@@ -750,6 +751,8 @@ fn action_fields(ui: &mut egui::Ui, button: &str, action: &mut ButtonActionInten
             ButtonActionIntent::Unmodeled { .. } => ActionKind::Unmodeled,
         };
         let mut kind = old_kind;
+        // 2026-09-30: each side-button control has its own accessible name.
+        let action_name = ui.label(format!("{button} action"));
         egui::ComboBox::from_id_salt(format!("action_kind_{button}"))
             .selected_text(action_label(action))
             .show_ui(ui, |ui| {
@@ -757,7 +760,9 @@ fn action_fields(ui: &mut egui::Ui, button: &str, action: &mut ButtonActionInten
                 ui.selectable_value(&mut kind, ActionKind::Unassigned, "Unassigned");
                 ui.selectable_value(&mut kind, ActionKind::KeyboardShortcut, "Keyboard shortcut");
                 ui.selectable_value(&mut kind, ActionKind::Unmodeled, "Unmodeled description");
-            });
+            })
+            .response
+            .labelled_by(action_name.id);
         change_action_kind(action, old_kind, kind, button);
         let mut next = action.clone();
         if let ButtonActionIntent::KeyboardShortcut {
@@ -769,17 +774,27 @@ fn action_fields(ui: &mut egui::Ui, button: &str, action: &mut ButtonActionInten
         } = &mut next
         {
             ui.horizontal_wrapped(|ui| {
-                ui.checkbox(control, "Ctrl");
-                ui.checkbox(alt, "Alt");
-                ui.checkbox(shift, "Shift");
-                ui.checkbox(windows, "Windows");
+                for (value, modifier) in [
+                    (control, "Ctrl"),
+                    (alt, "Alt"),
+                    (shift, "Shift"),
+                    (windows, "Windows"),
+                ] {
+                    let response = ui.checkbox(value, modifier);
+                    ui.ctx().accesskit_node_builder(response.id, |node| {
+                        node.set_label(format!("{button} {modifier}"));
+                    });
+                }
+                let key_label = ui.label(format!("{button} key"));
                 egui::ComboBox::from_id_salt(format!("key_{button}"))
                     .selected_text(format!("{key:?}"))
                     .show_ui(ui, |ui| {
                         for &option in keyboard_keys() {
                             ui.selectable_value(key, option, format!("{option:?}"));
                         }
-                    });
+                    })
+                    .response
+                    .labelled_by(key_label.id);
             });
             ui.label(RichText::new("Every named key and modifier combination is preserved as intent; support is unverified.").size(10.0).color(MUTED));
         }
@@ -789,11 +804,13 @@ fn action_fields(ui: &mut egui::Ui, button: &str, action: &mut ButtonActionInten
                     .size(10.0)
                     .color(MUTED),
             );
+            let description_label = ui.label(format!("{button} description"));
             ui.add(
                 egui::TextEdit::singleline(description)
                     .desired_width(f32::INFINITY)
                     .hint_text("Describe the unmodeled idea"),
-            );
+            )
+            .labelled_by(description_label.id);
         }
         *action = next;
     });
@@ -1039,6 +1056,55 @@ mod tests {
         assert_eq!(intent.dpi, DpiTarget { x: 800, y: 800 });
         assert_eq!(intent.polling_hz, 1_000);
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn duplicate_name_is_accessibly_labelled_and_edits_the_copy_name() {
+        let paths = temp_paths("duplicate-accessibility");
+        let root = paths.root.clone();
+        let mut app = EguiPreview::from_paths(Ok(paths));
+        app.deferred = Some(DeferredAction::Duplicate);
+        app.duplicate_name = "Copy name".to_owned();
+        let mut harness = Harness::builder().build_ui_state(|ui, app| app.view(ui), app);
+        harness.run();
+        let name = harness.get_by_role_and_label(Role::TextInput, "Name for the new local draft");
+        assert_eq!(name.value(), Some("Copy name".to_owned()));
+        name.click();
+        harness.run();
+        harness
+            .get_by_role_and_label(Role::TextInput, "Name for the new local draft")
+            .type_text(" edited");
+        harness.run();
+        assert!(harness.state().duplicate_name.contains("edited"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn side_button_controls_have_distinct_accessible_names() {
+        let mut harness = Harness::builder()
+            .with_size(Vec2::new(800.0, 800.0))
+            .build_ui_state(
+                |ui, intent: &mut ProfileIntentV1| {
+                    action_fields(ui, "Mouse4", &mut intent.mouse4);
+                    action_fields(ui, "Mouse5", &mut intent.mouse5);
+                },
+                new_intent(),
+            );
+        harness.state_mut().mouse4 = default_shortcut("Mouse4");
+        harness.state_mut().mouse5 = ButtonActionIntent::Unmodeled {
+            description: "Idea".to_owned(),
+        };
+        harness.run();
+        harness.get_by_role_and_label(Role::ComboBox, "Mouse4 action");
+        harness.get_by_role_and_label(Role::ComboBox, "Mouse5 action");
+        harness.get_by_role_and_label(Role::ComboBox, "Mouse4 key");
+        harness.get_by_role_and_label(Role::CheckBox, "Mouse4 Ctrl");
+        assert_eq!(
+            harness
+                .get_by_role_and_label(Role::TextInput, "Mouse5 description")
+                .value(),
+            Some("Idea".to_owned())
+        );
     }
 
     #[test]

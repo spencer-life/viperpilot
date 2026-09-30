@@ -6,7 +6,7 @@ labels:
     - codex-created
 state: open
 state_reason: null
-synced_at: 2026-09-29T21:45:14.653843481Z
+synced_at: 2026-09-30T07:11:20.708001134Z
 ---
 
 ## Context
@@ -25,3 +25,7 @@ Implementation baseline: [public PR #3](https://github.com/spencer-life/viperpil
 ## Checkpoint — 2026-09-29
 
 The optional editor's Windows presentation and real input/accessibility behavior remain unverified. The user is away from the Windows PC, so monitor, IME, paste, screen-reader, and DPI checks are deferred. Keep the production integration gate open.
+
+## Software readiness — 2026-09-30
+
+Independent source/UI audit found and fixed unnamed duplicate input and indistinct side-button controls. Headless tests confirm associated names/roles and duplicate-name editing; all 11 editor tests and strict preview checks pass. Actual Windows monitor/capture, screen reader, keyboard/IME/paste and scaling remain unobserved. See [manual handoff](https://github.com/spencer-life/viperpilot/blob/codex/ui-readiness/docs/manual-handoff.md). Installed app unchanged; no GUI/HID or startup operation ran. Issue remains open for its manual and delivery gates.
