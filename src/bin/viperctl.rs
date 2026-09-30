@@ -5,7 +5,7 @@ use std::process::ExitCode;
 #[cfg(windows)]
 use serde::Serialize;
 #[cfg(windows)]
-use std::path::{Path, PathBuf};
+use std::path::Path;
 #[cfg(windows)]
 use viper_v4_utility::engine::{DeviceControl, apply_write_plan};
 #[cfg(windows)]
