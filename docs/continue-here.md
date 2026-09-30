@@ -37,7 +37,7 @@ release or hardware operation occurred. PR #3 and all new implementation PRs rem
 | 13 | [Native UIA test client](https://github.com/spencer-life/viperpilot/tree/codex/native-uia-test-client) | `codex/native-uia-test-client` | Owner-present native/editor smoke results and guarded native COM test client replacing false managed Button/Invoke negatives |
 | 14 | [Editor visual alignment](https://github.com/spencer-life/viperpilot/tree/codex/figma-editor-styling) | `codex/figma-editor-styling` | Figma rose/charcoal editor tokens, readable controls and visual validation boundaries |
 | 15 | [#28](https://github.com/spencer-life/viperpilot/pull/28) | `codex/native-figma-polish` | Preview-only standard-button custom draw, Figma palette, padded compact actions and separated mouse targets |
-| 16 | [Device dashboard layout](https://github.com/spencer-life/viperpilot/tree/codex/device-dashboard-layout) | `codex/device-dashboard-layout` | Figma Device dashboard, separate read-only Buttons inspector, roomier status rows and guarded view navigation |
+| 16 | [#29](https://github.com/spencer-life/viperpilot/pull/29) | `codex/device-dashboard-layout` | Figma Device dashboard, separate read-only Buttons inspector, roomier status rows and guarded view navigation |
 
 Official [stack #17](https://github.com/spencer-life/viperpilot/pull/3) is
 registered on GitHub. The first sanitized import is still broad; its original

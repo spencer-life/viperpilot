@@ -105,7 +105,8 @@ layout correction is a separate follow-up within this visual layer.
 
 ## Device dashboard correction (2026-09-30)
 
-This focused follow-up uses `codex/device-dashboard-layout`, based on draft #28.
+This focused follow-up is draft [#29](https://github.com/spencer-life/viperpilot/pull/29)
+on `codex/device-dashboard-layout`, based on draft #28.
 
 The detailed view now follows the structural reference: a left Device sidebar,
 a large contained mouse image and a right device card with three horizontal
@@ -142,3 +143,10 @@ hotspots to have the required visibility before asserting the view. This records
 the observed failure and harness correction; it does not attribute an intermittent
 provider result to a proven application defect. Inspector power values now use
 three spaced horizontal label/value rows rather than six tightly stacked lines.
+
+The corrected, hash-checked manual preview was staged separately and opened on
+Device for owner comparison. The preceding owned manual process was closed and
+confirmed no longer running; its exit code was not verified by the external
+Get-Process wrapper, which reported an error on the exit-code check. The prior
+session record and staged folder were retained. Automated staged sessions above
+reported exit code 0. No other process was closed.

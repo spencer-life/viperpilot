@@ -8,7 +8,7 @@ projects:
     - ViperPilot dashboard
 state: open
 state_reason: ""
-synced_at: 2026-09-30T11:04:53.832696989Z
+synced_at: 2026-09-30T11:09:04.970287424Z
 info:
     author: spencer-life
     created_at: 2026-09-29T18:22:41Z
@@ -74,7 +74,7 @@ installed app, startup or hardware operation occurred. Keep this issue open.
 The owner reports working Tab navigation on both native views and marked compact
 action spacing, overlapping mouse-number borders and narrow detailed cards. They
 also rejected the old inspector layout as a match for the approved Figma render.
-The [focused dashboard layer](https://github.com/spencer-life/viperpilot/tree/codex/device-dashboard-layout) separates the
+[Draft #29](https://github.com/spencer-life/viperpilot/pull/29) separates the
 Device dashboard from the numbered read-only Buttons inspector. Compact action
 labels are padded/centered; hotspot targets are separate; inspector status cards
 are wider and power rows have spacing. The Device page follows the reference
