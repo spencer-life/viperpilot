@@ -96,7 +96,9 @@ The owner-present focus observations above belong to the prior binary. After the
 Windows capture at 2576×1408 showed the palette, consistent card widths, all
 profile/action controls and bottom Save/disabled Apply rendering legibly without
 overlap. The bounded form leaves substantial empty space when maximized; this is
-not pixel parity with the compact raster concept. New-build keyboard focus and
-other display scales remain unobserved. This improves
+not pixel parity with the compact raster concept. The owner then repeated the
+Tab/Shift+Tab check on this styled build and confirmed focus remained visible.
+This is an owner-observed focus/navigation result, not screen-reader speech or
+IME validation. Other display scales remain unobserved. This improves
 the reference palette, type size and control layout; it does not claim pixel
 parity with the raster concepts or completion of compact/detailed view alignment.
