@@ -1,6 +1,6 @@
 # egui evaluation for ViperPilot
 
-Updated 2026-09-29. This is an architecture decision record for a hardware-free UI experiment, not evidence of new device support or completed product UI. The immediate priority is a fast native tray/hotkey path with low idle cost. User-authored profile drafts are also a product goal. Developer and Gaming remain protected recovery examples; local aliases of them are not custom profiles.
+Updated 2026-09-30. This is an architecture decision record for a hardware-free UI experiment, not evidence of new device support or completed product UI. The immediate priority is a fast native tray/hotkey path with low idle cost. User-authored profile drafts are also a product goal. Developer and Gaming remain protected recovery examples; local aliases of them are not custom profiles.
 
 ## Decision for the current slice
 
@@ -44,7 +44,7 @@ The optional editor runs as a separate on-demand process, keeping its renderer o
 
 1. The feature-gated preview cross-builds with the repository's mise task and runs without hardware access. Existing default Linux CI, native Windows CI, and Windows production cross-build remain green.
 2. Behavior tests edit synthetic profile names, DPI intent, polling intent, and button mapping intent; no preview action can request a device write or claim unverified settings are applied.
-3. On Windows, inspect the persisted editor's UIA roles/names, keyboard focus and activation, IME composition, paste and non-Latin profile names, screen-reader output, high-DPI scaling, and the approved Figma dark compact/detailed states. Record failures as well as passes. These owner-present editor and compact-switcher checks remain pending.
+3. On Windows, inspect the persisted editor's UIA roles/names, keyboard focus and activation, IME composition, paste and non-Latin profile names, screen-reader output, high-DPI scaling, and the approved Figma dark compact/detailed states. Record failures as well as passes. See `figma-visual-validation.md` and `native-visual-validation.md` for owner-present preview results; IME composition, screen-reader speech and other display scales remain pending.
 4. Measure binary size, cold open to interactive, close/reopen, and idle CPU/working set for tray-only, editor-open, and editor-closed states. Compare with the current native build on the same machine. Do not assert a lighter or faster app from library choice alone.
 5. Before connecting a real editor to the worker, define a versioned semantic profile-intent schema, migration/rollback, per-device capability contract, inspectable write plan, independent readback, and fail-closed behavior. The first immutable baseline is never a profile or draft.
 
@@ -55,9 +55,21 @@ The implementation candidate's hardware-free foundation checks report 108 core t
 - The isolated Windows preview cross-build and runtime smoke passed. Its executable is 7,461,888 bytes; the current production tray executable is 906,752 bytes in the same cross-build target. This compares binary size only, not runtime overhead. The default production dependency tree contains no eframe package.
 - Headless egui/AccessKit tests passed (3): synthetic values stay editable, the `Profile name` input has a semantic text-input role and name, and Apply remains disabled. Windows UI Automation found that input as an enabled Edit and both Apply and Save as disabled Buttons. The preview opened and closed with exit code 0. The test did not exercise a screen reader or keyboard-only navigation.
 - Headless Linux Xvfb/Mesa renders exercised the synthetic quick-edit and all-settings views after replacing unsupported decorative glyphs and pinning the disabled action footer. Screenshot files are omitted from this public repository; these renders do not establish Windows display behavior.
-- Windows desktop capture remains inconclusive: a normal desktop capture showed a white client area while a separate renderer-frame capture showed rendered controls. It is not established whether the issue is presentation or capture. Physical display appearance, high-DPI behavior, time to interactive, resident tray resource comparison, and production process separation remain open gates. The capture images are not included in this public repository.
+- At this earlier checkpoint, Windows desktop capture was inconclusive: a normal desktop capture showed a white client area while a separate renderer-frame capture showed rendered controls. It is not established whether the issue is presentation or capture. Physical display appearance, high-DPI behavior, time to interactive, resident tray resource comparison, and production process separation remain open gates. Later owner screenshots and background PrintWindow captures resolved the preview presentation question; see `figma-visual-validation.md`. The earlier failed capture is retained here as evidence. The capture images are not included in this public repository.
 - `mise run measure-egui-preview-windows` stages only the preview EXE and repeats three launches. Window-handle detection took 301, 69, and 75 ms; working set after two seconds was 83.3, 82.2, and 82.4 MiB; process CPU time added 0 ms in each following five-second idle interval at the available counter resolution. Each process closed with exit code 0. These are one-machine preview measurements, not time to interactive, tray-only overhead, or a Synapse comparison.
-- As of the issue #12 implementation, the optional editor uses the separate local draft library for create/edit/rename/duplicate/delete/save/reopen. Enabled fields match V1 intent; unsupported settings are unsavable. Save has no planner or HID path, and Apply remains disabled. Historical Windows measurements above apply to the earlier synthetic preview; the persistent editor has not been manually tested on Windows.
+- As of the issue #12 implementation, the optional editor uses the separate local draft library for create/edit/rename/duplicate/delete/save/reopen. Enabled fields match V1 intent; unsupported settings are unsavable. Save has no planner or HID path, and Apply remains disabled. Historical Windows measurements above apply to the earlier synthetic preview. The persisted editor has since passed owner save/reopen, keyboard reachability/focus and exact Unicode persistence checks; `figma-visual-validation.md` records the actual Windows presentation and remaining gates.
+
+## Persisted styled editor measurements (2026-09-30)
+
+`mise run measure-egui-preview-windows` passed three isolated launches with unique
+Windows TEMP draft roots and clean exits. Window-handle detection took 276, 64 and
+71 ms. Working sets after two seconds were 167.5, 106.8 and 107.1 MiB; private bytes
+were 163.4, 111.3 and 109.9 MiB. Each following five-second idle interval added
+0 ms process CPU at the available counter resolution. The first sample had higher
+memory use; no cause or steady-state plateau was established. These numbers apply
+to the persisted, styled editor with installed-font fallback, not the earlier
+synthetic preview. They measure window creation rather than time to interactive,
+and do not establish resident tray overhead or a comparison with Synapse.
 
 ## Customization boundary
 
