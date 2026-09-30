@@ -5,12 +5,14 @@
 //! tested in WSL without access to the mouse.
 
 pub mod capability;
+pub mod catalog_export;
 #[cfg(feature = "egui-preview")]
 pub mod draft_editor;
 pub mod engine;
 pub mod gui_logic;
 pub mod model;
 pub mod planning;
+pub mod profile_catalog;
 pub mod profile_intent;
 pub mod profile_library;
 pub mod protocol;
