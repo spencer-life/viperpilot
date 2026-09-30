@@ -133,8 +133,25 @@ try {
         } catch {
             $invokeAvailable = $false
         }
+        # 2026-09-30: panes/no-Invoke was a known defect, not a passing result.
+        if ($button.Current.ControlType -ne [System.Windows.Automation.ControlType]::Button) {
+            throw "Control ID $ControlId is not exposed as a UIA Button."
+        }
+        if (-not $invokeAvailable) {
+            throw "Control ID $ControlId lacks the required UIA InvokePattern."
+        }
         Write-ProgressMarker ("Control {0}: UIA type={1}; name='{2}'; enabled={3}; InvokePattern={4}" -f $ControlId, $button.Current.ControlType.ProgrammaticName, $button.Current.Name, $button.Current.IsEnabled, $invokeAvailable)
         return $button
+    }
+
+    function Invoke-PreviewButton {
+        param([Parameter(Mandatory = $true)][int] $ControlId)
+        $button = Get-PreviewButton -ControlId $ControlId
+        if (-not $button.Current.IsEnabled) {
+            throw "Refusing UIA Invoke for disabled control ID $ControlId."
+        }
+        $pattern = $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
+        $pattern.Invoke()
     }
 
     function Click-PreviewButton {
@@ -314,8 +331,8 @@ try {
         Write-ProgressMarker "Back-to-back profile commands settled on '$firstExpectedProfile'."
     }
 
-    Write-ProgressMarker 'Sending BM_CLICK to the Details button HWND.'
-    Click-PreviewButton -ControlId 2003
+    Write-ProgressMarker 'Invoking Details through UI Automation.'
+    Invoke-PreviewButton -ControlId 2003
 
     $recoveryDeadline = [DateTime]::UtcNow.AddSeconds($controlTimeoutSeconds)
     $recoveryLabelsFound = $false
@@ -343,6 +360,11 @@ try {
     [void](Assert-Button -ControlId 2001 -ExpectedName 'Apply Developer recovery preset' -ExpectedEnabled $true)
     [void](Assert-Button -ControlId 2002 -ExpectedName 'Apply Gaming recovery preset' -ExpectedEnabled $true)
     [void](Assert-Button -ControlId 2003 -ExpectedName 'Quick switch' -ExpectedEnabled $true)
+    $hotspotNames = @('Left click', 'Right click', 'Middle click', 'Rear side · Mouse 4', 'Front side · Mouse 5', 'DPI button')
+    for ($hotspot = 1; $hotspot -le 6; $hotspot++) {
+        [void](Assert-Button -ControlId (2100 + $hotspot) -ExpectedName $hotspotNames[$hotspot - 1] -ExpectedEnabled $true)
+    }
+
     Write-ProgressMarker 'Details exposed both recovery labels.'
 
     Write-ProgressMarker 'Toggling Details twice back-to-back, then checking the final Details labels.'

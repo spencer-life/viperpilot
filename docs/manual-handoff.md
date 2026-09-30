@@ -23,8 +23,11 @@ production/preview GUI launch or hardware operation occurred.
 - Reviewed correction of the manual checklist: no fixtures in legacy data,
   incidental exit of the installed app, or portable production launch assumed safe.
 
-Independent UI review found two concrete issues and reviewed their fixes with no
-remaining material findings. Core checks pass **129 library + 2 CLI + 3 capability
+Independent review resolved the worker-error and editor-name findings. Final
+handoff review also identified the already-recorded native owner-draw/UIA defect.
+The native accessibility layer switches action/view/hotspot controls to standard
+Windows push buttons. Its preview script now requires Button/Invoke semantics
+and exercises UIA invocation; actual Windows execution remains deferred. Core checks pass **129 library + 2 CLI + 3 capability
 + 6 catalog tests**; preview checks pass **135 library + 2 CLI + 11 editor +
 3 capability + 6 catalog tests**. Formatting, strict Clippy, native release and
 Windows MSVC production/editor cross-builds pass without launching. A first new
@@ -42,7 +45,7 @@ proof of a later commit. New PRs remain draft even when checks pass.
 
 | Issue / task | Boundary | Next observed step |
 | --- | --- | --- |
-| #6 native UI | Interactive Windows | Isolated native preview: labels, keyboard, roles/patterns, screen reader, scale, narrow windows and error states |
+| #6 native UI | Source remediation prepared; interactive Windows verification | Standard button semantics replace the known owner-draw pane/no-Invoke path. Run the isolated preview script and verify: labels, keyboard, roles/patterns, screen reader, scale, narrow windows and error states |
 | #8 editor UI | Interactive Windows | Isolated editor: actual monitor vs capture, keyboard/IME/paste, non-Latin names, screen reader, scaling, Save/reopen and disabled Apply |
 | #7 production tray | Owner-present Windows + mouse | First review the separate launch arrangement/hotkey ownership. Keep production blocked until safe prerequisites are agreed; then supervised complete-profile/readback/rollback/hotkey/persistence checks |
 | #9 performance | Owner-present Windows | Record tray-only resources and production switching latency separately from editor metrics; blocked tray cannot provide valid measurements |
@@ -68,3 +71,30 @@ proof of a later commit. New PRs remain draft even when checks pass.
 
 The installed legacy app stays untouched. No unobserved checkbox is a passing
 result, and no automatic approval or merge is implied by this handoff.
+
+## Native button remediation — 2026-09-30
+
+The historical pane/no-Invoke result remains recorded in quick-switch status.
+Source remediation uses Windows-standard button styles without adding a resident
+UI framework or custom accessibility provider. Windows system COM annotations
+provide semantic names for numbered hotspots while retaining their compact
+visual labels; initialization, partial failures and teardown have scoped cleanup. The native appearance replaces
+custom-colored button painting; current profile and selected assignment remain
+visible in status text. Compact profile names wrap through the multiline style.
+Real roles, Invoke, keyboard, focus, contrast, scaling and legibility must still
+pass on Windows. The preview script fails on pane/no-Invoke instead of merely
+logging it; it remains an owner-present test, not an unattended launch.
+
+This is a prepared software fix, not a claimed passing Windows accessibility
+result. No production gate or hardware policy changed.
+
+The annotation follows Microsoft’s [accessible-name sample](https://learn.microsoft.com/en-us/accessibility-tools-docs/items/win32/edit_name). UIA name propagation and teardown must be measured on Windows; cross-compilation alone does not establish either.
+
+Final native-layer validation passed formatting/diff checks, production and native
+preview Windows MSVC cross-builds, and Windows-target all-target Clippy using the
+repository's Windows policy (`-D warnings -A clippy::pedantic`). Initial annotation
+compilation exposed missing Windows features; enabling only system COM and
+Accessibility resolved it. Independent review found no remaining material software
+blocker in the scoped delta. The headless core/editor results above are from
+`7f4dfac`; the final layer changes Windows-only controls and their manual script.
+PowerShell/UIA runtime validation is deferred; no script or GUI was launched.

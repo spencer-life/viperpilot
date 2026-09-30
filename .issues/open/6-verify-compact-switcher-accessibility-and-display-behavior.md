@@ -6,7 +6,7 @@ labels:
     - release-gate
 state: open
 state_reason: null
-synced_at: 2026-09-30T07:11:15.680353526Z
+synced_at: 2026-09-30T07:21:43.066629204Z
 ---
 
 ## Context
@@ -28,3 +28,16 @@ Accessibility and real monitor/display behavior remain unverified. No Windows de
 ## Software readiness — 2026-09-30
 
 Generic worker/read errors now mark current state unavailable, clearing observed values and disabling switching/hotkeys until successful refresh. Pure GUI regression and Windows cross-build pass. Real native control roles/patterns, keyboard, screen-reader and scaling checks remain manual. See [manual handoff](https://github.com/spencer-life/viperpilot/blob/codex/ui-readiness/docs/manual-handoff.md). Installed app unchanged; no GUI/HID or startup operation ran. Issue remains open for its manual and delivery gates.
+
+## Native accessibility remediation — 2026-09-30
+
+The recorded owner-draw pane/no-Invoke result was a software defect. The
+[native accessibility layer](https://github.com/spencer-life/viperpilot/tree/codex/native-button-accessibility)
+now prepares standard Windows button styles and semantic hotspot names through
+the system annotation service. The isolated preview script requires UIA Button
+and InvokePattern, checks all six semantic hotspot names, and invokes Details via
+UIA. Windows production/preview cross-builds, Windows-target lint and independent
+review passed. The PowerShell script, GUI/UIA and screen reader were not run;
+actual roles, names, invocation, keyboard, contrast and scaling remain manual
+validation gates. The production tray/installer stay blocked and the installed
+app remains unchanged.
