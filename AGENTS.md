@@ -56,10 +56,10 @@ Read `docs/quick-switch-status.md` for this decision, the current source-only
 boundary, and recorded validation blockers before continuing the profile work.
 Do not mistake local named configurations for independently stored onboard slots.
 
-The next software slice is the editable/persisted local draft editor tracked in
-public issue #12. Unverified settings may remain clearly marked drafts; Apply
-stays disabled until the documented device, field, and complete-profile gates
-pass. See `docs/tooling-decision.md` for the Cargo/mise decision; Aube was not
+The local draft editor (#12) and read-only capability contract (#4) are
+implemented in the draft PR. Read `docs/capability-contract.md` before promotion
+work (#13). No custom combination is approved; Apply stays disabled until the
+documented device, field, recovery and complete-profile gates pass. See `docs/tooling-decision.md` for the Cargo/mise decision; Aube was not
 adopted, and its embedded Rust library was not compiled or benchmarked.
 
 `ROADMAP.md` describes possible expansion. It is planning material, not evidence

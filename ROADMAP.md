@@ -2,7 +2,7 @@
 
 > **Current direction · 2026-09-29.** ViperPilot is a lightweight native Windows utility for the Razer Viper V4 Pro. The immediate product priority is a fast tray and hotkey path with minimal idle overhead. Users should also be able to create and save their own profile drafts; device writes remain limited to the documented Viper V4 Pro field scope and its evidence gates. This roadmap is planning, not proof of hardware support.
 
-Live work: [public GitHub issues](https://github.com/spencer-life/viperpilot/issues). The current implementation candidate is [PR 3](https://github.com/spencer-life/viperpilot/pull/3), still a draft. Its last validated source checkpoint is [`7cb0440`](https://github.com/spencer-life/viperpilot/commit/7cb0440): the [Linux and Windows Core CI run](https://github.com/spencer-life/viperpilot/actions/runs/36612610509) and [Security run](https://github.com/spencer-life/viperpilot/actions/runs/36612610273) passed for that checkpoint. Later documentation revisions have separate CI/security status. These are software checks only; no production tray or physical mouse validation is claimed. See [quick-switch status](docs/quick-switch-status.md) for the validation boundary.
+Live work: [public GitHub issues](https://github.com/spencer-life/viperpilot/issues). The current implementation candidate is [PR 3](https://github.com/spencer-life/viperpilot/pull/3), still a draft. Hosted [Linux/Windows Core CI](https://github.com/spencer-life/viperpilot/actions/runs/36648753194) and [Security](https://github.com/spencer-life/viperpilot/actions/runs/36648753154) passed at `6406e17` before the capability contract slice. Later commits require their own checks. These are software checks only; no production tray or physical mouse validation is claimed. See [quick-switch status](docs/quick-switch-status.md) for the validation boundary.
 
 Planning views: [HTML roadmap](artifacts/viperpilot-roadmap.html), [Figma design](https://www.figma.com/design/Ujs2cpFXYNnSI2YquOG1jF), [Figma development workflow](https://www.figma.com/board/7ZCW50LM1czKUmPISbxukM/Figma---Development-Workflow), and [project brain and roadmap](https://www.figma.com/board/1DhV61xcYdFD3SbtWbGBHN/ViperPilot-%25E2%2580%2594-Project-Brain---Roadmap). These are planning references; this documentation refresh does not claim that any Figma file was updated or that its designs were validated in a running application.
 
@@ -29,7 +29,7 @@ Historical foundation sources compile and their software suites pass: 108 core t
 The next software work follows the public issue sequence:
 
 1. [#12 — persist profile drafts offline](https://github.com/spencer-life/viperpilot/issues/12): software implemented in the draft PR; review and owner-observed Windows UI checks remain, with no device planner or HID path.
-2. [#4 — define per-field capability contracts](https://github.com/spencer-life/viperpilot/issues/4): make supported values, device scope, and evidence requirements explicit before any new writable field can be exposed.
+2. [#4 — define per-field capability contracts](https://github.com/spencer-life/viperpilot/issues/4): read-only exact-scope registry and fail-closed request preflight implemented in the draft PR; review and delivery remain. No custom combination is approved.
 3. [#13 — add guarded promotion to the device path](https://github.com/spencer-life/viperpilot/issues/13): connect only contract-approved intents to inspectable plans and the existing guarded worker, preserving independent readback and rollback checks.
 
 Owner-present checkpoints remain pending: [#6 compact switcher accessibility](https://github.com/spencer-life/viperpilot/issues/6), [#7 production tray validation](https://github.com/spencer-life/viperpilot/issues/7), [#8 editor presentation](https://github.com/spencer-life/viperpilot/issues/8), [#9 production performance](https://github.com/spencer-life/viperpilot/issues/9), [#10 changed DPI values](https://github.com/spencer-life/viperpilot/issues/10), and [#11 additional button actions](https://github.com/spencer-life/viperpilot/issues/11). The field experiments for DPI and buttons remain isolated, one logical field at a time, with readback and baseline restoration. Software checks do not close these gates.
@@ -53,13 +53,13 @@ Owner-present checkpoints remain pending: [#6 compact switcher accessibility](ht
 
 **Exit gate:** Issue #12 hardware-free round-trip, invalid-data, failure-retention and isolation checks pass at source `6792c6f`; owner-observed Windows editor validation remains pending. Saving intent does not invoke a planner or HID operation.
 
-### M2 — Per-field capability contracts · planned
+### M2 — Per-field capability contracts · software checked, delivery pending
 
 - Define typed field support, allowed semantic values, exact device/transport scope, validation, readback expectations, and the evidence required before a value can be applied.
 - Treat DPI changes and additional button actions as separate research items. Existing wireless polling transitions and particular Mouse4/Mouse5 assignments apply only to their documented Viper V4 Pro identity and conditions.
 - No source encoder, unchanged-value write, saved draft, or GET response by itself establishes support for a changed value.
 
-**Exit gate:** Issue #4 documents and tests the fail-closed contract offline. Any new hardware capability remains unavailable until its own supervised single-field evidence is recorded.
+**Exit gate:** Offline contract/rejection tests and both Windows cross-builds passed at `28b36f2`; review and deliver the [read-only contract](docs/capability-contract.md) in issue #4. Any new hardware capability remains unavailable until its own supervised single-field evidence is recorded. Draft request V1 does not migrate or rewrite draft library V1.
 
 ### M3 — Guarded draft promotion · planned, hardware-gated
 

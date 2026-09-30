@@ -27,6 +27,17 @@ Current hardware evidence is limited to one documented wireless Viper V4 Pro dev
 
 For each candidate value or action, record the full connected identity and immutable baseline; review the exact single-field plan; perform one setter experiment; independently GET the field; restore and verify the baseline before starting another. Record failed attempts and ambiguous responses. Each new DPI value, side-button action, polling transition, stage behavior, or model needs its own evidence. Changed DPI values and additional button actions remain pending owner-present experiments ([issue #10](https://github.com/spencer-life/viperpilot/issues/10) and [issue #11](https://github.com/spencer-life/viperpilot/issues/11)). After isolated fields pass, test the actual combined custom profile, rollback, process exit, and mouse power cycle. Keep startup and release gates in AGENTS.md and the README.
 
+## Implemented contract — 2026-09-29
+
+[Issue #4](https://github.com/spencer-life/viperpilot/issues/4) now has a typed
+exact-scope registry, strict versioned semantic request and read-only preflight.
+The contract rejects missing, mismatched, stale, ambiguous and unsupported
+inputs; even individually evidenced values stop at the unapproved custom
+combination gate. It emits no WritePlan and changes no production allowlist.
+Read [the contract, storage compatibility and recovery rules](capability-contract.md).
+The optional editor assesses drafts without a verified device scope and keeps
+Save independent from the disabled Apply action.
+
 ## Implementation relationship
 
 - ProfileIntentV1 is a semantic, local-only model. Its field assessments describe evidence and do not produce WritePlan or HID packets. ProfileDraftLibraryV1 persists validated, unverified local intents in profile-drafts-v1.json; that library is separate from quick-switch aliases.
