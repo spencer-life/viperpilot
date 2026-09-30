@@ -22,13 +22,13 @@ use windows::Win32::Foundation::{
 use windows::Win32::Graphics::Dwm::{DWMWA_USE_IMMERSIVE_DARK_MODE, DwmSetWindowAttribute};
 use windows::Win32::Graphics::Gdi::{
     BITMAP, BeginPaint, CLEARTYPE_QUALITY, CLIP_DEFAULT_PRECIS, CLR_INVALID, CreateCompatibleDC,
-    CreateFontW, CreatePen, CreateSolidBrush, DEFAULT_CHARSET, DEFAULT_PITCH, DT_CENTER,
-    DT_SINGLELINE, DT_VCENTER, DeleteDC, DeleteObject, DrawFocusRect, DrawTextW, Ellipse, EndPaint,
-    FONT_WEIGHT, FW_BOLD, FW_NORMAL, FillRect, GetCurrentObject, GetObjectW, HALFTONE, HBITMAP,
-    HBRUSH, HDC, HFONT, HGDIOBJ, InvalidateRect, LineTo, MoveToEx, OBJ_BRUSH, OBJ_PEN,
-    OUT_DEFAULT_PRECIS, PAINTSTRUCT, PS_SOLID, RDW_ALLCHILDREN, RDW_INVALIDATE, RedrawWindow,
-    RestoreDC, RoundRect, SRCCOPY, SaveDC, SelectObject, SetBkMode, SetStretchBltMode,
-    SetTextColor, StretchBlt, TRANSPARENT,
+    CreateFontW, CreatePen, CreateSolidBrush, DEFAULT_CHARSET, DEFAULT_PITCH, DT_CALCRECT,
+    DT_CENTER, DT_SINGLELINE, DT_VCENTER, DeleteDC, DeleteObject, DrawFocusRect, DrawTextW,
+    Ellipse, EndPaint, FONT_WEIGHT, FW_BOLD, FW_NORMAL, FillRect, GetCurrentObject, GetObjectW,
+    HALFTONE, HBITMAP, HBRUSH, HDC, HFONT, HGDIOBJ, InvalidateRect, LineTo, MoveToEx, OBJ_BRUSH,
+    OBJ_PEN, OUT_DEFAULT_PRECIS, PAINTSTRUCT, PS_SOLID, RDW_ALLCHILDREN, RDW_INVALIDATE,
+    RedrawWindow, RestoreDC, RoundRect, SRCCOPY, SaveDC, SelectObject, SetBkMode,
+    SetStretchBltMode, SetTextColor, StretchBlt, TRANSPARENT,
 };
 use windows::Win32::System::Com::{
     CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx,
@@ -1322,7 +1322,7 @@ fn mouse_hotspot_bounds(control: gui_logic::MouseControl) -> (i32, i32, i32, i32
         ),
         gui_logic::MouseControl::Right => (
             BASE_MOUSE_IMAGE_LEFT + 100,
-            BASE_MOUSE_IMAGE_TOP + 37,
+            BASE_MOUSE_IMAGE_TOP + 30,
             34,
             34,
         ),
@@ -1340,13 +1340,13 @@ fn mouse_hotspot_bounds(control: gui_logic::MouseControl) -> (i32, i32, i32, i32
         ),
         gui_logic::MouseControl::FrontSide => (
             BASE_MOUSE_IMAGE_LEFT + 32,
-            BASE_MOUSE_IMAGE_TOP + 122,
+            BASE_MOUSE_IMAGE_TOP + 126,
             34,
             34,
         ),
         gui_logic::MouseControl::Dpi => (
             BASE_MOUSE_IMAGE_LEFT + 78,
-            BASE_MOUSE_IMAGE_TOP + 97,
+            BASE_MOUSE_IMAGE_TOP + 102,
             34,
             34,
         ),
@@ -2707,6 +2707,13 @@ impl TrayApp {
                 is_hotspot,
                 focused,
                 multiline: !self.detailed && matches!(control_id, BUTTON_DEVELOPER | BUTTON_GAMING),
+                text_inset: if !self.detailed
+                    && matches!(control_id, BUTTON_DEVELOPER | BUTTON_GAMING)
+                {
+                    scale(10, dpi)
+                } else {
+                    0
+                },
             },
         )
     }
@@ -3335,6 +3342,7 @@ struct ButtonPaintStyle {
     is_hotspot: bool,
     focused: bool,
     multiline: bool,
+    text_inset: i32,
 }
 
 fn draw_button_gdi(
@@ -3433,13 +3441,42 @@ fn draw_button_gdi(
     }
     if draw_ok {
         let mut wide: Vec<u16> = label.encode_utf16().collect();
-        let mut text_rect = rect;
         let format = if style.multiline {
-            DT_CENTER | DT_VCENTER | windows::Win32::Graphics::Gdi::DT_WORDBREAK
+            DT_CENTER | windows::Win32::Graphics::Gdi::DT_WORDBREAK
         } else {
             DT_CENTER | DT_VCENTER | DT_SINGLELINE
         };
-        draw_ok = unsafe { DrawTextW(hdc, &mut wide, &mut text_rect, format) } > 0;
+        if style.multiline {
+            let content = RECT {
+                left: rect.left + style.text_inset,
+                top: rect.top + style.text_inset,
+                right: rect.right - style.text_inset,
+                bottom: rect.bottom - style.text_inset,
+            };
+            if content.right <= content.left || content.bottom <= content.top {
+                draw_ok = false;
+            } else {
+                let mut measured = content;
+                let required =
+                    unsafe { DrawTextW(hdc, &mut wide, &mut measured, format | DT_CALCRECT) };
+                let required_height = measured.bottom - measured.top;
+                let content_height = content.bottom - content.top;
+                if required <= 0 || required_height <= 0 || required_height > content_height {
+                    draw_ok = false;
+                } else {
+                    let top = content.top + (content_height - required_height) / 2;
+                    let mut text_rect = RECT {
+                        top,
+                        bottom: top + required_height,
+                        ..content
+                    };
+                    draw_ok = unsafe { DrawTextW(hdc, &mut wide, &mut text_rect, format) } > 0;
+                }
+            }
+        } else {
+            let mut text_rect = rect;
+            draw_ok = unsafe { DrawTextW(hdc, &mut wide, &mut text_rect, format) } > 0;
+        }
     }
     if draw_ok && style.focused {
         let mut focus = rect;
@@ -4068,8 +4105,42 @@ mod quick_switch_tray_tests {
                 is_hotspot: false,
                 focused: false,
                 multiline: false,
+                text_inset: 0,
             },
         ));
+    }
+
+    #[test]
+    fn numbered_mouse_hotspots_stay_separate_and_inside_the_image_at_common_dpis() {
+        for dpi in [96, 144, 192] {
+            let image = mouse_image_bounds(dpi);
+            let hotspots: Vec<RECT> = gui_logic::MouseControl::ALL
+                .into_iter()
+                .map(|control| {
+                    let (left, top, width, height) = mouse_hotspot_bounds(control);
+                    RECT {
+                        left: scale(left, dpi),
+                        top: scale(top, dpi),
+                        right: scale(left + width, dpi),
+                        bottom: scale(top + height, dpi),
+                    }
+                })
+                .collect();
+
+            for (index, hotspot) in hotspots.iter().enumerate() {
+                assert!(hotspot.left >= image.left, "left of image at {dpi} DPI");
+                assert!(hotspot.top >= image.top, "above image at {dpi} DPI");
+                assert!(hotspot.right <= image.right, "right of image at {dpi} DPI");
+                assert!(hotspot.bottom <= image.bottom, "below image at {dpi} DPI");
+                for other in &hotspots[index + 1..] {
+                    let overlaps = hotspot.left < other.right
+                        && other.left < hotspot.right
+                        && hotspot.top < other.bottom
+                        && other.top < hotspot.bottom;
+                    assert!(!overlaps, "mouse hotspots overlap at {dpi} DPI");
+                }
+            }
+        }
     }
 
     #[test]
