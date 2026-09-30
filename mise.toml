@@ -67,17 +67,21 @@ run = "cargo clippy --all-targets --locked -- -D warnings -A clippy::pedantic"
 description = "Hardware-free native Windows checks, tests, build, and CLI smoke test."
 run = [{ task = "fmt-check" }, { task = "lint-windows" }, { task = "test" }, { task = "build-native" }, { task = "cli-smoke" }]
 
+# 2026-09-29: include feature-gated draft-session tests, not only binary UI tests.
 [tasks.ci-preview]
-description = "Strictly lint and test the hardware-free egui editor preview."
+description = "Strictly lint and test the hardware-free local draft editor and session."
 run = [
   "cargo clippy --all-targets --features egui-preview --locked -- -D warnings",
-  "cargo test --locked --features egui-preview --bin viperpilot-egui-preview",
+  "cargo test --all-targets --locked --features egui-preview",
 ]
 
+# 2026-09-29: exercise local draft/session and AccessKit tests on hosted Windows;
+# these tests use temporary stores and never open a window or HID device.
 [tasks.ci-windows-preview]
-description = "Compile and lint the hardware-free native Win32 UI preview without launching it."
+description = "Compile, lint, and headlessly test the isolated Windows previews without launching them."
 run = [
-  "cargo clippy --all-targets --features ui-preview --locked -- -D warnings -A clippy::pedantic",
+  "cargo clippy --all-targets --features ui-preview,egui-preview --locked -- -D warnings -A clippy::pedantic",
+  "cargo test --all-targets --features egui-preview --locked",
   "cargo build --release --locked --features ui-preview --bin viperpilot-ui-preview",
 ]
 
@@ -100,7 +104,7 @@ run = [
 ]
 
 # 2026-09-29: isolated egui/eframe settings editor exploration.
-# It renders synthetic state only and is separate from the production app.
+# It edits local drafts only and is separate from the production tray/device path.
 [tasks.build-egui-preview-windows]
 description = "Cross-build the hardware-free egui settings editor preview without launching it."
 run = "mise exec -- cargo xwin build --target x86_64-pc-windows-msvc --features egui-preview --bin viperpilot-egui-preview --release --locked"
