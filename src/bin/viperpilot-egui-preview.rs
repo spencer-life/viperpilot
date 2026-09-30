@@ -6,9 +6,11 @@
 use std::path::PathBuf;
 
 use eframe::egui::{self, Color32, RichText, Stroke, Vec2, Visuals};
+use viper_v4_utility::capability::{assess_draft, recorded_evidence_summary};
 use viper_v4_utility::draft_editor::DraftEditor;
 use viper_v4_utility::profile_intent::{
-    ButtonActionIntent, DpiTarget, KeyboardKey, PROFILE_INTENT_SCHEMA_VERSION, ProfileIntentV1,
+    ButtonActionIntent, DpiTarget, FieldCapability, KeyboardKey, PROFILE_INTENT_SCHEMA_VERSION,
+    ProfileIntentV1,
 };
 use viper_v4_utility::storage::StoragePaths;
 
@@ -424,6 +426,8 @@ impl EguiPreview {
                 action_fields(ui, "Mouse4", &mut self.buffer.mouse4);
                 ui.add_space(12.0);
                 action_fields(ui, "Mouse5", &mut self.buffer.mouse5);
+                ui.add_space(12.0);
+                capability_evidence(ui, &self.buffer);
             });
             ui.add_space(10.0);
             if let Err(error) = self.buffer.validate() {
@@ -523,6 +527,92 @@ impl EguiPreview {
                 });
             });
         }
+    }
+}
+
+fn capability_evidence(ui: &mut egui::Ui, intent: &ProfileIntentV1) {
+    egui::CollapsingHeader::new("Capability evidence · local draft review")
+        .id_salt("profile_capability_evidence")
+        .show(ui, |ui| {
+            ui.label(
+                RichText::new("No connected mouse has been verified.")
+                    .strong()
+                    .color(ROSE),
+            );
+            ui.label(
+                RichText::new(
+                    "This report uses no device identity, serial, firmware, or transport data.",
+                )
+                .size(10.0)
+                .color(MUTED),
+            );
+            ui.label(
+                RichText::new(
+                    "Per-field evidence does not verify the full profile combination; promotion remains blocked.",
+                )
+                .size(10.0)
+                .color(MUTED),
+            );
+
+            match assess_draft(intent, None) {
+                Ok(report) => {
+                    ui.add_space(6.0);
+                    ui.label(
+                        RichText::new(format!(
+                            "Recorded scope reference only: {}",
+                            recorded_evidence_summary()
+                        ))
+                        .size(10.0)
+                        .color(MUTED),
+                    );
+
+                    ui.add_space(6.0);
+                    for field in report.fields {
+                        ui.label(
+                            RichText::new(format!(
+                                "{} · {}",
+                                field.label,
+                                capability_label(field.evidence)
+                            ))
+                            .strong()
+                            .size(11.0),
+                        );
+                        ui.label(RichText::new(field.reason).size(10.0).color(MUTED));
+                    }
+                    if !report.blockers.is_empty() {
+                        ui.add_space(6.0);
+                        ui.label(RichText::new("Blockers").strong().size(11.0));
+                        for blocker in report.blockers {
+                            ui.label(
+                                RichText::new(format!("• {blocker}"))
+                                    .size(10.0)
+                                    .color(MUTED),
+                            );
+                        }
+                    }
+                }
+                Err(error) => {
+                    ui.label(
+                        RichText::new(format!("Evidence report unavailable: {error}"))
+                            .size(10.0)
+                            .color(ROSE),
+                    );
+                }
+            }
+            ui.label(
+                RichText::new("Apply is disabled in this editor. Saving a valid local draft is independent of this report.")
+                    .size(10.0)
+                    .color(MUTED),
+            );
+        });
+}
+
+fn capability_label(capability: FieldCapability) -> &'static str {
+    match capability {
+        FieldCapability::LocalOnly => "Local metadata",
+        FieldCapability::ObservedValueOnly => "Observed value only",
+        FieldCapability::MeasuredTransition => "Measured field transition",
+        FieldCapability::ResearchRequired => "Research required",
     }
 }
 
@@ -1098,5 +1188,177 @@ mod tests {
         harness.run();
         assert!(harness.query_by_label(&expected).is_some());
         fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn offline_evidence_is_accessible_apply_stays_disabled_and_valid_intent_saves() {
+        let paths = temp_paths("offline-evidence-save");
+        let root = paths.root.clone();
+        let mut intent = new_intent();
+        intent.name = "Evidence preview".to_owned();
+        intent.dpi = DpiTarget { x: 1_600, y: 1_600 };
+        intent.polling_hz = 4_000;
+        intent.mouse4 = ButtonActionIntent::KeyboardShortcut {
+            control: true,
+            alt: true,
+            shift: false,
+            windows: false,
+            key: KeyboardKey::F10,
+        };
+        intent.mouse5 = ButtonActionIntent::KeyboardShortcut {
+            control: true,
+            alt: true,
+            shift: false,
+            windows: false,
+            key: KeyboardKey::F11,
+        };
+        let report = assess_draft(&intent, None).unwrap();
+        assert!(!report.can_apply());
+        assert!(report.blockers.iter().any(|blocker| {
+            blocker.contains("profile combinations") && blocker.contains("promotion")
+        }));
+        let missing_scope_blocker = report
+            .blockers
+            .iter()
+            .find(|blocker| blocker.contains("No verified device scope"))
+            .expect("offline assessment explains the missing verified device scope");
+
+        let mut app = EguiPreview::from_paths(Ok(paths.clone()));
+        app.buffer = intent.clone();
+        let mut harness = Harness::builder()
+            .with_size(Vec2::new(1080.0, 1200.0))
+            .build_ui_state(|ui, app| app.view(ui), app);
+        harness.run();
+        harness
+            .get_by_role_and_label(Role::Button, "Capability evidence · local draft review")
+            .click();
+        harness.run();
+
+        assert!(
+            harness
+                .query_by_label("No connected mouse has been verified.")
+                .is_some()
+        );
+        assert!(
+            harness
+                .query_by_label(
+                    "This report uses no device identity, serial, firmware, or transport data."
+                )
+                .is_some()
+        );
+        assert!(harness
+            .query_by_label("Per-field evidence does not verify the full profile combination; promotion remains blocked.")
+            .is_some());
+        assert!(
+            harness
+                .query_by_label(&format!(
+                    "Recorded scope reference only: {}",
+                    recorded_evidence_summary()
+                ))
+                .is_some()
+        );
+        for field in &report.fields {
+            assert!(
+                harness
+                    .query_by_label(&format!(
+                        "{} · {}",
+                        field.label,
+                        capability_label(field.evidence)
+                    ))
+                    .is_some()
+            );
+            assert!(harness.query_by_label(&field.reason).is_some());
+        }
+        for blocker in &report.blockers {
+            assert!(harness.query_by_label(&format!("• {blocker}")).is_some());
+        }
+        assert!(
+            harness
+                .query_by_label(&format!("• {missing_scope_blocker}"))
+                .is_some()
+        );
+        let apply = harness.get_by_role_and_label(Role::Button, "Apply changes");
+        assert!(apply.accesskit_node().is_disabled());
+        harness
+            .get_by_role_and_label(Role::Button, "Save draft")
+            .click();
+        harness.run();
+        let selected_id = harness
+            .state()
+            .selected_id
+            .clone()
+            .expect("valid intent remains savable offline");
+        let reopened = DraftEditor::open(paths).unwrap();
+        assert_eq!(
+            reopened.library().get(&selected_id).unwrap().intent(),
+            &intent
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn editing_unmeasured_values_updates_evidence_without_storage_writes() {
+        let paths = temp_paths("live-evidence");
+        let root = paths.root.clone();
+        let mut intent = new_intent();
+        intent.dpi = DpiTarget { x: 1_234, y: 4_321 };
+        intent.polling_hz = 1_333;
+        intent.mouse4 = ButtonActionIntent::KeyboardShortcut {
+            control: false,
+            alt: true,
+            shift: true,
+            windows: false,
+            key: KeyboardKey::F12,
+        };
+        intent.mouse5 = ButtonActionIntent::Unmodeled {
+            description: "Custom action idea".to_owned(),
+        };
+        let report = assess_draft(&intent, None).unwrap();
+        let mut app = EguiPreview::from_paths(Ok(paths));
+        app.buffer = intent;
+        let mut harness = Harness::builder()
+            .with_size(Vec2::new(1080.0, 1200.0))
+            .build_ui_state(|ui, app| app.view(ui), app);
+        harness.run();
+        harness
+            .get_by_role_and_label(Role::Button, "Capability evidence · local draft review")
+            .click();
+        harness.run();
+
+        for field in &report.fields {
+            assert!(
+                harness
+                    .query_by_label(&format!(
+                        "{} · {}",
+                        field.label,
+                        capability_label(field.evidence)
+                    ))
+                    .is_some()
+            );
+            assert!(harness.query_by_label(&field.reason).is_some());
+        }
+        assert!(
+            report
+                .fields
+                .iter()
+                .filter(|field| field.label != "Name")
+                .all(|field| field.evidence == FieldCapability::ResearchRequired)
+        );
+        assert!(
+            report
+                .blockers
+                .iter()
+                .any(|blocker| blocker.contains("DPI"))
+        );
+        assert!(
+            report
+                .blockers
+                .iter()
+                .any(|blocker| blocker.contains("Polling"))
+        );
+        assert!(
+            !root.exists(),
+            "editing and assessing must not create storage files"
+        );
     }
 }
