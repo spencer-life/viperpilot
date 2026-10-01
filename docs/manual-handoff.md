@@ -53,7 +53,7 @@ proof of a later commit. New PRs remain draft even when checks pass.
 | #11 side-button actions | Supervised mouse experiment | One reviewed button/action, independent readback and baseline restoration; no interception/injection |
 | #4, #12, #13 delivery | Review/delivery and relevant evidence | Software portions implemented; keep issues open until acceptance and authorized delivery. Custom promotion waits for complete device-scoped evidence |
 | #5 CI enforcement | Explicit settings authorization | Review draft PR #19's concrete staged A/B/C policy; capture current protection, reconcile selected heads and fresh checks before each authorized activation |
-| Codex Cloud automation | Cloud environment access/credentials | Local CLI Project access works; verify actual cloud task credentials/project access separately. No cloud environment or secret was changed |
+| Codex Cloud automation | Cloud environment access/credentials | Local CLI Project access works; use [Cloud access handoff](cloud-access-check.md) in the actual task. Environment/task URL still needed. No cloud environment or secret was changed |
 
 ## Resume sequence
 
@@ -71,6 +71,22 @@ proof of a later commit. New PRs remain draft even when checks pass.
 
 The installed legacy app stays untouched. No unobserved checkbox is a passing
 result, and no automatic approval or merge is implied by this handoff.
+
+## Delivery review checkpoint — 2026-09-30
+
+At integration head `b176656`, live GitHub checks were green for every
+implementation PR in stack #17: #1, #14, #15, #16, #3, #18, #20, #21, #22,
+#23 and #24. Each has its own successful Linux/Windows results; all layers from
+#14 upward also passed Security. This observation does not carry forward after
+a new push or base change. Draft policy PR #19 and Renovate #2 do not have those
+implementation checks and require their own delivery review.
+
+Read-only CI proposal review confirmed A/B/C templates target only main, have
+no bypass actors, and preserve the historical required-context differences.
+Live main still had no rulesets or legacy protection. Settings activation and
+merges remain separately authorized steps; no rules were applied. The final
+handoff audit corrected the checklist to separate isolated preview/editor work
+from future production tray tests and label tray-route regression as planned.
 
 ## Native button remediation — 2026-09-30
 
