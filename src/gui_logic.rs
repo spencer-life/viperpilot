@@ -465,7 +465,9 @@ pub fn classify_worker_error(message: &str) -> ConnectionStatus {
     if ambiguous.iter().any(|marker| lowered.contains(marker)) {
         return ConnectionStatus::WrongDevice;
     }
-    ConnectionStatus::Connected
+    // 2026-09-30: an error event carries no verified live snapshot. Unknown
+    // failures (including GET timeouts) must not re-enable switching controls.
+    ConnectionStatus::Unavailable
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -817,8 +819,23 @@ mod tests {
             classify_worker_error(
                 "Razer Synapse components are running (razer synapse). Close Synapse yourself; this utility never terminates processes"
             ),
-            ConnectionStatus::Connected
+            ConnectionStatus::Unavailable
         );
+    }
+
+    #[test]
+    fn failed_worker_read_leaves_state_unknown_and_switching_disabled() {
+        let mut state = idle_state();
+        state.connection = classify_worker_error("GET failed after validated attempts");
+        state.profile = ProfileMatch::OutOfSync;
+        state.polling_hz = None;
+        state.dpi = None;
+        state.power = None;
+        let presentation = present(&state);
+        assert_eq!(presentation.connection_line, "Unavailable");
+        assert_eq!(presentation.profile_line, "Unknown");
+        assert_eq!(presentation.dpi_line, "Unavailable");
+        assert!(!presentation.buttons_enabled);
     }
 
     #[test]

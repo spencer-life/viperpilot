@@ -4,9 +4,15 @@ labels:
     - codex-created
     - hardware-test
     - release-gate
+projects:
+    - ViperPilot dashboard
 state: open
-state_reason: null
-synced_at: 2026-09-29T21:45:14.009235732Z
+state_reason: ""
+synced_at: 2026-09-30T07:11:16.411945959Z
+info:
+    author: spencer-life
+    created_at: 2026-09-29T18:22:43Z
+    updated_at: 2026-09-30T06:59:40Z
 ---
 
 ## Context
@@ -26,3 +32,15 @@ Implementation baseline: [public PR #3](https://github.com/spencer-life/viperpil
 ## Checkpoint — 2026-09-29
 
 The production tray, both complete profiles, and the production hotkey have not passed the documented owner-supervised validation. The user is away from the Windows PC, so these manual checks are deferred. Keep this release gate open; no new hardware tests were run.
+
+## Development isolation — 2026-09-29
+
+Draft [PR #18](https://github.com/spencer-life/viperpilot/pull/18) separates default development data from the installed legacy app and blocks installer/production tray entry points before process, startup, hotkey or HID effects. Hardware-free tests and Windows cross-builds passed without launching. This does not satisfy the owner-supervised release gate. A separately reviewed executable/startup/hotkey identity and development installer are prerequisites for future installation or concurrent use. The currently installed app is untouched.
+
+## Fresh final-state reporting — 2026-09-29
+
+Draft [PR #20](https://github.com/spencer-life/viperpilot/pull/20), above isolation PR #18, removes stale final-state fallbacks after failed reads. Historical observations remain diagnostic evidence; unavailable or unclassifiable current state clears live values and disables profile controls/hotkeys until refresh. Core/preview CI and production Windows cross-build passed with synthetic mocks; no GUI/HID or physical disconnect/rollback test ran. This is a software safety improvement, not completion of the manual release gate.
+
+## Software readiness — 2026-09-30
+
+Draft PR #21 separates development window/mutex/show-message/startup identities in source and corrects the legacy-touching checklist. The production tray and installer remain blocked; source changes do not validate coexistence or authorize device tests. See [manual handoff](https://github.com/spencer-life/viperpilot/blob/codex/ui-readiness/docs/manual-handoff.md). Installed app unchanged; no GUI/HID or startup operation ran. Issue remains open for its manual and delivery gates.

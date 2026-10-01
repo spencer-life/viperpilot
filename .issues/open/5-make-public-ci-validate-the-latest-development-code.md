@@ -7,11 +7,11 @@ projects:
     - ViperPilot dashboard
 state: open
 state_reason: null
-synced_at: 2026-09-30T06:30:19.763636374Z
+synced_at: 2026-09-30T07:08:24.539349727Z
 info:
     author: spencer-life
     created_at: 2026-09-29T18:22:39Z
-    updated_at: 2026-09-30T03:20:20Z
+    updated_at: 2026-09-30T06:53:04Z
 ---
 
 ## Context
@@ -48,3 +48,7 @@ A minimal two-Core-check ruleset was prepared and independently reviewed, with r
 The official review stack is PR #1 → #14 → #15 → #16 → #3. The shared Core check-name alignment is in #16; enforcement still follows the staged policy and requires explicit settings authorization. Existing commits and runtime behavior were preserved when the owner requested smaller PRs. PR #3 and the new PRs remain draft; issues stay open until their delivery and validation criteria pass. No merge, release or mouse operation occurred. Earlier references to the combined PR #3 describe historical checkpoints.
 
 The split exposes a check-name mismatch: preserved #14/#15 heads emit `Core CI (...)`, while #1/#16/#3 emit `ci (...)`. The earlier two-PR ruleset proposal must be revised or contexts normalized and validated before activation across the official stack. Do not enable known-missing checks. Updated policy: [CI and merge gates](https://github.com/spencer-life/viperpilot/blob/codex/sanitized-quick-switch/docs/ci-and-merge-gates.md).
+
+## Revised staged proposal — 2026-09-29
+
+Draft [PR #19](https://github.com/spencer-life/viperpilot/pull/19) supplies concrete phase A/B/C JSON templates that preserve existing commits and check names: phase A for #1, phase B after #1 merges for #14/#15, phase C after both #14/#15 merge for #16 and later. Each settings change requires explicit authorization and fresh reconciled checks. No settings changed; the earlier two-PR proposal is superseded. This issue remains open until enforcement is authorized, applied and read back.

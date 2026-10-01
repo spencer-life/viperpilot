@@ -6,7 +6,7 @@ labels:
     - release-gate
 state: open
 state_reason: null
-synced_at: 2026-09-29T21:45:13.271401503Z
+synced_at: 2026-09-30T07:11:15.680353526Z
 ---
 
 ## Context
@@ -24,3 +24,7 @@ Implementation baseline: [public PR #3](https://github.com/spencer-life/viperpil
 ## Checkpoint — 2026-09-29
 
 Accessibility and real monitor/display behavior remain unverified. No Windows desktop or screen-reader validation was run for this checkpoint; keep the release gate open. Synthetic or Linux checks do not establish this issue's acceptance criteria.
+
+## Software readiness — 2026-09-30
+
+Generic worker/read errors now mark current state unavailable, clearing observed values and disabling switching/hotkeys until successful refresh. Pure GUI regression and Windows cross-build pass. Real native control roles/patterns, keyboard, screen-reader and scaling checks remain manual. See [manual handoff](https://github.com/spencer-life/viperpilot/blob/codex/ui-readiness/docs/manual-handoff.md). Installed app unchanged; no GUI/HID or startup operation ran. Issue remains open for its manual and delivery gates.
