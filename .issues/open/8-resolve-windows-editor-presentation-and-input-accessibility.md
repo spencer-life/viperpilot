@@ -8,7 +8,7 @@ projects:
     - ViperPilot dashboard
 state: open
 state_reason: ""
-synced_at: 2026-09-30T09:12:59.529927343Z
+synced_at: 2026-09-30T09:56:30.782035892Z
 info:
     author: spencer-life
     created_at: 2026-09-29T18:22:45Z
@@ -49,3 +49,50 @@ with the same temporary draft library preserved `Manual Test`, DPI X/Y
 `1200`/`1200` and `1000 Hz` polling. Saved JSON and actual reopened UIA values
 agreed; Apply remained disabled. Keyboard, IME, screen-reader and scaling checks
 remain open. No legacy app or hardware state was changed.
+
+The owner then reported all requested controls reachable with visible focus
+using Tab/Shift+Tab: profile name, DPI X/Y, Mouse4, Mouse5 and Save draft. An
+owner-supplied screenshot showed Mouse5 and the pinned footer after scrolling.
+This observation applies to the original isolated editor hash recorded in the
+manual handoff; styling changes must preserve it and receive their own check.
+IME, screen-reader speech and scaling remain unobserved.
+
+The owner requested closer Figma alignment. A focused editor styling layer now
+uses the reference rose/charcoal palette, readable labels, consistent card widths,
+scrollable navigation and measured pinned footer layout. Linux offscreen renders
+at normal/minimum sizes, including an invalid draft and a populated library,
+were inspected. Strict preview checks and Windows cross-lint/build passed.
+The newly styled Windows binary still requires owner visual/focus validation;
+compact/detailed view alignment remains a separate check.
+
+### Styled Windows paste/Unicode round trip — 2026-09-30
+
+The owner pasted `Test – 日本語 – café`, saved and closed the styled isolated
+editor. Reopening the same hash-checked executable and temporary library
+preserved that exact Unicode sequence in both the saved JSON and actual UIA
+Profile name/Edit value. DPI X/Y remained 1200/1200 and Apply remained disabled.
+This validates the requested paste/name persistence case, not IME composition or
+screen-reader speech. The owner also confirmed visible keyboard focus on this
+styled build. Narrow-window/other-scale and reader/IME checks remain open.
+
+### Owner minimum-window screenshots — 2026-09-30
+
+Owner-provided Windows screenshots at 850×640 show Save and disabled Apply
+contained at the bottom in both initial and scrolled states. Mouse5 is reachable
+by scrolling. These establish the observed minimum-window layout at this
+display scale, not other DPI scales.
+
+The same screenshots expose missing Japanese glyphs: `日本語` renders as boxes
+in the name input, navigation and status. The exact Unicode storage/UIA round
+trip passed, but visual non-Latin name support failed. Do not describe the
+persistence result as a complete input/rendering pass. Windows lists installed
+MS Gothic and Yu Gothic font collections; an editor-only font fallback fix is
+being investigated. IME composition and screen-reader speech remain unobserved.
+
+The editor-only font fallback correction is implemented and validated: actual
+Windows background captures show Japanese glyphs correctly in all three name
+locations at normal/minimum sizes, with Save/disabled Apply contained. UIA still
+reads the exact Unicode name and DPI 1200/1200. Strict preview checks (159 tests),
+Windows cross-lint/build and independent review passed. No font installation,
+redistribution, tray/device or legacy-app changes. IME composition, screen-reader
+speech and other display scales remain unobserved.
