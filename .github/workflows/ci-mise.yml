@@ -16,7 +16,8 @@ concurrency:
 
 jobs:
   ci:
-    name: Core CI
+    # 2026-09-29: preserve PR #1 check contexts through the stacked merge.
+    # Omitting an explicit job name emits ci (<matrix OS>) on both PRs.
     strategy:
       fail-fast: false
       matrix:

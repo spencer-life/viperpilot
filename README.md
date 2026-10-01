@@ -36,6 +36,12 @@ sends a device write. Unsupported fields are explicitly unsavable. For isolated
 editor checks, pass `--draft-root <temporary-directory>`; this uses a separate
 store. See [draft persistence details](docs/local-draft-editor.md).
 
+The collapsed **Capability evidence** section distinguishes offline intent from
+recorded device evidence. The [read-only capability contract](docs/capability-contract.md)
+uses an exact model, firmware, transport and HID collection scope. It never
+authorizes a custom profile or creates a device write plan; other mice inherit
+no support.
+
 ## Validation and safety
 
 Its GitHub Actions checks are hardware-free; they validate source and tests without connecting to or writing to a mouse. Historical raw device measurements and diagnostics are deliberately not published here; their absence does not prove hardware support. See [quick-switch status](docs/quick-switch-status.md) for software implementation and validation boundaries.

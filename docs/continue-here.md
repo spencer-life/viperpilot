@@ -33,7 +33,7 @@ The resident production path is native Win32. Egui/eframe 0.36.2 is a separate o
 
 ## Next code assignment
 
-Issue #12 now implements local create/edit/rename/duplicate/delete/save/reopen in the optional editor. Review [local editor details](local-draft-editor.md) and complete owner-observed Windows UI checks when available. The next software slice is the capability contract in issue #4; promotion in issue #13 remains hardware-gated. Keep the resident tray lightweight and the existing native architecture. Do not turn continued work into new hardware writes, extra onboard slots, broad mouse support, or a JavaScript migration.
+Issue #12 now implements local create/edit/rename/duplicate/delete/save/reopen in the optional editor. Review [local editor details](local-draft-editor.md) and complete owner-observed Windows UI checks when available. Issue #4 now implements the [read-only capability contract](capability-contract.md); review and delivery remain. The next software slice is guarded promotion in issue #13, which remains hardware-gated. Keep the resident tray lightweight and the existing native architecture. Do not turn continued work into new hardware writes, extra onboard slots, broad mouse support, or a JavaScript migration.
 
 Passing means:
 
@@ -43,7 +43,7 @@ Passing means:
 - Meaningful headless state/storage checks pass alongside the repository's relevant mise checks. Real keyboard, accessibility and Windows presentation remain separate manual gates.
 - Documentation and issue progress distinguish completed software work from still-open desktop/device checks. Commit coherent validated slices and update the same draft PR.
 
-Follow-on work remains: capability contract https://github.com/spencer-life/viperpilot/issues/4, then proven custom-profile promotion https://github.com/spencer-life/viperpilot/issues/13. Promotion also requires device field/combination evidence; implementing the contract alone does not permit Apply.
+Follow-on work is https://github.com/spencer-life/viperpilot/issues/13. Read the contract first: caller-supplied snapshots are not proof of a fresh GET, immutable baseline or full serial review. No custom combination is registered as approved. Do not connect drafts to setters or enable Apply until field, combination, readback and recovery evidence permits it. Other model owners or contributed supervised evidence are needed for other mice; the V4 Pro alone cannot validate them.
 
 ## Issue #12 software checkpoint — 2026-09-29
 
@@ -73,6 +73,40 @@ parser was available. Hosted checks for this new head must be checked separately
 from historical green runs. No manual Windows UI, production tray/hotkey,
 installation/startup, performance or physical-device test was run. PR #3 remains
 draft, and issue #12 remains open pending delivery and owner-observed UI checks.
+
+## Issue #4 software checkpoint — 2026-09-29
+
+Source checkpoint `28b36f2` adds the editor's offline evidence view after the
+read-only contract in `d28661c`. See [contract details](capability-contract.md).
+
+- `mise run ci` passed formatting, strict Clippy, **114 core tests + 3 integration
+  tests**, native release build and CLI help smoke.
+- `mise run ci-preview` passed strict feature Clippy, **120 library tests,
+  9 headless editor tests and 3 integration tests**.
+- Sequential `build-windows` and `build-egui-preview-windows` passed without
+  launching either executable. Default normal dependencies still exclude
+  egui/eframe; no Cargo dependency or production planner/engine/tray change.
+- Independent review found and fixed silently ignored unknown fields in the
+  pass-through/unassigned JSON actions. All four action variants now reject
+  extras without changing valid V1 serialization. Final review found no remaining
+  material issues. All eight scope axes reject inherited evidence; timestamp,
+  GET-only power and collection-order changes do not falsely mark state stale.
+- Documentation links, whitespace and all 30 available mise tasks validated.
+
+Checks used process-scoped mise trust with automatic installation disabled.
+Supplied snapshots do not prove live GET or baseline immutability. Every custom
+request remains rejected at the combination gate; no WritePlan or setter is
+created. No manual Windows, tray/hotkey, performance, startup or mouse test was
+run. PR #3 remains draft; #4 stays open for review/delivery and #13 remains gated.
+Hosted checks for the published head must be checked separately.
+
+## Hosted checkpoint before the contract slice
+
+At head `6406e17df7a8c86b175613515b711d477379af10`, hosted
+[Linux/Windows Core CI](https://github.com/spencer-life/viperpilot/actions/runs/36648753194)
+and [Security](https://github.com/spencer-life/viperpilot/actions/runs/36648753154)
+passed. Those results validate the prior editor checkpoint, not subsequent
+capability code. Check the actual latest head separately.
 
 ## Tests available now
 

@@ -59,10 +59,36 @@ from historical green runs. No manual Windows UI, production tray/hotkey,
 installation/startup, performance or physical-device test was run. PR #3 remains
 draft, and issue #12 remains open pending delivery and owner-observed UI checks.
 
+## Issue #4 software checkpoint — 2026-09-29
+
+Source checkpoint `28b36f2` adds the editor's offline evidence view after the
+read-only contract in `d28661c`. See [contract details](capability-contract.md).
+
+- `mise run ci` passed formatting, strict Clippy, **114 core tests + 3 integration
+  tests**, native release build and CLI help smoke.
+- `mise run ci-preview` passed strict feature Clippy, **120 library tests,
+  9 headless editor tests and 3 integration tests**.
+- Sequential `build-windows` and `build-egui-preview-windows` passed without
+  launching either executable. Default normal dependencies still exclude
+  egui/eframe; no Cargo dependency or production planner/engine/tray change.
+- Independent review found and fixed silently ignored unknown fields in the
+  pass-through/unassigned JSON actions. All four action variants now reject
+  extras without changing valid V1 serialization. Final review found no remaining
+  material issues. All eight scope axes reject inherited evidence; timestamp,
+  GET-only power and collection-order changes do not falsely mark state stale.
+- Documentation links, whitespace and all 30 available mise tasks validated.
+
+Checks used process-scoped mise trust with automatic installation disabled.
+Supplied snapshots do not prove live GET or baseline immutability. Every custom
+request remains rejected at the combination gate; no WritePlan or setter is
+created. No manual Windows, tray/hotkey, performance, startup or mouse test was
+run. PR #3 remains draft; #4 stays open for review/delivery and #13 remains gated.
+Hosted checks for the published head must be checked separately.
+
 ## Next work and deferred tests
 
 - [Issue #12](https://github.com/spencer-life/viperpilot/issues/12): local editing and persistence are implemented in the optional editor; review software checks and complete deferred owner-observed Windows UI validation. Every enabled setting maps to V1 intent; unsupported settings are explicitly unsavable.
-- [Issue #4](https://github.com/spencer-life/viperpilot/issues/4): define device-scoped capabilities and the safe request/write contract; it does not broaden the hardware allowlist by itself.
+- [Issue #4](https://github.com/spencer-life/viperpilot/issues/4): [read-only exact-scope contract](capability-contract.md) and strict request preflight implemented; all custom combinations remain blocked. Review and delivery remain; no production allowlist changed.
 - [Issue #13](https://github.com/spencer-life/viperpilot/issues/13): later promote proven custom settings into quick switching, after storage, contract, field and combination evidence gates pass.
 - [Issue #5](https://github.com/spencer-life/viperpilot/issues/5): software CI is green at the recorded checkpoint; required-check enforcement and the stacked PR merge order remain open. Public `main` was unprotected with no rulesets when rechecked on 2026-09-29.
 - Manual desktop/device gates remain open in [#6](https://github.com/spencer-life/viperpilot/issues/6), [#7](https://github.com/spencer-life/viperpilot/issues/7), [#8](https://github.com/spencer-life/viperpilot/issues/8), [#9](https://github.com/spencer-life/viperpilot/issues/9), [#10](https://github.com/spencer-life/viperpilot/issues/10), and [#11](https://github.com/spencer-life/viperpilot/issues/11). The owner is away from the PC; no new manual tests are authorized by this documentation refresh.
