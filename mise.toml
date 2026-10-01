@@ -75,6 +75,34 @@ run = [
   "cargo test --all-targets --locked --features egui-preview",
 ]
 
+# 2026-09-30: one Linux/WSL entrypoint prevents skipping optional editor checks.
+# Sequential composition reuses CI policy without opening a window or device.
+[tasks.verify-linux]
+description = "Run hardware-free core and editor CI checks sequentially on Linux/WSL."
+run = [{ task = "ci" }, { task = "ci-preview" }]
+
+# 2026-09-30: host Clippy cannot inspect cfg(windows) code from Linux/WSL.
+# Check default and combined preview features with the existing Windows warning
+# policy; cross-compilation does not execute Windows tests or binaries.
+[tasks.lint-windows-cross]
+description = "Cross-lint Windows core and both previews from Linux/WSL without launching."
+run = [
+  "mise exec -- cargo xwin clippy --target x86_64-pc-windows-msvc --all-targets --locked -- -D warnings -A clippy::pedantic",
+  "mise exec -- cargo xwin clippy --target x86_64-pc-windows-msvc --all-targets --features ui-preview,egui-preview --locked -- -D warnings -A clippy::pedantic",
+]
+
+# 2026-09-30: keep xwin setup/builds sequential to avoid shared tool setup races.
+# Deliberately exclude installers, interactive previews and hardware commands.
+[tasks.verify-windows-cross]
+description = "Check formatting, cross-lint and build all Windows executables sequentially without launching."
+run = [
+  { task = "fmt-check" },
+  { task = "lint-windows-cross" },
+  { task = "build-windows" },
+  { task = "build-ui-preview-windows" },
+  { task = "build-egui-preview-windows" },
+]
+
 # 2026-09-29: exercise local draft/session and AccessKit tests on hosted Windows;
 # these tests use temporary stores and never open a window or HID device.
 [tasks.ci-windows-preview]

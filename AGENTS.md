@@ -8,6 +8,11 @@ conditions and evidence. Label protocol or product assumptions as unproven.
 
 - Keep changes scoped to this utility. Use the repository's `mise.toml` tasks
   for package checks and builds; it also pins the Windows cross-build tools.
+- 2026-09-30: on Linux/WSL use `verify-linux` for core/editor checks and
+  `verify-windows-cross` for sequential Windows lint/build checks before a PR.
+  Use `check` for quick core feedback and `fmt` to format Rust. See
+  `docs/tooling-decision.md` for native Windows and security entrypoints.
+  Cross-build success does not satisfy manual Windows/device gates.
 - Date and justify changes to configuration, protocol behavior, and supported
   hardware inline. Record failed experiments and ruled-out explanations along
   with successful results.
