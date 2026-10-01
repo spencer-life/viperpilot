@@ -52,3 +52,13 @@ run = "cargo run --quiet --locked --bin viperctl -- --help"
 [tasks.ci]
 description = "Hardware-free checks, tests, native build, and CLI smoke test."
 run = [{ task = "check" }, { task = "build-native" }, { task = "cli-smoke" }]
+
+# 2026-09-28: inherited Win32 FFI code has pedantic warnings. Keep all default
+# Clippy and compiler warnings denied while the native code is reviewed.
+[tasks.lint-windows]
+description = "Lint Windows code with default Clippy and compiler warnings denied."
+run = "cargo clippy --all-targets --locked -- -D warnings -A clippy::pedantic"
+
+[tasks.ci-windows]
+description = "Hardware-free native Windows checks, tests, build, and CLI smoke test."
+run = [{ task = "fmt-check" }, { task = "lint-windows" }, { task = "test" }, { task = "build-native" }, { task = "cli-smoke" }]
