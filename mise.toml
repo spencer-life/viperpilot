@@ -2,6 +2,9 @@
 "cargo:cargo-xwin" = "0.22.0"
 "conda:clang" = "22.1.8"
 "conda:lld" = "22.1.8"
+"aqua:rhysd/actionlint" = { version = "1.7.12", os = ["linux"] }
+"aqua:gitleaks/gitleaks" = { version = "8.30.1", os = ["linux"] }
+"aqua:zizmorcore/zizmor" = { version = "1.30.1", os = ["linux"] }
 
 [task_config]
 shell = "env -u BASH_ENV bash --noprofile --norc -euo pipefail -c"
@@ -53,12 +56,85 @@ run = "cargo run --quiet --locked --bin viperctl -- --help"
 description = "Hardware-free checks, tests, native build, and CLI smoke test."
 run = [{ task = "check" }, { task = "build-native" }, { task = "cli-smoke" }]
 
-# 2026-09-28: inherited Win32 FFI code has pedantic warnings. Keep all default
-# Clippy and compiler warnings denied while the native code is reviewed.
+# 2026-09-28: the existing Win32 FFI code emits pedantic Clippy warnings.
+# Keep compiler and default Clippy warnings denied on native Windows CI while
+# those warnings are reviewed; Linux CI retains the full pedantic policy.
 [tasks.lint-windows]
-description = "Lint Windows code with default Clippy and compiler warnings denied."
+description = "Lint native Windows code with default warnings denied."
 run = "cargo clippy --all-targets --locked -- -D warnings -A clippy::pedantic"
 
 [tasks.ci-windows]
 description = "Hardware-free native Windows checks, tests, build, and CLI smoke test."
 run = [{ task = "fmt-check" }, { task = "lint-windows" }, { task = "test" }, { task = "build-native" }, { task = "cli-smoke" }]
+
+[tasks.ci-preview]
+description = "Strictly lint and test the hardware-free egui editor preview."
+run = [
+  "cargo clippy --all-targets --features egui-preview --locked -- -D warnings",
+  "cargo test --locked --features egui-preview --bin viperpilot-egui-preview",
+]
+
+[tasks.ci-windows-preview]
+description = "Compile and lint the hardware-free native Win32 UI preview without launching it."
+run = [
+  "cargo clippy --all-targets --features ui-preview --locked -- -D warnings -A clippy::pedantic",
+  "cargo build --release --locked --features ui-preview --bin viperpilot-ui-preview",
+]
+
+# 2026-09-29: a separate feature-gated executable renders synthetic UI state.
+# These tasks do not install the production utility or access the mouse.
+[tasks.build-ui-preview-windows]
+description = "Cross-build and package the hardware-free native UI preview without launching it."
+run = [
+  "mise exec -- cargo xwin build --target x86_64-pc-windows-msvc --features ui-preview --bin viperpilot-ui-preview --release --locked",
+  "cp assets/viper-utility-icon.ico assets/viperpilot-mouse-silhouette.bmp assets/viper-v4-black-dashboard.bmp target/x86_64-pc-windows-msvc/release/",
+]
+
+[tasks.test-ui-preview-windows]
+description = "Check preview UIA names/states and native button actions; requires an interactive desktop."
+depends = ["build-ui-preview-windows"]
+run = [
+  'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w scripts/test-ui-preview.ps1)" -Executable "$(wslpath -w target/x86_64-pc-windows-msvc/release/viperpilot-ui-preview.exe)" -Scenario default',
+  'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w scripts/test-ui-preview.ps1)" -Executable "$(wslpath -w target/x86_64-pc-windows-msvc/release/viperpilot-ui-preview.exe)" -Scenario reversed',
+  'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w scripts/test-ui-preview.ps1)" -Executable "$(wslpath -w target/x86_64-pc-windows-msvc/release/viperpilot-ui-preview.exe)" -Scenario unavailable',
+]
+
+# 2026-09-29: isolated egui/eframe settings editor exploration.
+# It renders synthetic state only and is separate from the production app.
+[tasks.build-egui-preview-windows]
+description = "Cross-build the hardware-free egui settings editor preview without launching it."
+run = "mise exec -- cargo xwin build --target x86_64-pc-windows-msvc --features egui-preview --bin viperpilot-egui-preview --release --locked"
+
+[tasks.test-egui-preview]
+description = "Run headless state checks for the egui editor preview."
+run = "cargo test --locked --features egui-preview --bin viperpilot-egui-preview"
+
+
+# 2026-09-29: repeatable editor-only process measurement. It stages only the
+# preview EXE in Windows TEMP and does not launch the production tray or HID.
+[tasks.measure-egui-preview-windows]
+description = "Measure preview window creation, process memory, and idle CPU in three isolated Windows runs."
+depends = ["build-egui-preview-windows"]
+run = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w scripts/measure-egui-preview-windows.ps1)" -Executable "$(wslpath -w target/x86_64-pc-windows-msvc/release/viperpilot-egui-preview.exe)"'
+
+[tasks.test-egui-preview-windows]
+description = "Smoke-test the staged egui preview window, accessible controls, and clean exit."
+depends = ["build-egui-preview-windows"]
+run = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w scripts/test-egui-preview-windows.ps1)" -Executable "$(wslpath -w target/x86_64-pc-windows-msvc/release/viperpilot-egui-preview.exe)" -ScreenshotPath "$(wslpath -w target/viperpilot-egui-preview-runtime.png)"'
+
+# 2026-09-29: fork-safe, read-only workflow and full-history secret scanning.
+[tasks.actionlint]
+description = "Lint GitHub Actions workflow files."
+run = "actionlint"
+
+[tasks.gitleaks]
+description = "Scan repository history for secrets with fully redacted output."
+run = "gitleaks git --redact=100 --no-color --no-banner ."
+
+[tasks.zizmor]
+description = "Audit GitHub Actions workflows for security issues."
+run = "zizmor .github/workflows"
+
+[tasks.security]
+description = "Run workflow lint, secret scanning, and workflow security analysis."
+run = [{ task = "actionlint" }, { task = "gitleaks" }, { task = "zizmor" }]

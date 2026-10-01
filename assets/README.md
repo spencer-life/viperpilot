@@ -1,19 +1,7 @@
-# Viper utility icon
+# ViperPilot artwork
 
-`viper-utility-icon.png` is the original RGBA artwork generated for this
-machine-specific utility with OpenAI's built-in image-generation tool on
-2026-08-14. `viper-utility-icon.ico` is the derived multi-resolution Windows
-icon containing 16, 20, 24, 32, 40, 48, 64, 128, and 256 pixel sizes.
+This directory contains the ViperPilot tray/window icon and logo-free mouse artwork used by the native interface and isolated UI previews. The rose V mark and mouse silhouette are original project assets; they do not reproduce Razer's three-snake logo.
 
-The emblem combines an original angular viper head, a top-down mouse, and two
-profile-switch arrows. It deliberately does not reproduce Razer's trademark
-three-snake logo. Both assets are distributed with the utility under its
-GPL-2.0-only license.
+The icon files are `viper-utility-icon.ico` and `viper-utility-icon.png`. Preview artwork is `viperpilot-mouse-silhouette.bmp`, `viperpilot-mouse-silhouette.svg`, and `viperpilot-v-mark.svg`. `viper-v4-black-dashboard.bmp` is the existing logo-free product-style illustration.
 
-`viper-v4-black-dashboard.bmp` is original project artwork generated with
-OpenAI's built-in image-generation tool on 2026-08-14, then resized to a
-deterministic 300×380 Windows BMP3 asset. Its prompt requested a straight
-top-down, logo-free black Viper V4 Pro-style symmetrical esports mouse on a
-Catppuccin Mocha background, with restrained blue/lavender rim lighting and no
-text, cable, dongle, or watermark. It is not copied from Razer or ClickSync;
-the official Razer product page was used only to confirm the product identity.
+All artwork is distributed under the repository license. No device identifiers, local paths, or user-generated screenshots are embedded as project metadata.

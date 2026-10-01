@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#131315">
+  <title>ViperPilot — Product roadmap</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #131315; --bg-2: #141416; --surface: #1c1c1f; --raised: #232326;
+      --text: #faf8f5; --secondary: #dac0c9; --muted: #a28a93; --border: #42383e;
+      --rose: #ffafd3; --rose-strong: #f472b6; --cyan: #38bdf8; --amber: #fbbf24;
+      --green: #34d399; --coral: #fb7185; --measure: #34d399; --planned: #ffafd3;
+      --research: #38bdf8; --blocked: #fb7185; --gated: #fbbf24; --radius: 12px;
+      font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg); color: var(--text);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; min-width: 320px; background: var(--bg); line-height: 1.55; }
+    a { color: var(--rose); text-underline-offset: .2em; }
+    a:hover { color: #ffd6e9; }
+    a:focus-visible { outline: 3px solid var(--rose); outline-offset: 4px; border-radius: 2px; }
+    .shell { width: min(1120px, calc(100% - 48px)); margin-inline: auto; }
+    .topbar { border-bottom: 1px solid var(--border); }
+    .topbar-inner { min-height: 60px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+    .brand { color: var(--text); text-decoration: none; font-weight: 750; letter-spacing: -.03em; }
+    .brand span { color: var(--rose); }
+    .topbar nav ul { list-style: none; display: flex; gap: 24px; margin: 0; padding: 0; font-size: .88rem; }
+    .topbar nav a { color: var(--secondary); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+    .topbar nav a:hover { color: var(--text); }
+    .hero { padding: 64px 0 42px; }
+    .eyebrow, .label, .milestone-index, .status { font-family: "Roboto Mono", "Cascadia Code", Consolas, monospace; font-size: .72rem; font-weight: 700; letter-spacing: .04em; }
+    .eyebrow { color: var(--rose); margin: 0 0 14px; text-transform: uppercase; }
+    h1 { max-width: 760px; margin: 0; font-size: clamp(2.6rem, 7vw, 5.2rem); line-height: .98; letter-spacing: -.065em; }
+    h1 span { color: var(--rose); }
+    .hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(250px, 340px); gap: 48px; align-items: end; }
+    .lede { color: var(--secondary); max-width: 690px; font-size: clamp(1.05rem, 1.7vw, 1.24rem); margin: 24px 0 0; }
+    .scope { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+    .scope .label { margin: 0 0 10px; color: var(--green); text-transform: uppercase; }
+    .scope p { margin: 0; color: var(--secondary); font-size: .93rem; }
+    .scope strong { color: var(--text); }
+    .principle { padding: 14px 16px; margin: 28px 0 0; border-left: 3px solid var(--rose-strong); color: var(--text); background: var(--bg-2); max-width: 850px; }
+    main { padding-bottom: 76px; }
+    .section-head { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin: 14px 0 22px; }
+    h2 { margin: 0; font-size: clamp(1.55rem, 3vw, 2rem); letter-spacing: -.035em; line-height: 1.15; }
+    .section-note { margin: 0; color: var(--muted); font-size: .9rem; max-width: 420px; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 16px 0 24px; border-top: 1px solid var(--border); }
+    .legend-item { display: inline-flex; align-items: center; gap: 8px; color: var(--secondary); font-size: .82rem; }
+    .swatch { width: 9px; height: 9px; border-radius: 2px; background: var(--swatch); flex: 0 0 auto; }
+    .legend-item strong { color: var(--text); font-weight: 650; }
+    .sequence { list-style: none; margin: 0; padding: 0; counter-reset: milestone; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
+    .milestone { --state: var(--planned); position: relative; min-width: 0; display: flex; flex-direction: column; padding: 18px 16px 17px; background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--state); border-radius: var(--radius); }
+    .milestone[data-state="measured"] { --state: var(--measure); }
+    .milestone[data-state="planned"] { --state: var(--planned); }
+    .milestone[data-state="gated"] { --state: var(--gated); }
+    .milestone-index { color: var(--state); margin: 0 0 9px; }
+    .status { display: inline-flex; align-self: flex-start; color: var(--state); font-size: .66rem; text-transform: uppercase; padding: 3px 7px; border: 1px solid color-mix(in srgb, var(--state), transparent 58%); border-radius: 4px; margin-bottom: 11px; }
+    .milestone h3 { font-size: 1.08rem; letter-spacing: -.025em; line-height: 1.2; margin: 0 0 13px; }
+    .milestone ul { color: var(--secondary); font-size: .82rem; margin: 0; padding-left: 17px; }
+    .milestone li + li { margin-top: 8px; }
+    .gate { border-top: 1px solid var(--border); padding-top: 12px; margin: auto 0 0; padding-bottom: 0; color: var(--text); font-size: .8rem; }
+    .gate strong { display: block; color: var(--state); font-size: .67rem; font-family: "Roboto Mono", "Cascadia Code", Consolas, monospace; text-transform: uppercase; margin: 15px 0 5px; }
+    .direction { border-top: 1px solid var(--border); padding-top: 14px; color: var(--muted); font-size: .82rem; margin: 16px 0 0; }
+    .support { margin: 64px 0 0; }
+    .support-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr); gap: 28px; align-items: start; }
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+    .panel-head { padding: 20px 22px 14px; border-bottom: 1px solid var(--border); }
+    .panel-head h3 { margin: 0; font-size: 1.2rem; letter-spacing: -.025em; }
+    .panel-head p { margin: 6px 0 0; color: var(--muted); font-size: .86rem; }
+    .research-list { list-style: none; margin: 0; padding: 0 22px; }
+    .research-list li { display: grid; grid-template-columns: minmax(150px, .7fr) minmax(0, 1.3fr); gap: 16px; padding: 15px 0; border-bottom: 1px solid var(--border); font-size: .83rem; }
+    .research-list li:last-child { border-bottom: 0; }
+    .candidate { color: var(--text); font-weight: 650; }
+    .evidence { color: var(--secondary); }
+    .state-word { display: block; color: var(--research); font-family: "Roboto Mono", "Cascadia Code", Consolas, monospace; text-transform: uppercase; font-size: .65rem; margin-top: 4px; }
+    .state-word.get { color: var(--amber); }
+    .state-word.block { color: var(--coral); }
+    .rules { margin: 0; padding: 16px 24px 20px 42px; color: var(--secondary); font-size: .86rem; }
+    .rules li + li { margin-top: 11px; }
+    .rules strong { color: var(--text); }
+    .callout { color: var(--text); background: var(--raised); margin: 0 18px 18px; border-left: 3px solid var(--cyan); padding: 13px 14px; font-size: .82rem; }
+    .release { margin: 64px 0 0; }
+    .release-layout { display: grid; grid-template-columns: .72fr 1.28fr; gap: 34px; }
+    .release-intro { color: var(--secondary); margin: 13px 0 0; font-size: .93rem; }
+    .checklist { list-style: none; counter-reset: gate; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .checklist li { counter-increment: gate; padding: 14px 15px 14px 49px; min-height: 75px; position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--secondary); font-size: .82rem; }
+    .checklist li::before { content: counter(gate, decimal-leading-zero); position: absolute; left: 15px; top: 14px; font: 700 .72rem "Roboto Mono", "Cascadia Code", Consolas, monospace; color: var(--rose); }
+    .checklist strong { color: var(--text); }
+    footer { border-top: 1px solid var(--border); padding: 22px 0 34px; color: var(--muted); font-size: .8rem; }
+    footer p { margin: 0; }
+    footer strong { color: var(--secondary); }
+    @media (max-width: 1000px) { .sequence { grid-template-columns: repeat(2, minmax(0, 1fr)); } .milestone:last-child { grid-column: span 2; } }
+    @media (max-width: 720px) {
+      .shell { width: min(100% - 32px, 560px); }
+      .topbar-inner { align-items: flex-start; padding: 8px 0; flex-direction: column; gap: 0; }
+      .topbar nav { width: 100%; overflow-x: auto; }
+      .topbar nav ul { gap: 18px; white-space: nowrap; }
+      .hero { padding: 40px 0 30px; }
+      .hero-grid, .support-grid, .release-layout { grid-template-columns: 1fr; gap: 24px; }
+      .section-head { align-items: flex-start; flex-direction: column; gap: 8px; }
+      .sequence { grid-template-columns: 1fr; gap: 12px; }
+      .milestone:last-child { grid-column: auto; }
+      .milestone { padding: 17px 18px; }
+      .milestone h3 { font-size: 1.12rem; }
+      .milestone ul { font-size: .9rem; }
+      .research-list { padding-inline: 17px; }
+      .research-list li { grid-template-columns: 1fr; gap: 4px; }
+      .panel-head { padding-inline: 17px; }
+      .rules { padding-left: 36px; }
+      .checklist { grid-template-columns: 1fr; }
+      .support, .release { margin-top: 48px; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+    @media print {
+      :root { color-scheme: light; --bg:#fff; --bg-2:#f7f4f5; --surface:#fff; --raised:#f3eef0; --text:#181518; --secondary:#393239; --muted:#5c5056; --border:#c9bec3; --rose:#a12662; --rose-strong:#a12662; --green:#137858; --cyan:#05658b; --amber:#855b00; --coral:#aa3444; --measure:#137858; --planned:#a12662; --research:#05658b; --blocked:#aa3444; --gated:#855b00; }
+      body { background:#fff; print-color-adjust:exact; -webkit-print-color-adjust:exact; }
+      .shell { width:100%; max-width:none; } .topbar { display:none; } .hero { padding:10px 0 24px; }
+      .hero-grid { grid-template-columns:1fr 270px; gap:24px; } h1 { font-size:42pt; }
+      .sequence { grid-template-columns:repeat(2, 1fr); } .milestone:last-child { grid-column:span 2; }
+      .milestone, .panel, .checklist li { break-inside:avoid; } .support-grid { grid-template-columns:1.2fr .8fr; }
+      .support, .release { margin-top:32px; } a { color:inherit; } footer { padding-bottom:0; }
+    }
+    @page { size: A4 landscape; margin: 12mm; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <a class="brand" href="#top" aria-label="ViperPilot roadmap home">Viper<span>Pilot</span></a>
+      <nav aria-label="Roadmap sections"><ul>
+        <li><a href="#delivery">Delivery</a></li><li><a href="#research">Open gates</a></li><li><a href="#release">Release gates</a></li>
+      </ul></nav>
+    </div>
+  </header>
+  <div class="shell" id="top">
+    <header class="hero">
+      <p class="eyebrow">Product roadmap · ViperPilot · 2026-09-29</p>
+      <div class="hero-grid">
+        <div>
+          <h1>Fast profile switching for the <span>Viper V4 Pro.</span></h1>
+          <p class="lede">The immediate priority is a lightweight native tray and hotkey path. User-authored profile drafts are also part of the product. Device writes stay limited to documented Viper V4 Pro fields and supervised evidence gates.</p>
+        </div>
+        <aside class="scope" aria-label="Current implementation status">
+          <p class="label">Current checkpoint</p>
+          <p>PR 3 remains a draft. The last validated source checkpoint is <strong>7cb0440</strong>: 108 core tests and 3 egui preview tests passed, along with hosted Linux and Windows Core CI plus Security. Later documentation revisions have separate CI/security status. These are software-only checks; production UI and owner-present mouse gates remain open.</p>
+        </aside>
+      </div>
+      <p class="principle"><strong>Evidence boundary:</strong> Saved aliases, profile drafts, plans, GET results, and synthetic previews are not onboard slots or proof of a hardware write. Full Synapse parity and support for all recent Razer mice are not established requirements.</p>
+    </header>
+    <main>
+      <section id="delivery" aria-labelledby="delivery-title">
+        <div class="section-head"><h2 id="delivery-title">Delivery sequence</h2><p class="section-note">Software work follows the current public issue queue. A passed build or CI check does not close desktop or hardware gates.</p></div>
+        <div class="legend" aria-label="Evidence state legend">
+          <span class="legend-item"><span class="swatch" style="--swatch:var(--measure)"></span><strong>Software checked</strong> hardware-free checks only</span>
+          <span class="legend-item"><span class="swatch" style="--swatch:var(--planned)"></span><strong>Next / planned</strong> product or engineering work</span>
+          <span class="legend-item"><span class="swatch" style="--swatch:var(--gated)"></span><strong>Owner validation</strong> Windows or device session required</span>
+          <span class="legend-item"><span class="swatch" style="--swatch:var(--research)"></span><strong>Research</strong> no additional write support implied</span>
+          <span class="legend-item"><span class="swatch" style="--swatch:var(--blocked)"></span><strong>Blocked</strong> wait for the stated gate</span>
+        </div>
+        <ol class="sequence" aria-label="Milestones in dependency order">
+          <li class="milestone" data-state="measured"><p class="milestone-index">M0 / QUICK-SWITCH</p><span class="status">Software checked · manual gates open</span><h3>Preserve the native path</h3>
+            <ul><li>Keep tray, hotkey, compact switcher, and serialized worker as the fast path with low idle work.</li><li>Keep protected Developer/Gaming profiles and distinguish their local aliases from user-authored drafts and onboard storage.</li><li>Fail closed on unsupported devices, fields, transitions, and ambiguous state. No input interception or injection fallback.</li></ul>
+            <p class="gate"><strong>Exit gate</strong>Owner-present compact accessibility, production tray, and performance checkpoints (#6, #7, #9) remain pending. Editor presentation (#8) is a separate gate before shipping the editor.</p>
+          </li>
+          <li class="milestone" data-state="planned"><p class="milestone-index">M1 / ISSUE #12</p><span class="status">Next · planned</span><h3>Finish offline draft workflows</h3>
+            <ul><li>Create, name, edit, duplicate, and delete semantic user drafts without touching device storage.</li><li>Persist validated drafts separately from profile aliases, configuration, reports, and the immutable baseline.</li><li>Keep synthetic preview Save and Apply disabled; a draft store is not device authorization.</li></ul>
+            <p class="gate"><strong>Exit gate</strong><a href="https://github.com/spencer-life/viperpilot/issues/12">Issue #12</a> passes offline round-trip, invalid-data, rollback, and isolation checks.</p>
+          </li>
+          <li class="milestone" data-state="planned"><p class="milestone-index">M2 / ISSUE #4</p><span class="status">Planned</span><h3>Define field contracts</h3>
+            <ul><li>Set typed allowed values, validation, exact Viper V4 Pro scope, and readback requirements per field.</li><li>Treat changed DPI and additional button actions as separate research; existing polling and Mouse4/Mouse5 evidence is condition-specific.</li><li>A GET result, unchanged-value write, or source encoder alone never proves a changed value.</li></ul>
+            <p class="gate"><strong>Exit gate</strong><a href="https://github.com/spencer-life/viperpilot/issues/4">Issue #4</a> documents and tests the fail-closed contract offline.</p>
+          </li>
+          <li class="milestone" data-state="gated"><p class="milestone-index">M3 / ISSUE #13</p><span class="status">Planned · hardware-gated</span><h3>Guard draft promotion</h3>
+            <ul><li>Create inspectable plans only for contract-approved fields and combinations.</li><li>Keep identity checks, exact changed-field reporting, independent GET, journaling, partial-failure handling, and rollback.</li><li>One logical field per supervised experiment, then restore the immutable baseline before any next field.</li></ul>
+            <p class="gate"><strong>Exit gate</strong><a href="https://github.com/spencer-life/viperpilot/issues/13">Issue #13</a> passes offline safety checks; device writes still need owner-reviewed field evidence.</p>
+          </li>
+          <li class="milestone" data-state="planned"><p class="milestone-index">M4 / EDITOR QUALITY</p><span class="status">Planned</span><h3>Complete and measure the editor</h3>
+            <ul><li>Finish user-facing draft editing with keyboard, screen-reader, high-DPI, and narrow-window review.</li><li>Keep rendering work out of tray-only idle unless production measurements justify a different arrangement.</li><li>Measure the production app before making launch, overhead, or switching-speed claims.</li></ul>
+            <p class="gate"><strong>Exit gate</strong>Figma files are planning references. Running UI presentation, accessibility, and performance checks remain pending.</p>
+          </li>
+        </ol>
+        <p class="direction">The supported device scope remains the documented Razer Viper V4 Pro field set. No support is implied for other mice, transports, fields, or arbitrary Synapse settings.</p>
+      </section>
+      <section class="support" id="research" aria-labelledby="research-title">
+        <div class="section-head"><h2 id="research-title">Open owner-present gates</h2><p class="section-note">These checks remain pending. A software build, preview, GET, or design reference cannot close them.</p></div>
+        <div class="support-grid">
+          <section class="panel" aria-labelledby="candidates-title">
+            <div class="panel-head"><h3 id="candidates-title">Manual checkpoints</h3><p>Work with the device owner at a Windows PC and preserve the evidence record.</p></div>
+            <ul class="research-list">
+              <li><span class="candidate"><a href="https://github.com/spencer-life/viperpilot/issues/6">#6</a> Compact switcher<span class="state-word block">Pending</span></span><span class="evidence">Check accessibility, focus, labels, and legibility on the Windows display in use.</span></li>
+              <li><span class="candidate"><a href="https://github.com/spencer-life/viperpilot/issues/7">#7</a> Production tray<span class="state-word block">Pending</span></span><span class="evidence">Validate both complete profiles, hotkey, rollback, and normal process lifecycle.</span></li>
+              <li><span class="candidate"><a href="https://github.com/spencer-life/viperpilot/issues/8">#8</a> Editor presentation<span class="state-word block">Pending</span></span><span class="evidence">Review real running UI against approved planning states. Figma has not been updated by this docs-only refresh.</span></li>
+              <li><span class="candidate"><a href="https://github.com/spencer-life/viperpilot/issues/9">#9</a> Production performance<span class="state-word block">Pending</span></span><span class="evidence">Measure launch, idle resources, and switching under recorded conditions before claims.</span></li>
+              <li><span class="candidate"><a href="https://github.com/spencer-life/viperpilot/issues/10">#10</a> Changed DPI<span class="state-word block">Pending</span></span><span class="evidence">Isolated changed-value experiment, independent readback, and baseline restoration. 1600→1600 is not changed-value evidence.</span></li>
+              <li><span class="candidate"><a href="https://github.com/spencer-life/viperpilot/issues/11">#11</a> Additional buttons<span class="state-word block">Pending</span></span><span class="evidence">Test one action at a time with independent readback and baseline restoration; do not add a raw assignment editor.</span></li>
+            </ul>
+            <p class="callout"><strong>Device gate:</strong> Review full VID/PID and serials, the immutable baseline, and exact one-field plan before any setter. Use the required serial suffix as the final command guard. Record failed experiments and restore the reviewed baseline.</p>
+          </section>
+          <aside class="panel" aria-labelledby="links-title">
+            <div class="panel-head"><h3 id="links-title">Current references</h3><p>Public progress and design planning.</p></div>
+            <ol class="rules">
+              <li><strong>PR 3</strong> remains a draft. Last validated source checkpoint: <a href="https://github.com/spencer-life/viperpilot/commit/7cb0440">7cb0440</a>, with passing <a href="https://github.com/spencer-life/viperpilot/actions/runs/36612610509">Linux + Windows Core</a> and <a href="https://github.com/spencer-life/viperpilot/actions/runs/36612610273">Security</a> checks. Later revisions have separate check results.</li>
+              <li><strong>Next software issues</strong> — <a href="https://github.com/spencer-life/viperpilot/issues/12">#12 draft persistence</a>, <a href="https://github.com/spencer-life/viperpilot/issues/4">#4 capability contracts</a>, <a href="https://github.com/spencer-life/viperpilot/issues/13">#13 guarded promotion</a>.</li>
+              <li><strong>Design planning</strong> — <a href="https://www.figma.com/design/Ujs2cpFXYNnSI2YquOG1jF">Figma design</a>, <a href="https://www.figma.com/board/7ZCW50LM1czKUmPISbxukM/Figma---Development-Workflow">development workflow</a>, and <a href="https://www.figma.com/board/1DhV61xcYdFD3SbtWbGBHN/ViperPilot-%25E2%2580%2594-Project-Brain---Roadmap">project brain</a>. Links are references, not evidence that these files were revised or validated.</li>
+              <li><strong>Evidence limits</strong> — start with <a href="../docs/continue-here.md">the continuation brief</a>, then see <a href="../docs/quick-switch-status.md">quick-switch status</a>, <a href="../docs/quick-switch-supervised-checklist.md">supervised checklist</a>, and <code>ROADMAP.md</code>. Software-only test results do not establish mouse behavior.</li>
+            </ol>
+          </aside>
+        </div>
+      </section>
+      <section class="release" id="release" aria-labelledby="release-title">
+        <div class="release-layout"><div><p class="eyebrow">Definition of a release</p><h2 id="release-title">Evidence closes the gate.</h2><p class="release-intro">Keep software checks, desktop usability, and measured device behavior distinct. Plans and visual previews do not prove device support.</p></div>
+          <ol class="checklist">
+            <li><strong>Software.</strong> Checks pass for the exact candidate and are reported as hardware-free where applicable.</li>
+            <li><strong>Desktop.</strong> Owner-present tray, editor, accessibility, presentation, and performance gates are recorded.</li>
+            <li><strong>Hardware.</strong> Full identity, immutable baseline, one-field plan, independent readback, and restoration are recorded.</li>
+            <li><strong>Regression.</strong> Both complete built-in profiles and production hotkey pass; process-exit and power-cycle behavior are recorded before persistence claims.</li>
+            <li><strong>Scope.</strong> Public claims stay within the documented Viper V4 Pro field scope and tested conditions.</li>
+          </ol>
+        </div>
+      </section>
+    </main>
+    <footer><p><strong>ViperPilot</strong> is the project name. Existing executable and Cargo package identifiers may remain for compatibility. Current software and hardware validation boundaries are in <a href="../docs/quick-switch-status.md">quick-switch status</a> and the <a href="../docs/quick-switch-supervised-checklist.md">supervised checklist</a>.</p></footer>
+  </div>
+</body>
+</html>

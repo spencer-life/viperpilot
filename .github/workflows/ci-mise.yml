@@ -5,13 +5,6 @@ on:
     branches:
       - main
   pull_request:
-    paths:
-      - 'src/**'
-      - 'tests/**'
-      - 'Cargo.*'
-      - 'mise.toml'
-      - 'mise.lock'
-      - '.github/workflows/ci-mise.yml'
   workflow_dispatch:
 
 permissions:
@@ -23,6 +16,7 @@ concurrency:
 
 jobs:
   ci:
+    name: Core CI
     strategy:
       fail-fast: false
       matrix:
@@ -33,6 +27,8 @@ jobs:
       # Hosted runners already provide Rust. Cross-build tools are WSL-only;
       # native Windows CI must not install the conda/cargo-xwin toolchain.
       MISE_ENABLE_TOOLS: ''
+      MISE_TASK_RUN_AUTO_INSTALL: 'false'
+      MISE_EXEC_AUTO_INSTALL: 'false'
       CARGO_TERM_COLOR: always
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -43,9 +39,21 @@ jobs:
           version: '2026.9.16'
           install: false
           cache: false
+      - name: Use latest stable Rust
+        run: rustup update stable --no-self-update
       - name: Check, test, build, and smoke-test without hardware on Linux
         if: runner.os == 'Linux'
         run: mise run ci
       - name: Check, test, build, and smoke-test without hardware on Windows
         if: runner.os == 'Windows'
+        env:
+          MISE_ENV: windows
         run: mise run ci-windows
+      - name: Lint and test the egui preview without hardware on Linux
+        if: runner.os == 'Linux'
+        run: mise run ci-preview
+      - name: Compile and lint the native UI preview without hardware on Windows
+        if: runner.os == 'Windows'
+        env:
+          MISE_ENV: windows
+        run: mise run ci-windows-preview

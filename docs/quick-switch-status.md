@@ -1,0 +1,45 @@
+# Quick-switch implementation and validation status
+
+Updated 2026-09-29. The software checkpoint below is public commit `7cb0440a8b21f54154c1042757c810f3b9552c24` in [draft PR #3](https://github.com/spencer-life/viperpilot/pull/3), branch `codex/sanitized-quick-switch`. Its hosted software checks passed; it is not release approval or physical-device validation. Later documentation-only commits do not imply a new validation result. Start a new session with [the continuation brief](continue-here.md) and track open work in the [public issue tracker](https://github.com/spencer-life/viperpilot/issues). GitHub is the implementation source; the old ZIP patch must not be reapplied.
+
+## Goal and scope
+
+The priority is fast access from the native Windows tray or hotkey, with no browser or settings navigation for an established profile pair and little background work. Users should eventually be able to create their own settings for DPI, buttons, polling, and other fields that are proven safe. The Developer and Gaming profiles are protected example/recovery presets; they do not define the full customization model. Full Synapse parity and support for every recent mouse are not requirements.
+
+The application currently supports only its documented Viper V4 Pro device and field boundaries. Local names and drafts are not additional onboard slots, baselines, device authorization, or proof of current hardware state. Unsupported devices, fields, transitions, and ambiguous states must continue to fail closed.
+
+## Implemented software
+
+- A validated local profile-alias library supports protected built-ins, user-named aliases, and a two-entry quick-switch selection.
+- Tray actions and the global hotkey reload the selection, verify current device state, and use the existing guarded profile-apply path. Pair selection and library reload do not write to the device.
+- The native compact switcher opens first, with a Details view for the existing read-only inspector and recovery actions. The UI preview is isolated from the production tray and hardware worker.
+- User-authored profile intent has a versioned local draft model and storage separate from complete-preset aliases and device baselines. The egui editor remains a synthetic preview; its Save and Apply controls are disabled. The user-facing draft editor is incomplete.
+- Hardware-free tasks cover formatting, lint, tests, native build, and CLI smoke. Separate preview tasks exercise synthetic UI states and Windows accessibility metadata.
+
+The guarded write engine also checks each planned field against the last trusted snapshot before writing, advances that snapshot only after a complete validated readback, verifies device identity on readback, and stops when identity or field state is ambiguous. A rejected write is classified using readback; an ambiguous acknowledgement cannot be treated as proof that an equal-value DPI write succeeded. These checks reduce stale-plan and rollback risk. They do not establish additional device support or authorize new writes.
+
+## Validation evidence and limits
+
+The synchronized candidate was checked locally with `mise run ci`: formatting, default Clippy, 108 tests, native release build, and CLI help smoke all passed. `mise run ci-preview` passed strict Clippy and three egui preview tests. Windows-target release builds for the utility, Win32 UI preview, and egui preview passed; Windows-target preview Clippy passed. `mise tasks validate` accepted all 25 tasks, and `mise run --skip-tools security` passed actionlint, a redacted full-history Gitleaks scan, and an offline zizmor audit. These were software-only checks; they did not launch the production tray or send device commands.
+
+Hosted CI on public checkpoint `7cb0440` passed the [Ubuntu Core CI job](https://github.com/spencer-life/viperpilot/actions/runs/36612610509/job/109557553770), [Windows Core CI job](https://github.com/spencer-life/viperpilot/actions/runs/36612610509/job/109557553566), and [Security checks job](https://github.com/spencer-life/viperpilot/actions/runs/36612610273/job/109557552100). Their successful conclusions were rechecked through GitHub on 2026-09-29. The core jobs ran hardware-free source/test/build/preview tasks; the security job ran workflow lint, redacted history scanning, and workflow security analysis. These results do not validate the production tray on a desktop or any physical-device behavior.
+
+A fresh detached worktree at that same checkpoint passed `mise run --skip-tools build-native`, `test` (**108 passed, 0 failed**), `test-egui-preview` (**3 passed, 0 failed**), `fmt-check`, `lint`, and `ci-preview` on Linux/Rust 1.98.1 on 2026-09-29. Compilation outputs and dependency caches were isolated; no Windows UI or device was accessed. Task validation found 25 repository tasks (30 including inherited global tasks). The earlier failed task startup could not register mise trust in the sandbox; its retry passed before any source changes. The [tooling decision](tooling-decision.md) records the assessment and its limits.
+
+The preview UI's accessible names and enabled states were checked with Windows UI Automation in earlier development work. The owner-drawn Win32 preview controls were reported as panes without `InvokePattern`; screen-reader behavior and the production UI's Windows display-scale appearance remain unverified. The egui preview exposes standard control roles, but keyboard-only and screen-reader operation remain unverified. UI Automation was not rerun as part of the synchronized candidate checks.
+
+No physical-device validation of the new tray pair-selection or hotkey path is recorded here. A build, unit test, UI preview, GET result, or planned write is not evidence that a hardware write succeeded. Use the [supervised validation checklist](quick-switch-supervised-checklist.md) when an owner can observe the Windows device session. Keep serials, local paths, raw reports, and screenshots containing private information in local evidence storage rather than this repository.
+
+## Next work and deferred tests
+
+- [Issue #12](https://github.com/spencer-life/viperpilot/issues/12): connect real editor values to the local draft store, with create/edit/duplicate/rename/delete/reopen behavior and clear draft-only status. Match enabled settings to what can actually round-trip; do not silently discard preview-only fields.
+- [Issue #4](https://github.com/spencer-life/viperpilot/issues/4): define device-scoped capabilities and the safe request/write contract; it does not broaden the hardware allowlist by itself.
+- [Issue #13](https://github.com/spencer-life/viperpilot/issues/13): later promote proven custom settings into quick switching, after storage, contract, field and combination evidence gates pass.
+- [Issue #5](https://github.com/spencer-life/viperpilot/issues/5): software CI is green at the recorded checkpoint; required-check enforcement and the stacked PR merge order remain open. Public `main` was unprotected with no rulesets when rechecked on 2026-09-29.
+- Manual desktop/device gates remain open in [#6](https://github.com/spencer-life/viperpilot/issues/6), [#7](https://github.com/spencer-life/viperpilot/issues/7), [#8](https://github.com/spencer-life/viperpilot/issues/8), [#9](https://github.com/spencer-life/viperpilot/issues/9), [#10](https://github.com/spencer-life/viperpilot/issues/10), and [#11](https://github.com/spencer-life/viperpilot/issues/11). The owner is away from the PC; no new manual tests are authorized by this documentation refresh.
+
+## Release gates
+
+Keep the tray integration in draft until the documented full-profile and hotkey paths pass with owner-observed evidence. Before a hardware write, review a complete immutable baseline, device identity, and exact plan; test one logical field at a time; independently read it back; and restore the reviewed baseline before the next experiment. Do not kill Synapse or use input interception/injection as a fallback. Record process-exit and mouse power-cycle results before claiming persistence.
+
+For customization, unverified values may be saved only as clearly marked local drafts; Apply must stay disabled until the target device, field, and complete combination pass their documented evidence gates. Local saved profiles are not additional onboard slots.

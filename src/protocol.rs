@@ -515,7 +515,7 @@ pub fn parse_dpi_stages(response: &Response) -> Result<(u8, Vec<DpiStage>), Prot
     }
     require_arguments(response, 3 + count * 7, "DPI stages")?;
     let mut stages = Vec::with_capacity(count);
-    for chunk in response.arguments[3..3 + count * 7].chunks_exact(7) {
+    for chunk in response.arguments[3..3 + count * 7].as_chunks::<7>().0 {
         stages.push(DpiStage {
             id: chunk[0],
             x: u16::from_be_bytes([chunk[1], chunk[2]]),

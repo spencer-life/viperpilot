@@ -7,6 +7,8 @@
 //! `gui_logic` module and performs no HID work of its own.
 
 use core::ffi::c_void;
+use std::cell::{Cell, RefCell};
+use std::collections::VecDeque;
 use std::mem::size_of;
 use std::os::windows::ffi::OsStrExt;
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
@@ -23,8 +25,9 @@ use windows::Win32::Graphics::Gdi::{
     CreatePen, CreateSolidBrush, DEFAULT_CHARSET, DEFAULT_PITCH, DT_CENTER, DT_SINGLELINE,
     DT_VCENTER, DeleteDC, DeleteObject, DrawFocusRect, DrawTextW, Ellipse, EndPaint, FONT_WEIGHT,
     FW_BOLD, FW_NORMAL, FillRect, GetObjectW, HALFTONE, HBITMAP, HBRUSH, HDC, HFONT, HGDIOBJ,
-    InvalidateRect, LineTo, MoveToEx, OUT_DEFAULT_PRECIS, PAINTSTRUCT, PS_SOLID, RoundRect,
-    SRCCOPY, SelectObject, SetBkMode, SetStretchBltMode, SetTextColor, StretchBlt, TRANSPARENT,
+    InvalidateRect, LineTo, MoveToEx, OUT_DEFAULT_PRECIS, PAINTSTRUCT, PS_SOLID, RDW_ALLCHILDREN,
+    RDW_INVALIDATE, RedrawWindow, RoundRect, SRCCOPY, SelectObject, SetBkMode, SetStretchBltMode,
+    SetTextColor, StretchBlt, TRANSPARENT,
 };
 use windows::Win32::System::Registry::{
     HKEY, HKEY_CURRENT_USER, REG_SZ, RegCloseKey, RegCreateKeyW, RegDeleteValueW, RegSetValueExW,
@@ -44,23 +47,24 @@ use windows::Win32::UI::Shell::{
     NIM_MODIFY, NIM_SETVERSION, NOTIFYICON_VERSION_4, NOTIFYICONDATAW, Shell_NotifyIconW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    AppendMenuW, CREATESTRUCTW, CW_USEDEFAULT, CreatePopupMenu, CreateWindowExW, DefWindowProcW,
-    DestroyMenu, DestroyWindow, DispatchMessageW, FindWindowW, GWLP_USERDATA, GetClientRect,
-    GetCursorPos, GetMessageW, GetWindowLongPtrW, HICON, ICON_BIG, ICON_SMALL, IDC_ARROW,
-    IDI_APPLICATION, IMAGE_BITMAP, IMAGE_ICON, IsDialogMessageW, IsIconic, LR_LOADFROMFILE,
-    LoadCursorW, LoadIconW, LoadImageW, MF_CHECKED, MF_GRAYED, MF_STRING, MSG, MoveWindow,
-    PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_RESTORE,
-    SW_SHOW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER, SendMessageW, SetForegroundWindow,
-    SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow, TPM_RIGHTBUTTON, TrackPopupMenu,
-    TranslateMessage, WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU,
-    WM_CTLCOLORSTATIC, WM_DESTROY, WM_DEVICECHANGE, WM_DPICHANGED, WM_DRAWITEM, WM_HOTKEY,
-    WM_LBUTTONDBLCLK, WM_LBUTTONUP, WM_NCCREATE, WM_PAINT, WM_RBUTTONUP, WM_SETFONT, WM_SETICON,
-    WNDCLASSW, WS_CAPTION, WS_CHILD, WS_CLIPCHILDREN, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU,
-    WS_TABSTOP, WS_VISIBLE,
+    AppendMenuW, BN_CLICKED, CREATESTRUCTW, CW_USEDEFAULT, CreatePopupMenu, CreateWindowExW,
+    DefWindowProcW, DestroyMenu, DestroyWindow, DispatchMessageW, FindWindowW, GWLP_USERDATA,
+    GetClientRect, GetCursorPos, GetDlgItem, GetMessageW, GetWindowLongPtrW, HICON, HMENU,
+    ICON_BIG, ICON_SMALL, IDC_ARROW, IDI_APPLICATION, IMAGE_BITMAP, IMAGE_ICON, IsDialogMessageW,
+    IsIconic, LR_LOADFROMFILE, LoadCursorW, LoadIconW, LoadImageW, MF_CHECKED, MF_GRAYED, MF_POPUP,
+    MF_STRING, MSG, MoveWindow, PostMessageW, PostQuitMessage, RegisterClassW,
+    RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER,
+    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow,
+    TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WINDOW_EX_STYLE,
+    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CTLCOLORSTATIC, WM_DESTROY,
+    WM_DEVICECHANGE, WM_DPICHANGED, WM_DRAWITEM, WM_HOTKEY, WM_LBUTTONDBLCLK, WM_LBUTTONUP,
+    WM_NCCREATE, WM_NCDESTROY, WM_PAINT, WM_RBUTTONUP, WM_SETFONT, WM_SETICON, WNDCLASSW,
+    WS_CAPTION, WS_CHILD, WS_CLIPCHILDREN, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP,
+    WS_VISIBLE,
 };
 use windows::core::{BOOL, PCWSTR, w};
 
-use crate::engine::{ProfileMatch, apply_write_plan, classify_profile, next_profile_for_hotkey};
+use crate::engine::{ProfileMatch, apply_write_plan, classify_profile};
 use crate::gui_logic::{
     self, BusyKind, ConnectionStatus, LaunchDecision, StatusPresentation, Tone, VerificationOutcome,
 };
@@ -68,23 +72,27 @@ use crate::model::{
     DpiPair, ProfileName, ProfileSpec, RawButtonAssignment, UtilityConfigV1, WirelessPowerSettings,
 };
 use crate::planning::{plan_profile_with_baseline, require_proven_polling_writes};
+use crate::profile_library::{MAX_SAVED_PROFILES, ProfileLibraryV1};
 use crate::storage::{
-    StoragePaths, append_diagnostic, load_config, read_snapshot, save_config, write_plan_journal,
-    write_verification_report,
+    StoragePaths, append_diagnostic, load_config, load_profile_library, read_snapshot, save_config,
+    save_profile_library, write_plan_journal, write_verification_report,
 };
 use crate::windows::{RazerDevice, refuse_if_synapse_running};
 
 const WINDOW_CLASS: PCWSTR = w!("ViperV4UtilityTrayWindowV1");
-const WINDOW_TITLE: PCWSTR = w!("Viper V4 Pro Utility");
+const PREVIEW_WINDOW_CLASS: PCWSTR = w!("ViperV4UtilityPreviewWindowV1");
+const WINDOW_TITLE: PCWSTR = w!("ViperPilot");
 const MUTEX_NAME: PCWSTR = w!("Local\\ViperV4UtilityTrayV1");
 const SHOW_MESSAGE_NAME: PCWSTR = w!("ViperV4UtilityShowWindowV1");
 const STARTUP_KEY: PCWSTR = w!("Software\\Microsoft\\Windows\\CurrentVersion\\Run");
 const STARTUP_VALUE: PCWSTR = w!("ViperV4Utility");
 const ICON_FILE_NAME: &str = "viper-utility-icon.ico";
 const DASHBOARD_MOUSE_BMP: &str = "viper-v4-black-dashboard.bmp";
+const COMPACT_MOUSE_BMP: &str = "viperpilot-mouse-silhouette.bmp";
 const TRAY_ICON_ID: u32 = 1;
 const TRAY_CALLBACK: u32 = WM_APP + 1;
 const WORKER_EVENT: u32 = WM_APP + 2;
+const DEFERRED_DRAIN_EVENT: u32 = WM_APP + 3;
 const HOTKEY_ID: i32 = 0x5654;
 
 const MENU_OPEN: usize = 1000;
@@ -94,8 +102,15 @@ const MENU_STARTUP: usize = 1003;
 const MENU_DIAGNOSTICS: usize = 1004;
 const MENU_EXIT_AFTER_GAMING: usize = 1005;
 const MENU_EXIT: usize = 1006;
+const MENU_RELOAD_LIBRARY: usize = 1007;
+const MENU_QUICK_APPLY_FIRST: usize = 1008;
+const MENU_QUICK_APPLY_SECOND: usize = 1009;
+const MENU_SAVED_APPLY_BASE: usize = 3000;
+const MENU_QUICK_FIRST_BASE: usize = 4000;
+const MENU_QUICK_SECOND_BASE: usize = MENU_QUICK_FIRST_BASE + MAX_SAVED_PROFILES;
 const BUTTON_DEVELOPER: usize = 2001;
 const BUTTON_GAMING: usize = 2002;
+const BUTTON_VIEW_MODE: usize = 2003;
 const HOTSPOT_LEFT: usize = 2101;
 const HOTSPOT_RIGHT: usize = 2102;
 const HOTSPOT_MIDDLE: usize = 2103;
@@ -118,6 +133,8 @@ const MAIN_WINDOW_STYLE: WINDOW_STYLE = WINDOW_STYLE(
 const BASE_MARGIN: i32 = 24;
 const BASE_CLIENT_WIDTH: i32 = 880;
 const BASE_CLIENT_HEIGHT: i32 = 680;
+const BASE_COMPACT_WIDTH: i32 = 900;
+const BASE_COMPACT_HEIGHT: i32 = 520;
 const BASE_HEADER_TITLE_TOP: i32 = 17;
 const BASE_HEADER_SUBTITLE_TOP: i32 = 45;
 const BASE_MAIN_TOP: i32 = 98;
@@ -147,25 +164,36 @@ const fn rgb(red: u8, green: u8, blue: u8) -> COLORREF {
 }
 
 // Catppuccin Mocha.
-const CAT_BASE: COLORREF = rgb(30, 30, 46);
-const CAT_CRUST: COLORREF = rgb(17, 17, 27);
-const CAT_SURFACE0: COLORREF = rgb(49, 50, 68);
-const CAT_SURFACE1: COLORREF = rgb(69, 71, 90);
-const CAT_OVERLAY0: COLORREF = rgb(108, 112, 134);
-const CAT_TEXT: COLORREF = rgb(205, 214, 244);
-const CAT_SUBTEXT0: COLORREF = rgb(166, 173, 200);
+const CAT_BASE: COLORREF = rgb(19, 22, 25);
+const CAT_CRUST: COLORREF = rgb(13, 15, 17);
+const CAT_SURFACE0: COLORREF = rgb(26, 31, 36);
+const CAT_SURFACE1: COLORREF = rgb(48, 54, 61);
+const CAT_OVERLAY0: COLORREF = rgb(111, 119, 128);
+const CAT_TEXT: COLORREF = rgb(240, 242, 244);
+const CAT_SUBTEXT0: COLORREF = rgb(166, 174, 182);
 const CAT_BLUE: COLORREF = rgb(137, 180, 250);
 const CAT_GREEN: COLORREF = rgb(166, 227, 161);
 const CAT_YELLOW: COLORREF = rgb(249, 226, 175);
 const CAT_RED: COLORREF = rgb(243, 139, 168);
+const VIPER_ROSE: COLORREF = rgb(235, 143, 164);
 const CAT_MAUVE: COLORREF = rgb(203, 166, 247);
 const CAT_PEACH: COLORREF = rgb(250, 179, 135);
 const MOUSE_BLACK: COLORREF = rgb(11, 11, 15);
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 enum WorkerCommand {
+    LoadLibrary,
     Refresh,
     Apply(ProfileName),
+    ApplySaved {
+        id: String,
+        expected_preset: ProfileName,
+    },
+    SetQuickSwitch {
+        slot: usize,
+        profile_id: String,
+    },
+    ToggleQuickSwitch,
     SetStartWithWindows(bool),
     SetDiagnostics(bool),
     SetExitAfterGaming(bool),
@@ -201,7 +229,97 @@ enum WorkerEvent {
         button_assignments: Option<Vec<RawButtonAssignment>>,
     },
     Config(UtilityConfigV1),
+    LibraryUpdated(ProfileLibraryV1),
+    LibraryError(String),
+    LocalError(String),
     Error(String),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct QuickSwitchAction {
+    profile_id: String,
+    expected_preset: ProfileName,
+    label: String,
+}
+
+fn quick_switch_action(
+    library: &ProfileLibraryV1,
+    slot: usize,
+) -> Result<QuickSwitchAction, String> {
+    library.validate()?;
+    let profile_id = library
+        .quick_switch()
+        .get(slot)
+        .ok_or_else(|| format!("quick-switch slot {slot} is unavailable"))?;
+    let entry = library
+        .entries()
+        .iter()
+        .find(|entry| entry.id() == profile_id)
+        .ok_or_else(|| format!("quick-switch profile {profile_id:?} is unavailable"))?;
+    Ok(QuickSwitchAction {
+        profile_id: entry.id().to_owned(),
+        expected_preset: entry.source_preset(),
+        label: format!(
+            "Switch to {} — complete {} preset",
+            entry.name(),
+            preset_display_name(entry.source_preset())
+        ),
+    })
+}
+
+fn preset_display_name(preset: ProfileName) -> &'static str {
+    match preset {
+        ProfileName::Developer => "Developer",
+        ProfileName::Gaming => "Gaming",
+    }
+}
+
+fn quick_switch_slot_for_command(command: usize) -> Option<usize> {
+    match command {
+        MENU_QUICK_APPLY_FIRST => Some(0),
+        MENU_QUICK_APPLY_SECOND => Some(1),
+        _ => None,
+    }
+}
+
+fn resolve_saved_apply(
+    library: &ProfileLibraryV1,
+    profile_id: &str,
+    expected_preset: ProfileName,
+) -> Result<ProfileName, String> {
+    library.validate()?;
+    let entry = library
+        .entries()
+        .iter()
+        .find(|entry| entry.id() == profile_id)
+        .ok_or_else(|| format!("saved local profile {profile_id:?} no longer exists"))?;
+    if entry.source_preset() != expected_preset {
+        return Err(format!(
+            "saved local profile {profile_id:?} changed since the menu was opened; reload saved profiles and try again"
+        ));
+    }
+    Ok(entry.source_preset())
+}
+
+fn quick_slot_entry_eligible(library: &ProfileLibraryV1, slot: usize, profile_id: &str) -> bool {
+    if library.validate().is_err() || slot > 1 {
+        return false;
+    }
+    let other_preset = library
+        .quick_switch()
+        .get(1 - slot)
+        .and_then(|other_id| {
+            library
+                .entries()
+                .iter()
+                .find(|entry| entry.id() == other_id)
+        })
+        .map(|entry| entry.source_preset());
+    let candidate = library
+        .entries()
+        .iter()
+        .find(|entry| entry.id() == profile_id);
+    matches!((candidate, other_preset), (Some(entry), Some(other)) if entry.source_preset() != other)
 }
 
 struct StatusWindow {
@@ -224,6 +342,7 @@ struct StatusWindow {
     verification_value: HWND,
     developer_button: HWND,
     gaming_button: HWND,
+    view_mode_button: HWND,
     brand_font: HFONT,
     title_font: HFONT,
     body_font: HFONT,
@@ -244,9 +363,9 @@ struct TrayApp {
     event_rx: Receiver<WorkerEvent>,
     current: ProfileMatch,
     config: UtilityConfigV1,
+    library: Option<ProfileLibraryV1>,
+    initializing: bool,
     busy: Option<BusyKind>,
-    // A complete read-verified profile may toggle; an out-of-sync state may not.
-    hotkey_armed: bool,
     connection: ConnectionStatus,
     polling_hz: Option<u16>,
     dpi: Option<DpiPair>,
@@ -256,11 +375,177 @@ struct TrayApp {
     last_verification: Option<VerificationOutcome>,
     last_error: Option<String>,
     presentation: Option<StatusPresentation>,
-    show_message: u32,
+    detailed: bool,
     status: Option<StatusWindow>,
     base_brush: HBRUSH,
     surface_brush: HBRUSH,
     mouse_bitmap: Option<DashboardBitmap>,
+    compact_mouse_bitmap: Option<DashboardBitmap>,
+    preview_mode: bool,
+    quit_requested: bool,
+}
+
+/// Stable state installed in GWLP_USERDATA. Win32 can synchronously send
+/// messages while a handler calls layout, paints an owner-drawn control, or
+/// tracks a popup menu, so handlers must never create aliased `&mut TrayApp`s.
+struct WindowRuntime {
+    app: RefCell<TrayApp>,
+    deferred: RefCell<VecDeque<DeferredAction>>,
+    draining: Cell<bool>,
+    paint_pending: Cell<bool>,
+    popup_pending: Cell<bool>,
+    closing: Cell<bool>,
+    preview_mode: bool,
+    show_message: u32,
+    fallback_brush: HBRUSH,
+}
+
+#[derive(Clone, Copy)]
+enum DeferredAction {
+    Command(usize),
+    Hotkey,
+    WorkerEvent,
+    Refresh,
+    TrayOpen,
+    TrayMenu,
+    Dpi(RECT),
+    ShowWindow,
+}
+
+fn is_known_child_command(id: usize, notification: u16) -> bool {
+    notification == BN_CLICKED as u16
+        && matches!(
+            id,
+            BUTTON_DEVELOPER
+                | BUTTON_GAMING
+                | BUTTON_VIEW_MODE
+                | HOTSPOT_LEFT
+                | HOTSPOT_RIGHT
+                | HOTSPOT_MIDDLE
+                | HOTSPOT_REAR_SIDE
+                | HOTSPOT_FRONT_SIDE
+                | HOTSPOT_DPI
+        )
+}
+
+fn is_known_menu_command(id: usize) -> bool {
+    matches!(
+        id,
+        MENU_OPEN
+            | MENU_DEVELOPER
+            | MENU_GAMING
+            | MENU_STARTUP
+            | MENU_DIAGNOSTICS
+            | MENU_EXIT_AFTER_GAMING
+            | MENU_EXIT
+            | MENU_RELOAD_LIBRARY
+            | MENU_QUICK_APPLY_FIRST
+            | MENU_QUICK_APPLY_SECOND
+    ) || (MENU_SAVED_APPLY_BASE..MENU_SAVED_APPLY_BASE + MAX_SAVED_PROFILES).contains(&id)
+        || (MENU_QUICK_FIRST_BASE..MENU_QUICK_SECOND_BASE + MAX_SAVED_PROFILES).contains(&id)
+}
+
+fn ignored_while_closing(closing: bool, show_message: u32, message: u32) -> bool {
+    closing
+        && (matches!(
+            message,
+            DEFERRED_DRAIN_EVENT
+                | WORKER_EVENT
+                | WM_HOTKEY
+                | WM_DEVICECHANGE
+                | WM_COMMAND
+                | TRAY_CALLBACK
+        ) || (show_message != 0 && message == show_message))
+}
+
+fn valid_window_command(window: HWND, wparam: WPARAM, lparam: LPARAM) -> Option<usize> {
+    let id = wparam.0 & 0xffff;
+    if lparam.0 == 0 {
+        return is_known_menu_command(id).then_some(id);
+    }
+    let notification = ((wparam.0 >> 16) & 0xffff) as u16;
+    if !is_known_child_command(id, notification) {
+        return None;
+    }
+    let child = HWND(lparam.0 as *mut c_void);
+    unsafe { GetDlgItem(Some(window), id as i32) }
+        .ok()
+        .filter(|expected| *expected == child)
+        .map(|_| id)
+}
+
+#[cfg(test)]
+mod window_command_tests {
+    use super::*;
+
+    #[test]
+    fn child_commands_require_known_button_and_click_notification() {
+        assert!(is_known_child_command(BUTTON_DEVELOPER, BN_CLICKED as u16));
+        assert!(is_known_child_command(HOTSPOT_DPI, BN_CLICKED as u16));
+        assert!(!is_known_child_command(9999, BN_CLICKED as u16));
+        assert!(!is_known_child_command(BUTTON_DEVELOPER, 5));
+        assert!(!is_known_menu_command(BUTTON_DEVELOPER));
+    }
+
+    #[test]
+    fn registered_show_signal_is_ignored_only_while_closing() {
+        let show_message = WM_APP + 0x154;
+        assert!(!ignored_while_closing(false, show_message, show_message));
+        assert!(ignored_while_closing(true, show_message, show_message));
+        assert!(!ignored_while_closing(true, show_message, WM_APP + 0x155));
+    }
+
+    #[test]
+    fn menu_commands_accept_only_declared_ids_and_ranges() {
+        assert!(is_known_menu_command(MENU_OPEN));
+        assert!(is_known_menu_command(MENU_SAVED_APPLY_BASE));
+        assert!(is_known_menu_command(
+            MENU_SAVED_APPLY_BASE + MAX_SAVED_PROFILES - 1
+        ));
+        assert!(!is_known_menu_command(
+            MENU_SAVED_APPLY_BASE + MAX_SAVED_PROFILES
+        ));
+        assert!(is_known_menu_command(MENU_QUICK_FIRST_BASE));
+        assert!(is_known_menu_command(
+            MENU_QUICK_SECOND_BASE + MAX_SAVED_PROFILES - 1
+        ));
+        assert!(!is_known_menu_command(
+            MENU_QUICK_SECOND_BASE + MAX_SAVED_PROFILES
+        ));
+        assert!(!is_known_menu_command(9999));
+    }
+}
+
+impl WindowRuntime {
+    fn new(app: TrayApp, preview_mode: bool, show_message: u32) -> Self {
+        Self {
+            app: RefCell::new(app),
+            deferred: RefCell::new(VecDeque::new()),
+            draining: Cell::new(false),
+            paint_pending: Cell::new(false),
+            popup_pending: Cell::new(false),
+            closing: Cell::new(false),
+            preview_mode,
+            show_message,
+            fallback_brush: unsafe { CreateSolidBrush(CAT_SURFACE0) },
+        }
+    }
+
+    fn defer(&self, action: DeferredAction) {
+        self.deferred.borrow_mut().push_back(action);
+    }
+
+    fn defer_before_pending_events(&self, action: DeferredAction) {
+        self.deferred.borrow_mut().push_front(action);
+    }
+}
+
+impl Drop for WindowRuntime {
+    fn drop(&mut self) {
+        if !self.fallback_brush.0.is_null() {
+            let _ = unsafe { DeleteObject(HGDIOBJ(self.fallback_brush.0)) };
+        }
+    }
 }
 
 impl Drop for StatusWindow {
@@ -285,7 +570,13 @@ impl Drop for TrayApp {
                 let _ = unsafe { DeleteObject(HGDIOBJ(brush.0)) };
             }
         }
-        if let Some(bitmap) = self.mouse_bitmap.as_ref() {
+        for bitmap in [
+            self.mouse_bitmap.as_ref(),
+            self.compact_mouse_bitmap.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
             let _ = unsafe { DeleteObject(HGDIOBJ(bitmap.handle.0)) };
         }
     }
@@ -303,49 +594,54 @@ pub fn run(show_window_at_start: bool) -> Result<(), String> {
     };
     let (event_tx, event_rx) = mpsc::channel();
     let (command_tx, command_rx) = mpsc::channel();
-    let app = Box::into_raw(Box::new(TrayApp {
-        command_tx,
-        event_rx,
-        current: ProfileMatch::OutOfSync,
-        config: UtilityConfigV1::default(),
-        busy: Some(BusyKind::Reading),
-        hotkey_armed: false,
-        connection: ConnectionStatus::Connected,
-        polling_hz: None,
-        dpi: None,
-        power: None,
-        button_assignments: None,
-        selected_mouse_control: gui_logic::MouseControl::RearSide,
-        last_verification: None,
-        last_error: None,
-        presentation: None,
+    let runtime = Box::new(WindowRuntime::new(
+        TrayApp {
+            command_tx,
+            event_rx,
+            current: ProfileMatch::OutOfSync,
+            config: UtilityConfigV1::default(),
+            library: None,
+            initializing: true,
+            busy: Some(BusyKind::Reading),
+            connection: ConnectionStatus::Connected,
+            polling_hz: None,
+            dpi: None,
+            power: None,
+            button_assignments: None,
+            selected_mouse_control: gui_logic::MouseControl::RearSide,
+            last_verification: None,
+            last_error: None,
+            presentation: None,
+            detailed: false,
+            status: None,
+            base_brush: unsafe { CreateSolidBrush(CAT_BASE) },
+            surface_brush: unsafe { CreateSolidBrush(CAT_SURFACE0) },
+            mouse_bitmap: load_mouse_bitmap(DASHBOARD_MOUSE_BMP),
+            compact_mouse_bitmap: load_mouse_bitmap(COMPACT_MOUSE_BMP),
+            preview_mode: false,
+            quit_requested: false,
+        },
+        false,
         show_message,
-        status: None,
-        base_brush: unsafe { CreateSolidBrush(CAT_BASE) },
-        surface_brush: unsafe { CreateSolidBrush(CAT_SURFACE0) },
-        mouse_bitmap: load_dashboard_mouse_bitmap(),
-    }));
+    ));
 
-    let window = match create_main_window(unsafe { &mut *app }) {
-        Ok(window) => window,
-        Err(error) => {
-            drop(unsafe { Box::from_raw(app) });
-            return Err(error);
-        }
-    };
+    let window = create_main_window(&runtime)?;
     let controls = match create_status_controls(window) {
         Ok(controls) => controls,
         Err(error) => {
             let _ = unsafe { DestroyWindow(window) };
-            drop(unsafe { Box::from_raw(app) });
             return Err(error);
         }
     };
-    unsafe { &mut *app }.status = Some(controls);
-    if let Some(status) = unsafe { &mut *app }.status.as_mut() {
-        layout_status(window, status);
+    {
+        let mut app = runtime.app.borrow_mut();
+        app.status = Some(controls);
+        if let Some(status) = app.status.as_mut() {
+            layout_status(window, status, false);
+        }
+        app.update_ui(window);
     }
-    unsafe { &mut *app }.update_ui(window);
+    drain_deferred(&runtime, window);
 
     let worker_window = window.0 as usize;
     let worker = thread::Builder::new()
@@ -354,13 +650,11 @@ pub fn run(show_window_at_start: bool) -> Result<(), String> {
         .map_err(|error| format!("could not start serialized device worker: {error}"));
     if let Err(error) = worker {
         let _ = unsafe { DestroyWindow(window) };
-        drop(unsafe { Box::from_raw(app) });
         return Err(error);
     }
 
     if let Err(error) = add_tray_icon(window) {
         let _ = unsafe { DestroyWindow(window) };
-        drop(unsafe { Box::from_raw(app) });
         return Err(error);
     }
     let hotkey = unsafe {
@@ -375,32 +669,217 @@ pub fn run(show_window_at_start: bool) -> Result<(), String> {
     if let Err(error) = hotkey {
         remove_tray_icon(window);
         let _ = unsafe { DestroyWindow(window) };
-        drop(unsafe { Box::from_raw(app) });
         return Err(error);
     }
-    let startup_request = unsafe { &*app }
+    let startup_request = runtime
+        .app
+        .borrow()
         .command_tx
-        .send(WorkerCommand::Refresh)
+        .send(WorkerCommand::LoadLibrary)
+        .and_then(|()| runtime.app.borrow().command_tx.send(WorkerCommand::Refresh))
         .map_err(|error| format!("could not request startup state: {error}"));
     if let Err(error) = startup_request {
         let _ = unsafe { UnregisterHotKey(Some(window), HOTKEY_ID) };
         remove_tray_icon(window);
         let _ = unsafe { DestroyWindow(window) };
-        drop(unsafe { Box::from_raw(app) });
         return Err(error);
     }
     if show_window_at_start {
-        unsafe { &*app }.show_window_now(window);
+        runtime.app.borrow().show_window_now(window);
+        drain_deferred(&runtime, window);
     }
 
     let result = message_loop(window);
     let _ = unsafe { UnregisterHotKey(Some(window), HOTKEY_ID) };
     remove_tray_icon(window);
     let _ = unsafe { DestroyWindow(window) };
-    // `app` is owned by the window through GWLP_USERDATA until message-loop exit.
-    drop(unsafe { Box::from_raw(app) });
+    drop(runtime);
     drop(instance_mutex);
     result
+}
+
+/// Opens the existing native controls with synthetic state only. This opt-in
+/// path deliberately never starts the device worker or initializes tray,
+/// startup, hotkey, mutex, storage, or Synapse integrations.
+#[cfg(feature = "ui-preview")]
+pub fn run_preview(reversed_pair: bool, unavailable_library: bool) -> Result<(), String> {
+    let _ = unsafe { SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) };
+    let (event_tx, event_rx) = mpsc::channel();
+    let (command_tx, command_rx) = mpsc::channel();
+    drop(event_tx);
+    drop(command_rx);
+    let mut library = (!unavailable_library).then(ProfileLibraryV1::default);
+    if reversed_pair && let Some(library) = library.as_mut() {
+        library.set_quick_switch("gaming", "developer")?;
+    }
+    let runtime = Box::new(WindowRuntime::new(
+        TrayApp {
+            command_tx,
+            event_rx,
+            current: ProfileMatch::Developer,
+            config: UtilityConfigV1::default(),
+            library,
+            initializing: false,
+            busy: None,
+            connection: ConnectionStatus::Connected,
+            polling_hz: Some(1000),
+            dpi: Some(DpiPair { x: 1600, y: 1600 }),
+            power: None,
+            button_assignments: None,
+            selected_mouse_control: gui_logic::MouseControl::RearSide,
+            last_verification: None,
+            last_error: None,
+            presentation: None,
+            detailed: false,
+            status: None,
+            base_brush: unsafe { CreateSolidBrush(CAT_BASE) },
+            surface_brush: unsafe { CreateSolidBrush(CAT_SURFACE0) },
+            mouse_bitmap: load_mouse_bitmap(DASHBOARD_MOUSE_BMP),
+            compact_mouse_bitmap: load_mouse_bitmap(COMPACT_MOUSE_BMP),
+            preview_mode: true,
+            quit_requested: false,
+        },
+        true,
+        0,
+    ));
+    let window = create_main_window(&runtime)?;
+    let controls = match create_status_controls(window) {
+        Ok(controls) => controls,
+        Err(error) => {
+            let _ = unsafe { DestroyWindow(window) };
+            return Err(error);
+        }
+    };
+    {
+        let mut app = runtime.app.borrow_mut();
+        app.status = Some(controls);
+        if let Some(status) = app.status.as_mut() {
+            layout_status(window, status, false);
+            set_text(
+                status.brand_subtitle,
+                "PREVIEW / NO DEVICE ACCESS — synthetic in-memory state",
+            );
+        }
+        app.update_ui(window);
+    }
+    drain_deferred(&runtime, window);
+    let _ = unsafe { ShowWindow(window, SW_SHOW) };
+    let _ = unsafe { SetForegroundWindow(window) };
+    let result = message_loop(window);
+    let _ = unsafe { DestroyWindow(window) };
+    drop(runtime);
+    result
+}
+
+#[cfg(feature = "ui-preview")]
+unsafe fn preview_window_proc(
+    app: &mut TrayApp,
+    window: HWND,
+    message: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    match message {
+        WM_DEVICECHANGE | WM_HOTKEY | TRAY_CALLBACK | WORKER_EVENT => LRESULT(0),
+        WM_COMMAND => {
+            let command = wparam.0 & 0xffff;
+            if command == BUTTON_VIEW_MODE {
+                app.detailed = !app.detailed;
+                if let Some(status) = app.status.as_mut() {
+                    layout_status(window, status, app.detailed);
+                    set_text(
+                        status.brand_subtitle,
+                        "PREVIEW / NO DEVICE ACCESS — synthetic in-memory state",
+                    );
+                }
+                app.update_ui(window);
+            } else if let Some(control) = mouse_control_for_hotspot(command) {
+                app.selected_mouse_control = control;
+                app.update_ui(window);
+            } else {
+                let slot = match command {
+                    BUTTON_DEVELOPER => Some(0),
+                    BUTTON_GAMING => Some(1),
+                    _ => None,
+                };
+                if let Some(slot) = slot {
+                    let target = if app.detailed {
+                        Some(if slot == 0 {
+                            ProfileName::Developer
+                        } else {
+                            ProfileName::Gaming
+                        })
+                    } else {
+                        app.library
+                            .as_ref()
+                            .and_then(|library| quick_switch_action(library, slot).ok())
+                            .map(|action| action.expected_preset)
+                    };
+                    if let Some(target) = target {
+                        app.current = match target {
+                            ProfileName::Developer => ProfileMatch::Developer,
+                            ProfileName::Gaming => ProfileMatch::Gaming,
+                        };
+                        app.update_ui(window);
+                    }
+                }
+            }
+            LRESULT(0)
+        }
+        WM_PAINT => {
+            app.paint_dashboard(window);
+            LRESULT(0)
+        }
+        WM_DRAWITEM => {
+            let item = unsafe { &*(lparam.0 as *const DRAWITEMSTRUCT) };
+            if app.draw_owner_button(item) {
+                LRESULT(1)
+            } else {
+                unsafe { DefWindowProcW(window, message, wparam, lparam) }
+            }
+        }
+        WM_CTLCOLORSTATIC => {
+            let control = HWND(lparam.0 as *mut c_void);
+            let (color, brush) = app.static_text_style(control);
+            let hdc = HDC(wparam.0 as *mut c_void);
+            let _ = unsafe { SetTextColor(hdc, color) };
+            let _ = unsafe { SetBkMode(hdc, TRANSPARENT) };
+            LRESULT(brush.0 as isize)
+        }
+        WM_DPICHANGED => {
+            let suggested = unsafe { &*(lparam.0 as *const RECT) };
+            let _ = unsafe {
+                SetWindowPos(
+                    window,
+                    None,
+                    suggested.left,
+                    suggested.top,
+                    suggested.right - suggested.left,
+                    suggested.bottom - suggested.top,
+                    SWP_NOZORDER | SWP_NOACTIVATE,
+                )
+            };
+            if let Some(status) = app.status.as_mut() {
+                layout_status(window, status, app.detailed);
+                set_text(
+                    status.brand_subtitle,
+                    "PREVIEW / NO DEVICE ACCESS — synthetic in-memory state",
+                );
+            }
+            LRESULT(0)
+        }
+        WM_CLOSE => {
+            // Exit the loop first; run_preview destroys the window only after
+            // this callback's mutable TrayApp borrow has ended.
+            unsafe { PostQuitMessage(0) };
+            LRESULT(0)
+        }
+        WM_DESTROY => {
+            unsafe { PostQuitMessage(0) };
+            LRESULT(0)
+        }
+        _ => unsafe { DefWindowProcW(window, message, wparam, lparam) },
+    }
 }
 
 enum InstanceGate {
@@ -455,15 +934,31 @@ impl Drop for OwnedHandle {
     }
 }
 
-fn create_main_window(app: &mut TrayApp) -> Result<HWND, String> {
+fn create_main_window(runtime: &WindowRuntime) -> Result<HWND, String> {
+    let (window_class, title, base_brush) = {
+        let app = runtime.app.borrow();
+        (
+            if app.preview_mode {
+                PREVIEW_WINDOW_CLASS
+            } else {
+                WINDOW_CLASS
+            },
+            if app.preview_mode {
+                w!("PREVIEW — ViperPilot")
+            } else {
+                WINDOW_TITLE
+            },
+            app.base_brush,
+        )
+    };
     let large_icon = load_app_icon(32, 32)?;
     let small_icon = load_app_icon(16, 16)?;
     let class = WNDCLASSW {
         lpfnWndProc: Some(window_proc),
-        lpszClassName: WINDOW_CLASS,
+        lpszClassName: window_class,
         hCursor: unsafe { LoadCursorW(None, IDC_ARROW) }.unwrap_or_default(),
         hIcon: large_icon,
-        hbrBackground: app.base_brush,
+        hbrBackground: base_brush,
         ..Default::default()
     };
     let atom = unsafe { RegisterClassW(&class) };
@@ -476,17 +971,17 @@ fn create_main_window(app: &mut TrayApp) -> Result<HWND, String> {
     let window = unsafe {
         CreateWindowExW(
             WINDOW_EX_STYLE(0),
-            WINDOW_CLASS,
-            WINDOW_TITLE,
+            window_class,
+            title,
             MAIN_WINDOW_STYLE,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            BASE_CLIENT_WIDTH,
-            BASE_CLIENT_HEIGHT,
+            BASE_COMPACT_WIDTH,
+            BASE_COMPACT_HEIGHT,
             None,
             None,
             None,
-            Some((app as *mut TrayApp).cast()),
+            Some((runtime as *const WindowRuntime as *mut WindowRuntime).cast()),
         )
     }
     .map_err(|error| format!("could not create the utility window: {error}"))?;
@@ -599,16 +1094,23 @@ fn create_status_controls(window: HWND) -> Result<StatusWindow, String> {
     let developer_button = create_child(
         window,
         w!("BUTTON"),
-        "Developer",
+        "Apply Developer recovery preset",
         WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0 | WS_TABSTOP.0 | BS_OWNERDRAW_STYLE),
         BUTTON_DEVELOPER,
     )?;
     let gaming_button = create_child(
         window,
         w!("BUTTON"),
-        "Gaming",
+        "Apply Gaming recovery preset",
         WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0 | WS_TABSTOP.0 | BS_OWNERDRAW_STYLE),
         BUTTON_GAMING,
+    )?;
+    let view_mode_button = create_child(
+        window,
+        w!("BUTTON"),
+        "Details",
+        WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0 | WS_TABSTOP.0 | BS_OWNERDRAW_STYLE),
+        BUTTON_VIEW_MODE,
     )?;
     Ok(StatusWindow {
         brand_title,
@@ -630,6 +1132,7 @@ fn create_status_controls(window: HWND) -> Result<StatusWindow, String> {
         verification_value,
         developer_button,
         gaming_button,
+        view_mode_button,
         brand_font: HFONT::default(),
         title_font: HFONT::default(),
         body_font: HFONT::default(),
@@ -782,7 +1285,7 @@ fn set_font(control: HWND, font: HFONT) {
 
 /// Positions every control and sizes the outer window for the window's current
 /// DPI. Called at creation and again on `WM_DPICHANGED`.
-fn layout_status(window: HWND, status: &mut StatusWindow) {
+fn layout_status(window: HWND, status: &mut StatusWindow, detailed: bool) {
     let dpi = unsafe { GetDpiForWindow(window) };
     for old in [
         status.brand_font,
@@ -825,6 +1328,36 @@ fn layout_status(window: HWND, status: &mut StatusWindow) {
     }
     set_font(status.developer_button, status.button_font);
     set_font(status.gaming_button, status.button_font);
+    set_font(status.view_mode_button, status.button_font);
+
+    if !detailed {
+        layout_compact_status(window, status, dpi);
+        return;
+    }
+    set_status_details_visible(status, true);
+    let _ = unsafe {
+        SetWindowTextW(
+            status.brand_title,
+            PCWSTR(wide("Viper V4 Pro Utility").as_ptr()),
+        )
+    };
+    let _ = unsafe {
+        SetWindowTextW(
+            status.brand_subtitle,
+            PCWSTR(wide("Verified onboard profiles  ·  Ctrl + Alt + P switches").as_ptr()),
+        )
+    };
+    let _ = unsafe { SetWindowTextW(status.labels[0], PCWSTR(wide("PROFILE").as_ptr())) };
+    let _ = unsafe { SetWindowTextW(status.labels[1], PCWSTR(wide("DPI").as_ptr())) };
+    let _ = unsafe { SetWindowTextW(status.labels[2], PCWSTR(wide("POLLING").as_ptr())) };
+    let _ = unsafe { SetWindowTextW(status.labels[6], PCWSTR(wide("CONNECTION").as_ptr())) };
+    let _ = unsafe { SetWindowTextW(status.labels[7], PCWSTR(wide("VERIFICATION").as_ptr())) };
+    let _ = unsafe {
+        SetWindowTextW(
+            status.assignment_heading,
+            PCWSTR(wide("SELECTED ONBOARD ASSIGNMENT  ·  READ-ONLY").as_ptr()),
+        )
+    };
 
     let margin = scale(BASE_MARGIN, dpi);
     let client_width = scale(BASE_CLIENT_WIDTH, dpi);
@@ -844,6 +1377,13 @@ fn layout_status(window: HWND, status: &mut StatusWindow) {
         scale(BASE_HEADER_SUBTITLE_TOP, dpi),
         client_width - 2 * margin,
         scale(16, dpi),
+    );
+    move_child(
+        status.view_mode_button,
+        client_width - scale(124, dpi),
+        scale(12, dpi),
+        scale(100, dpi),
+        scale(34, dpi),
     );
 
     let [profile_card, performance_card, power_card, link_card] = [
@@ -1070,6 +1610,137 @@ fn layout_status(window: HWND, status: &mut StatusWindow) {
     };
 }
 
+fn set_status_details_visible(status: &StatusWindow, visible: bool) {
+    let show = if visible { SW_SHOW } else { SW_HIDE };
+    let hide = if visible { SW_HIDE } else { SW_SHOW };
+    let show_detail_control = |window: HWND| unsafe { ShowWindow(window, show) };
+    let hide_detail_control = |window: HWND| unsafe { ShowWindow(window, hide) };
+    let detail_controls = [
+        status.labels[3],
+        status.labels[4],
+        status.labels[5],
+        status.battery_value,
+        status.sleep_value,
+        status.low_power_value,
+        status.assignment_heading,
+        status.assignment_name,
+        status.assignment_semantic,
+        status.assignment_raw,
+        status.assignment_hint,
+    ];
+    if visible {
+        for control in detail_controls {
+            let _ = show_detail_control(control);
+        }
+        for hotspot in status.mouse_hotspots {
+            let _ = show_detail_control(hotspot);
+        }
+    } else {
+        for control in detail_controls {
+            let _ = hide_detail_control(control);
+        }
+        for hotspot in status.mouse_hotspots {
+            let _ = hide_detail_control(hotspot);
+        }
+    }
+    let _ = unsafe {
+        SetWindowTextW(
+            status.view_mode_button,
+            PCWSTR(wide(if visible { "Quick switch" } else { "Details" }).as_ptr()),
+        )
+    };
+}
+
+fn wide(text: &str) -> Vec<u16> {
+    text.encode_utf16().chain(Some(0)).collect()
+}
+
+fn layout_compact_status(window: HWND, status: &mut StatusWindow, dpi: u32) {
+    set_status_details_visible(status, false);
+    let place = |child: HWND, x: i32, y: i32, width: i32, height: i32| {
+        let _ = unsafe {
+            MoveWindow(
+                child,
+                scale(x, dpi),
+                scale(y, dpi),
+                scale(width, dpi),
+                scale(height, dpi),
+                true,
+            )
+        };
+    };
+    let _ = unsafe { SetWindowTextW(status.brand_title, PCWSTR(wide("ViperPilot").as_ptr())) };
+    let _ = unsafe {
+        SetWindowTextW(
+            status.brand_subtitle,
+            PCWSTR(wide("Viper V4 Pro  ·  Ctrl + Alt + P switches").as_ptr()),
+        )
+    };
+    let _ = unsafe { SetWindowTextW(status.labels[0], PCWSTR(wide("CURRENT PROFILE").as_ptr())) };
+    let _ = unsafe { SetWindowTextW(status.labels[1], PCWSTR(wide("DPI").as_ptr())) };
+    let _ = unsafe { SetWindowTextW(status.labels[2], PCWSTR(wide("POLLING RATE").as_ptr())) };
+    let _ = unsafe { SetWindowTextW(status.labels[6], PCWSTR(wide("DEVICE CONNECTION").as_ptr())) };
+    let _ = unsafe { SetWindowTextW(status.labels[7], PCWSTR(wide("LATEST STATUS").as_ptr())) };
+    let _ = unsafe {
+        SetWindowTextW(
+            status.assignment_heading,
+            PCWSTR(wide("SELECTED QUICK-SWITCH PROFILES").as_ptr()),
+        )
+    };
+    let _ = unsafe { ShowWindow(status.assignment_heading, SW_SHOW) };
+
+    place(status.brand_title, 24, 15, 500, 30);
+    place(status.brand_subtitle, 24, 48, 560, 20);
+    place(status.view_mode_button, 780, 17, 96, 34);
+
+    // The left column holds the actual Figma-derived 190×250 silhouette.
+    place(status.labels[6], 24, 86, 240, 18);
+    place(status.connection_value, 24, 108, 260, 28);
+
+    // Device readbacks, selected local pair, and actions remain together in
+    // the right column for quick access without opening the detailed view.
+    place(status.labels[0], 318, 84, 550, 18);
+    place(status.profile_value, 318, 105, 550, 30);
+    place(status.labels[1], 318, 151, 265, 18);
+    place(status.dpi_value, 318, 172, 265, 30);
+    place(status.labels[2], 598, 151, 270, 18);
+    place(status.polling_value, 598, 172, 270, 30);
+    place(status.assignment_heading, 318, 221, 550, 20);
+    place(status.developer_button, 318, 248, 265, 76);
+    place(status.gaming_button, 598, 248, 270, 76);
+    place(status.labels[7], 318, 347, 550, 18);
+    place(status.verification_value, 318, 370, 550, 80);
+
+    let client_width = scale(BASE_COMPACT_WIDTH, dpi);
+    let client_height = scale(BASE_COMPACT_HEIGHT, dpi);
+    let mut outer = RECT {
+        left: 0,
+        top: 0,
+        right: client_width,
+        bottom: client_height,
+    };
+    let _ = unsafe {
+        AdjustWindowRectExForDpi(
+            &mut outer,
+            MAIN_WINDOW_STYLE,
+            false,
+            WINDOW_EX_STYLE(0),
+            dpi,
+        )
+    };
+    let _ = unsafe {
+        SetWindowPos(
+            window,
+            None,
+            0,
+            0,
+            outer.right - outer.left,
+            outer.bottom - outer.top,
+            SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
+        )
+    };
+}
+
 fn message_loop(window: HWND) -> Result<(), String> {
     let mut message = MSG::default();
     loop {
@@ -1101,93 +1772,275 @@ unsafe extern "system" fn window_proc(
 ) -> LRESULT {
     if message == WM_NCCREATE {
         let create = unsafe { &*(lparam.0 as *const CREATESTRUCTW) };
-        unsafe {
-            SetWindowLongPtrW(window, GWLP_USERDATA, create.lpCreateParams as isize);
-        }
+        unsafe { SetWindowLongPtrW(window, GWLP_USERDATA, create.lpCreateParams as isize) };
     }
-    let app_ptr = unsafe { GetWindowLongPtrW(window, GWLP_USERDATA) as *mut TrayApp };
-    if app_ptr.is_null() {
+    let runtime_ptr = unsafe { GetWindowLongPtrW(window, GWLP_USERDATA) as *mut WindowRuntime };
+    if runtime_ptr.is_null() {
         return unsafe { DefWindowProcW(window, message, wparam, lparam) };
     }
-    let app = unsafe { &mut *app_ptr };
-    if app.show_message != 0 && message == app.show_message {
-        app.show_window_now(window);
+    let runtime = unsafe { &*runtime_ptr };
+
+    // These messages are deliberately independent of TrayApp. DestroyWindow
+    // sends them synchronously, including when called during teardown.
+    match message {
+        WM_DESTROY => {
+            unsafe { PostQuitMessage(0) };
+            return LRESULT(0);
+        }
+        WM_NCDESTROY => {
+            let result = unsafe { DefWindowProcW(window, message, wparam, lparam) };
+            unsafe { SetWindowLongPtrW(window, GWLP_USERDATA, 0) };
+            return result;
+        }
+        WM_CLOSE if runtime.preview_mode => {
+            unsafe { PostQuitMessage(0) };
+            return LRESULT(0);
+        }
+        WM_CLOSE => {
+            let _ = unsafe { ShowWindow(window, SW_HIDE) };
+            return LRESULT(0);
+        }
+        _ => {}
+    }
+
+    if ignored_while_closing(runtime.closing.get(), runtime.show_message, message) {
         return LRESULT(0);
     }
+
+    if runtime.show_message != 0 && message == runtime.show_message {
+        runtime.defer(DeferredAction::ShowWindow);
+        drain_deferred(runtime, window);
+        return LRESULT(0);
+    }
+
     match message {
-        WORKER_EVENT => {
-            app.drain_worker_events(window);
-            LRESULT(0)
+        DEFERRED_DRAIN_EVENT => {
+            drain_deferred(runtime, window);
+            return LRESULT(0);
         }
-        WM_HOTKEY if wparam.0 as i32 == HOTKEY_ID => {
-            app.handle_hotkey(window);
-            LRESULT(0)
+        WORKER_EVENT if !runtime.preview_mode => runtime.defer(DeferredAction::WorkerEvent),
+        WM_HOTKEY if !runtime.preview_mode && wparam.0 as i32 == HOTKEY_ID => {
+            runtime.defer(DeferredAction::Hotkey)
         }
-        WM_DEVICECHANGE if app.busy.is_none() => {
-            app.request_refresh(window);
-            LRESULT(0)
-        }
+        WM_DEVICECHANGE if !runtime.preview_mode => runtime.defer(DeferredAction::Refresh),
         WM_COMMAND => {
-            app.handle_menu_command(window, wparam.0 & 0xffff);
-            LRESULT(0)
-        }
-        TRAY_CALLBACK => {
-            match u32::from(crate::tray_logic::notification_event_code(lparam.0)) {
-                WM_CONTEXTMENU | WM_RBUTTONUP => app.show_menu(window),
-                WM_LBUTTONUP | WM_LBUTTONDBLCLK => app.show_window_now(window),
-                _ => {}
+            if let Some(command) = valid_window_command(window, wparam, lparam) {
+                runtime.defer(DeferredAction::Command(command));
             }
-            LRESULT(0)
         }
+        TRAY_CALLBACK => match u32::from(crate::tray_logic::notification_event_code(lparam.0)) {
+            WM_CONTEXTMENU | WM_RBUTTONUP if !runtime.preview_mode => {
+                if !runtime.popup_pending.replace(true) {
+                    runtime.defer(DeferredAction::TrayMenu);
+                }
+            }
+            WM_LBUTTONUP | WM_LBUTTONDBLCLK if !runtime.preview_mode => {
+                runtime.defer(DeferredAction::TrayOpen)
+            }
+            _ => {}
+        },
         WM_PAINT => {
-            app.paint_dashboard(window);
-            LRESULT(0)
+            #[allow(unused_mut)]
+            if let Ok(mut app) = runtime.app.try_borrow_mut() {
+                #[cfg(feature = "ui-preview")]
+                if runtime.preview_mode {
+                    unsafe { preview_window_proc(&mut app, window, message, wparam, lparam) };
+                } else {
+                    app.paint_dashboard(window);
+                }
+                #[cfg(not(feature = "ui-preview"))]
+                app.paint_dashboard(window);
+                drop(app);
+                drain_deferred(runtime, window);
+            } else {
+                validate_deferred_paint(runtime, window);
+            }
+            return LRESULT(0);
         }
         WM_DRAWITEM => {
-            let item = unsafe { &*(lparam.0 as *const DRAWITEMSTRUCT) };
-            if app.draw_owner_button(item) {
-                LRESULT(1)
+            #[allow(unused_mut)]
+            if let Ok(mut app) = runtime.app.try_borrow_mut() {
+                #[cfg(feature = "ui-preview")]
+                let handled = if runtime.preview_mode {
+                    unsafe { preview_window_proc(&mut app, window, message, wparam, lparam) }.0 != 0
+                } else {
+                    let item = unsafe { &*(lparam.0 as *const DRAWITEMSTRUCT) };
+                    app.draw_owner_button(item)
+                };
+                #[cfg(not(feature = "ui-preview"))]
+                let handled = {
+                    let item = unsafe { &*(lparam.0 as *const DRAWITEMSTRUCT) };
+                    app.draw_owner_button(item)
+                };
+                drop(app);
+                drain_deferred(runtime, window);
+                if handled {
+                    return LRESULT(1);
+                }
+                return unsafe { DefWindowProcW(window, message, wparam, lparam) };
             } else {
-                unsafe { DefWindowProcW(window, message, wparam, lparam) }
+                // DRAWITEMSTRUCT contains callback-lifetime pointers and must
+                // never be retained. Let the current paint finish, then redraw.
+                runtime.paint_pending.set(true);
+                return LRESULT(1);
             }
         }
         WM_CTLCOLORSTATIC => {
             let control = HWND(lparam.0 as *mut c_void);
-            let (color, brush) = app.static_text_style(control);
             let hdc = HDC(wparam.0 as *mut c_void);
-            let _ = unsafe { SetTextColor(hdc, color) };
+            if let Ok(app) = runtime.app.try_borrow() {
+                let (color, brush) = app.static_text_style(control);
+                let _ = unsafe { SetTextColor(hdc, color) };
+                let _ = unsafe { SetBkMode(hdc, TRANSPARENT) };
+                let result = LRESULT(brush.0 as isize);
+                drop(app);
+                drain_deferred(runtime, window);
+                return result;
+            }
+            let _ = unsafe { SetTextColor(hdc, CAT_TEXT) };
             let _ = unsafe { SetBkMode(hdc, TRANSPARENT) };
-            LRESULT(brush.0 as isize)
+            runtime.paint_pending.set(true);
+            return LRESULT(runtime.fallback_brush.0 as isize);
         }
         WM_DPICHANGED => {
-            let suggested = unsafe { &*(lparam.0 as *const RECT) };
-            let _ = unsafe {
-                SetWindowPos(
-                    window,
-                    None,
-                    suggested.left,
-                    suggested.top,
-                    suggested.right - suggested.left,
-                    suggested.bottom - suggested.top,
-                    SWP_NOZORDER | SWP_NOACTIVATE,
-                )
-            };
-            if let Some(status) = app.status.as_mut() {
-                layout_status(window, status);
+            let suggested = unsafe { *(lparam.0 as *const RECT) };
+            runtime.defer(DeferredAction::Dpi(suggested));
+        }
+        _ => return unsafe { DefWindowProcW(window, message, wparam, lparam) },
+    }
+    drain_deferred(runtime, window);
+    LRESULT(0)
+}
+
+fn validate_deferred_paint(runtime: &WindowRuntime, window: HWND) {
+    runtime.paint_pending.set(true);
+    let mut paint = PAINTSTRUCT::default();
+    let dc = unsafe { BeginPaint(window, &mut paint) };
+    let _ = unsafe { EndPaint(window, &paint) };
+    let _ = dc;
+}
+
+fn drain_deferred(runtime: &WindowRuntime, window: HWND) {
+    if runtime.draining.replace(true) {
+        return;
+    }
+    loop {
+        if runtime.closing.get() {
+            break;
+        }
+        let action = runtime.deferred.borrow_mut().pop_front();
+        let Some(action) = action else { break };
+        if !dispatch_deferred(runtime, window, action) {
+            runtime.deferred.borrow_mut().push_front(action);
+            let _ =
+                unsafe { PostMessageW(Some(window), DEFERRED_DRAIN_EVENT, WPARAM(0), LPARAM(0)) };
+            break;
+        }
+    }
+    runtime.draining.set(false);
+    if runtime.paint_pending.replace(false) && !runtime.closing.get() {
+        // No RDW_UPDATENOW: invalidation schedules a later WM_PAINT after the
+        // current app borrow and synchronous message stack have unwound.
+        let _ = unsafe { RedrawWindow(Some(window), None, None, RDW_INVALIDATE | RDW_ALLCHILDREN) };
+    }
+}
+
+fn dispatch_deferred(runtime: &WindowRuntime, window: HWND, action: DeferredAction) -> bool {
+    match action {
+        DeferredAction::TrayMenu => {
+            if runtime.preview_mode {
+                runtime.popup_pending.set(false);
+                return true;
             }
-            LRESULT(0)
+            let menu = {
+                let Ok(app) = runtime.app.try_borrow() else {
+                    return false;
+                };
+                app.build_menu()
+            };
+            if let Some(menu) = menu {
+                // TrackPopupMenu runs a modal loop. Its menu is a snapshot, and
+                // no TrayApp borrow crosses that loop.
+                let selected_command = track_popup_menu(window, menu);
+                runtime.popup_pending.set(false);
+                if selected_command != 0 {
+                    // The returned ID refers to the menu snapshot. Apply it
+                    // before worker events queued by TrackPopupMenu's modal loop.
+                    runtime.defer_before_pending_events(DeferredAction::Command(selected_command));
+                }
+            } else {
+                runtime.popup_pending.set(false);
+            }
+            true
         }
-        // Closing the window hides it to the tray; the tray Exit item remains
-        // the deliberate way to terminate the utility.
-        WM_CLOSE => {
-            let _ = unsafe { ShowWindow(window, SW_HIDE) };
-            LRESULT(0)
+        _ => {
+            let Ok(mut app) = runtime.app.try_borrow_mut() else {
+                return false;
+            };
+            match action {
+                DeferredAction::Command(command) => {
+                    #[cfg(feature = "ui-preview")]
+                    if runtime.preview_mode {
+                        unsafe {
+                            preview_window_proc(
+                                &mut app,
+                                window,
+                                WM_COMMAND,
+                                WPARAM(command),
+                                LPARAM(0),
+                            );
+                        }
+                    } else {
+                        app.handle_menu_command(window, command);
+                    }
+                    #[cfg(not(feature = "ui-preview"))]
+                    app.handle_menu_command(window, command);
+                }
+                DeferredAction::Hotkey => app.handle_hotkey(window),
+                DeferredAction::WorkerEvent => app.drain_worker_events(window),
+                DeferredAction::Refresh => {
+                    if app.busy.is_none() {
+                        app.request_refresh(window);
+                    }
+                }
+                DeferredAction::TrayOpen | DeferredAction::ShowWindow => {
+                    app.show_window_now(window);
+                }
+                DeferredAction::Dpi(suggested) => {
+                    let _ = unsafe {
+                        SetWindowPos(
+                            window,
+                            None,
+                            suggested.left,
+                            suggested.top,
+                            suggested.right - suggested.left,
+                            suggested.bottom - suggested.top,
+                            SWP_NOZORDER | SWP_NOACTIVATE,
+                        )
+                    };
+                    let detailed = app.detailed;
+                    if let Some(status) = app.status.as_mut() {
+                        layout_status(window, status, detailed);
+                        #[cfg(feature = "ui-preview")]
+                        if runtime.preview_mode {
+                            set_text(
+                                status.brand_subtitle,
+                                "PREVIEW / NO DEVICE ACCESS — synthetic in-memory state",
+                            );
+                        }
+                    }
+                }
+                DeferredAction::TrayMenu => unreachable!("handled before borrowing app"),
+            }
+            let should_quit = app.quit_requested;
+            drop(app);
+            if should_quit {
+                runtime.closing.set(true);
+                runtime.deferred.borrow_mut().clear();
+                unsafe { PostQuitMessage(0) };
+            }
+            true
         }
-        WM_DESTROY => {
-            unsafe { PostQuitMessage(0) };
-            LRESULT(0)
-        }
-        _ => unsafe { DefWindowProcW(window, message, wparam, lparam) },
     }
 }
 
@@ -1213,10 +2066,12 @@ impl TrayApp {
             self.selected_mouse_control,
             self.button_assignments.as_deref(),
         );
-        set_tooltip(
-            window,
-            &format!("Viper V4 Pro: {}", presentation.profile_line),
-        );
+        if !self.preview_mode {
+            set_tooltip(
+                window,
+                &format!("Viper V4 Pro: {}", presentation.profile_line),
+            );
+        }
         if let Some(status) = &self.status {
             set_text(status.profile_value, &presentation.profile_line);
             set_text(status.dpi_value, &presentation.dpi_line);
@@ -1229,8 +2084,24 @@ impl TrayApp {
             set_text(status.assignment_semantic, &assignment.semantic);
             set_text(status.assignment_raw, &assignment.raw);
             set_text(status.verification_value, &presentation.verification_text);
-            let _ = unsafe { EnableWindow(status.developer_button, presentation.buttons_enabled) };
-            let _ = unsafe { EnableWindow(status.gaming_button, presentation.buttons_enabled) };
+            set_text(
+                status.developer_button,
+                &self.profile_action_button_label(0),
+            );
+            set_text(status.gaming_button, &self.profile_action_button_label(1));
+            let quick_pair_enabled = presentation.buttons_enabled
+                && self.library.as_ref().is_some_and(|library| {
+                    quick_switch_action(library, 0).is_ok()
+                        && quick_switch_action(library, 1).is_ok()
+                });
+            let developer_enabled = if self.detailed {
+                presentation.buttons_enabled
+            } else {
+                quick_pair_enabled
+            };
+            let gaming_enabled = developer_enabled;
+            let _ = unsafe { EnableWindow(status.developer_button, developer_enabled) };
+            let _ = unsafe { EnableWindow(status.gaming_button, gaming_enabled) };
             let _ = unsafe { InvalidateRect(Some(status.developer_button), None, true) };
             let _ = unsafe { InvalidateRect(Some(status.gaming_button), None, true) };
             for hotspot in status.mouse_hotspots {
@@ -1244,7 +2115,81 @@ impl TrayApp {
     /// Draws the non-control dashboard chrome. The colored button controls are
     /// ordinary owner-draw Win32 buttons layered over a packaged product image;
     /// clicking one only updates the selected display card.
+    fn paint_compact_switcher(&self, window: HWND) {
+        let mut paint = PAINTSTRUCT::default();
+        let hdc = unsafe { BeginPaint(window, &mut paint) };
+        let mut client = RECT::default();
+        let _ = unsafe { GetClientRect(window, &mut client) };
+        let _ = unsafe { FillRect(hdc, &client, self.base_brush) };
+        let dpi = unsafe { GetDpiForWindow(window) };
+        let card = |left: i32, top: i32, right: i32, bottom: i32| RECT {
+            left: scale(left, dpi),
+            top: scale(top, dpi),
+            right: scale(right, dpi),
+            bottom: scale(bottom, dpi),
+        };
+        draw_panel(
+            hdc,
+            card(18, 78, 290, 480),
+            CAT_SURFACE0,
+            CAT_SURFACE1,
+            scale(14, dpi),
+        );
+        draw_panel(
+            hdc,
+            card(308, 77, 882, 140),
+            CAT_SURFACE0,
+            CAT_SURFACE1,
+            scale(12, dpi),
+        );
+        draw_panel(
+            hdc,
+            card(308, 145, 588, 210),
+            CAT_SURFACE0,
+            CAT_SURFACE1,
+            scale(12, dpi),
+        );
+        draw_panel(
+            hdc,
+            card(588, 145, 882, 210),
+            CAT_SURFACE0,
+            CAT_SURFACE1,
+            scale(12, dpi),
+        );
+        draw_panel(
+            hdc,
+            card(308, 216, 882, 332),
+            CAT_SURFACE0,
+            CAT_SURFACE1,
+            scale(12, dpi),
+        );
+        draw_panel(
+            hdc,
+            card(308, 337, 882, 456),
+            CAT_SURFACE0,
+            CAT_SURFACE1,
+            scale(12, dpi),
+        );
+        let mouse = card(66, 162, 256, 412);
+        let _ = self.draw_bitmap(hdc, mouse, self.compact_mouse_bitmap.as_ref());
+        if let Some(status) = self.status.as_ref() {
+            let caption = card(38, 105, 270, 128);
+            draw_centered_text(
+                hdc,
+                caption,
+                "VIPERPILOT  ·  V4 PRO",
+                status.body_font,
+                CAT_SUBTEXT0,
+            );
+        }
+        let _ = unsafe { EndPaint(window, &paint) };
+    }
+
     fn paint_dashboard(&self, window: HWND) {
+        if !self.detailed {
+            self.paint_compact_switcher(window);
+            return;
+        }
         let mut paint = PAINTSTRUCT::default();
         let hdc = unsafe { BeginPaint(window, &mut paint) };
         let mut client = RECT::default();
@@ -1354,7 +2299,11 @@ impl TrayApp {
     }
 
     fn draw_dashboard_bitmap(&self, hdc: HDC, destination: RECT) -> bool {
-        let Some(bitmap) = self.mouse_bitmap.as_ref() else {
+        self.draw_bitmap(hdc, destination, self.mouse_bitmap.as_ref())
+    }
+
+    fn draw_bitmap(&self, hdc: HDC, destination: RECT, bitmap: Option<&DashboardBitmap>) -> bool {
+        let Some(bitmap) = bitmap else {
             return false;
         };
         let source = unsafe { CreateCompatibleDC(Some(hdc)) };
@@ -1393,6 +2342,7 @@ impl TrayApp {
         } else if control == status.brand_subtitle
             || status.labels.contains(&control)
             || control == status.assignment_heading
+            || control == status.view_mode_button
         {
             CAT_SUBTEXT0
         } else if control == status.assignment_name {
@@ -1447,19 +2397,56 @@ impl TrayApp {
     }
 
     fn draw_owner_button(&self, item: &DRAWITEMSTRUCT) -> bool {
-        let (label, accent, active, corner_radius, is_hotspot) = match item.CtlID as usize {
+        let quick_label = if !self.detailed {
+            let slot = match item.CtlID as usize {
+                BUTTON_DEVELOPER => Some(0),
+                BUTTON_GAMING => Some(1),
+                _ => None,
+            };
+            slot.map(|slot| self.profile_action_button_label(slot))
+        } else {
+            None
+        };
+        let (fixed_label, accent, active, corner_radius, is_hotspot) = match item.CtlID as usize {
             BUTTON_DEVELOPER => (
-                "Developer  ·  1000 Hz",
-                CAT_BLUE,
-                self.current == ProfileMatch::Developer,
+                if self.detailed {
+                    "Apply Developer recovery preset"
+                } else {
+                    "Saved profile unavailable"
+                },
+                VIPER_ROSE,
+                if self.detailed {
+                    self.current == ProfileMatch::Developer
+                } else {
+                    self.quick_slot_is_current(0)
+                },
                 12,
                 false,
             ),
             BUTTON_GAMING => (
-                "Gaming  ·  4000 Hz",
-                CAT_GREEN,
-                self.current == ProfileMatch::Gaming,
+                if self.detailed {
+                    "Apply Gaming recovery preset"
+                } else {
+                    "Saved profile unavailable"
+                },
+                VIPER_ROSE,
+                if self.detailed {
+                    self.current == ProfileMatch::Gaming
+                } else {
+                    self.quick_slot_is_current(1)
+                },
                 12,
+                false,
+            ),
+            BUTTON_VIEW_MODE => (
+                if self.detailed {
+                    "Quick switch"
+                } else {
+                    "Details"
+                },
+                VIPER_ROSE,
+                false,
+                8,
                 false,
             ),
             hotspot => {
@@ -1475,6 +2462,7 @@ impl TrayApp {
                 )
             }
         };
+        let label = quick_label.as_deref().unwrap_or(fixed_label);
         let disabled = item.itemState.0 & ODS_DISABLED.0 != 0;
         let selected = item.itemState.0 & ODS_SELECTED.0 != 0;
         let focused = item.itemState.0 & ODS_FOCUS.0 != 0;
@@ -1537,7 +2525,12 @@ impl TrayApp {
                 item.hDC,
                 &mut wide,
                 &mut rect,
-                DT_CENTER | DT_VCENTER | DT_SINGLELINE,
+                if !self.detailed && matches!(item.CtlID as usize, BUTTON_DEVELOPER | BUTTON_GAMING)
+                {
+                    DT_CENTER | DT_VCENTER | windows::Win32::Graphics::Gdi::DT_WORDBREAK
+                } else {
+                    DT_CENTER | DT_VCENTER | DT_SINGLELINE
+                },
             )
         };
         if focused {
@@ -1570,6 +2563,8 @@ impl TrayApp {
     }
 
     fn drain_worker_events(&mut self, window: HWND) {
+        // Keep the library snapshot fixed while the native popup is open. Its
+        // command IDs and labels must continue to refer to what the user saw.
         loop {
             match self.event_rx.try_recv() {
                 Ok(WorkerEvent::State {
@@ -1582,6 +2577,7 @@ impl TrayApp {
                 }) => {
                     self.current = profile;
                     self.config = config;
+                    self.initializing = false;
                     self.busy = None;
                     self.connection = ConnectionStatus::Connected;
                     self.polling_hz = polling_hz;
@@ -1589,7 +2585,6 @@ impl TrayApp {
                     self.power = power;
                     self.button_assignments = Some(button_assignments);
                     self.last_error = None;
-                    self.hotkey_armed = profile != ProfileMatch::OutOfSync;
                     self.update_ui(window);
                 }
                 Ok(WorkerEvent::Applied {
@@ -1612,7 +2607,6 @@ impl TrayApp {
                     self.dpi = dpi;
                     self.power = power;
                     self.button_assignments = button_assignments;
-                    self.hotkey_armed = true;
                     self.last_error = None;
                     let detail = gui_logic::success_detail(no_changes_needed);
                     self.last_verification = Some(VerificationOutcome {
@@ -1630,7 +2624,7 @@ impl TrayApp {
                         false,
                     );
                     if profile == ProfileName::Gaming && self.config.exit_after_gaming {
-                        let _ = unsafe { DestroyWindow(window) };
+                        self.quit_requested = true;
                     }
                 }
                 Ok(WorkerEvent::ApplyFailed {
@@ -1645,8 +2639,6 @@ impl TrayApp {
                 }) => {
                     self.busy = None;
                     self.current = final_profile.unwrap_or(ProfileMatch::OutOfSync);
-                    self.hotkey_armed =
-                        matches!(self.current, ProfileMatch::Developer | ProfileMatch::Gaming);
                     self.polling_hz = polling_hz;
                     self.dpi = dpi;
                     self.power = power;
@@ -1667,10 +2659,30 @@ impl TrayApp {
                     self.busy = None;
                     self.update_ui(window);
                 }
+                Ok(WorkerEvent::LibraryUpdated(library)) => {
+                    self.library = Some(library);
+                    if !self.initializing {
+                        self.busy = None;
+                    }
+                    self.update_ui(window);
+                }
+                Ok(WorkerEvent::LibraryError(error)) => {
+                    self.library = None;
+                    if !self.initializing {
+                        self.busy = None;
+                    }
+                    self.update_ui(window);
+                    notify(window, "Saved profiles unavailable", &error, true);
+                }
+                Ok(WorkerEvent::LocalError(error)) => {
+                    self.busy = None;
+                    self.update_ui(window);
+                    notify(window, "Quick-switch preference not saved", &error, true);
+                }
                 Ok(WorkerEvent::Error(error)) => {
+                    self.initializing = false;
                     self.busy = None;
                     self.current = ProfileMatch::OutOfSync;
-                    self.hotkey_armed = false;
                     self.connection = gui_logic::classify_worker_error(&error);
                     self.polling_hz = None;
                     self.dpi = None;
@@ -1682,16 +2694,27 @@ impl TrayApp {
                 }
                 Err(TryRecvError::Empty | TryRecvError::Disconnected) => break,
             }
+            if self.quit_requested {
+                break;
+            }
         }
     }
 
     fn handle_hotkey(&mut self, window: HWND) {
-        if self.busy.is_some() || !self.hotkey_armed || self.current == ProfileMatch::OutOfSync {
+        // The worker rereads the mouse and library before resolving the pair.
+        // This UI-side busy gate only deduplicates repeated shortcut input.
+        if self.busy.is_some() {
             return;
         }
-        if let Some(profile) = next_profile_for_hotkey(self.current) {
-            self.request_apply(window, profile);
+        self.busy = Some(BusyKind::Changing);
+        if self
+            .command_tx
+            .send(WorkerCommand::ToggleQuickSwitch)
+            .is_err()
+        {
+            self.busy = None;
         }
+        self.update_ui(window);
     }
 
     fn handle_menu_command(&mut self, window: HWND, command: usize) {
@@ -1702,8 +2725,72 @@ impl TrayApp {
             self.update_ui(window);
             return;
         }
+        if let Some(slot) = quick_switch_slot_for_command(command) {
+            self.apply_quick_switch_slot(window, slot);
+            return;
+        }
+        if !self.detailed && command == BUTTON_DEVELOPER {
+            self.apply_quick_switch_slot(window, 0);
+            return;
+        }
+        if !self.detailed && command == BUTTON_GAMING {
+            self.apply_quick_switch_slot(window, 1);
+            return;
+        }
+        if (MENU_SAVED_APPLY_BASE..MENU_SAVED_APPLY_BASE + MAX_SAVED_PROFILES).contains(&command) {
+            let index = command - MENU_SAVED_APPLY_BASE;
+            if let Some((id, expected_preset)) = self.library.as_ref().and_then(|library| {
+                library
+                    .entries()
+                    .get(index)
+                    .map(|entry| (entry.id().to_owned(), entry.source_preset()))
+            }) {
+                self.request_saved_apply(window, id, expected_preset);
+            }
+            return;
+        }
+        if (MENU_QUICK_FIRST_BASE..MENU_QUICK_SECOND_BASE + MAX_SAVED_PROFILES).contains(&command) {
+            let (slot, base) = if command < MENU_QUICK_SECOND_BASE {
+                (0, MENU_QUICK_FIRST_BASE)
+            } else {
+                (1, MENU_QUICK_SECOND_BASE)
+            };
+            let index = command - base;
+            if let Some(id) = self.library.as_ref().and_then(|library| {
+                library
+                    .entries()
+                    .get(index)
+                    .map(|entry| entry.id().to_owned())
+            }) {
+                self.request_config(
+                    window,
+                    WorkerCommand::SetQuickSwitch {
+                        slot,
+                        profile_id: id,
+                    },
+                );
+            }
+            return;
+        }
         match command {
             MENU_OPEN => self.show_window_now(window),
+            BUTTON_VIEW_MODE => {
+                self.detailed = !self.detailed;
+                if let Some(status) = self.status.as_mut() {
+                    layout_status(window, status, self.detailed);
+                    let focus = if self.detailed {
+                        status.view_mode_button
+                    } else {
+                        status.developer_button
+                    };
+                    let _ = unsafe { SetFocus(Some(focus)) };
+                }
+                self.update_ui(window);
+                let _ = unsafe { InvalidateRect(Some(window), None, true) };
+            }
+            MENU_RELOAD_LIBRARY if self.busy.is_none() => {
+                self.request_config(window, WorkerCommand::LoadLibrary);
+            }
             MENU_DEVELOPER | BUTTON_DEVELOPER => {
                 self.request_apply(window, ProfileName::Developer);
             }
@@ -1721,10 +2808,82 @@ impl TrayApp {
                 WorkerCommand::SetExitAfterGaming(!self.config.exit_after_gaming),
             ),
             MENU_EXIT if self.busy.is_none() => {
-                let _ = unsafe { DestroyWindow(window) };
+                self.quit_requested = true;
             }
             _ => {}
         }
+    }
+
+    fn profile_action_button_label(&self, slot: usize) -> String {
+        if self.detailed {
+            return match slot {
+                0 => "Apply Developer recovery preset".to_owned(),
+                1 => "Apply Gaming recovery preset".to_owned(),
+                _ => "Profile action unavailable".to_owned(),
+            };
+        }
+        self.library
+            .as_ref()
+            .and_then(|library| quick_switch_action(library, slot).ok())
+            .map_or_else(
+                || "Saved profile unavailable".to_owned(),
+                |action| action.label,
+            )
+    }
+
+    fn quick_slot_is_current(&self, slot: usize) -> bool {
+        let Some(action) = self
+            .library
+            .as_ref()
+            .and_then(|library| quick_switch_action(library, slot).ok())
+        else {
+            return false;
+        };
+        matches!(
+            (self.current, action.expected_preset),
+            (ProfileMatch::Developer, ProfileName::Developer)
+                | (ProfileMatch::Gaming, ProfileName::Gaming)
+        )
+    }
+
+    fn apply_quick_switch_slot(&mut self, window: HWND, slot: usize) {
+        let action = self
+            .library
+            .as_ref()
+            .and_then(|library| quick_switch_action(library, slot).ok());
+        if let Some(action) = action {
+            self.request_saved_apply(window, action.profile_id, action.expected_preset);
+        } else {
+            notify(
+                window,
+                "Quick-switch pair unavailable",
+                "Reload saved profiles before switching.",
+                true,
+            );
+        }
+    }
+
+    fn request_saved_apply(
+        &mut self,
+        window: HWND,
+        profile_id: String,
+        expected_preset: ProfileName,
+    ) {
+        if self.busy.is_some() {
+            return;
+        }
+        self.busy = Some(BusyKind::Changing);
+        if self
+            .command_tx
+            .send(WorkerCommand::ApplySaved {
+                id: profile_id,
+                expected_preset,
+            })
+            .is_err()
+        {
+            self.busy = None;
+        }
+        self.update_ui(window);
     }
 
     fn request_apply(&mut self, window: HWND, profile: ProfileName) {
@@ -1754,11 +2913,8 @@ impl TrayApp {
         self.update_ui(window);
     }
 
-    fn show_menu(&self, window: HWND) {
-        let menu = match unsafe { CreatePopupMenu() } {
-            Ok(menu) => menu,
-            Err(_) => return,
-        };
+    fn build_menu(&self) -> Option<HMENU> {
+        let menu = unsafe { CreatePopupMenu() }.ok()?;
         // Keep the popup in the native system theme. A dark MIM_BACKGROUND
         // without matching owner-drawn text can make the tray menu unreadable.
         let disabled = if self.busy.is_some() {
@@ -1766,14 +2922,111 @@ impl TrayApp {
         } else {
             MF_STRING
         };
-        append_menu(menu, MF_STRING, MENU_OPEN, "Open");
-        append_menu(menu, disabled, MENU_DEVELOPER, "Developer");
-        append_menu(menu, disabled, MENU_GAMING, "Gaming");
+        append_menu(menu, MF_STRING, MENU_OPEN, "Open dashboard");
+        append_menu(menu, disabled, MENU_RELOAD_LIBRARY, "Reload saved profiles");
+        if let Some(library) = self.library.as_ref() {
+            for (slot, command) in [MENU_QUICK_APPLY_FIRST, MENU_QUICK_APPLY_SECOND]
+                .into_iter()
+                .enumerate()
+            {
+                match quick_switch_action(library, slot) {
+                    Ok(action) => append_menu(menu, disabled, command, &action.label),
+                    Err(_) => append_menu(
+                        menu,
+                        MF_GRAYED,
+                        command,
+                        if slot == 0 {
+                            "Quick switch first profile (unavailable)"
+                        } else {
+                            "Quick switch second profile (unavailable)"
+                        },
+                    ),
+                }
+            }
+        } else {
+            append_menu(
+                menu,
+                MF_GRAYED,
+                MENU_QUICK_APPLY_FIRST,
+                "Quick switch first profile (unavailable)",
+            );
+            append_menu(
+                menu,
+                MF_GRAYED,
+                MENU_QUICK_APPLY_SECOND,
+                "Quick switch second profile (unavailable)",
+            );
+        }
+        append_menu(menu, MF_GRAYED, 0, "Apply complete built-in preset");
+        append_menu(
+            menu,
+            disabled,
+            MENU_DEVELOPER,
+            "Developer (recovery preset)",
+        );
+        append_menu(menu, disabled, MENU_GAMING, "Gaming (recovery preset)");
+        append_menu(
+            menu,
+            MF_GRAYED,
+            0,
+            "Saved entries are local names for complete presets",
+        );
+
+        if let Some(library) = self.library.as_ref() {
+            if let Ok(saved_menu) = unsafe { CreatePopupMenu() } {
+                for (index, entry) in library.entries().iter().enumerate() {
+                    let id = MENU_SAVED_APPLY_BASE + index;
+                    let label = format!(
+                        "{} — complete {} preset",
+                        entry.name(),
+                        entry.source_preset()
+                    );
+                    append_menu(saved_menu, disabled, id, &label);
+                }
+                append_popup(menu, saved_menu, "Apply saved local profile");
+
+                if let Ok(pair_menu) = unsafe { CreatePopupMenu() } {
+                    append_quick_slot_menu(pair_menu, library, 0, MENU_QUICK_FIRST_BASE, disabled);
+                    append_quick_slot_menu(pair_menu, library, 1, MENU_QUICK_SECOND_BASE, disabled);
+                    let first = library.quick_switch()[0].as_str();
+                    let second = library.quick_switch()[1].as_str();
+                    let first_name = library
+                        .entries()
+                        .iter()
+                        .find(|entry| entry.id() == first)
+                        .map_or("Unknown", |entry| entry.name());
+                    let second_name = library
+                        .entries()
+                        .iter()
+                        .find(|entry| entry.id() == second)
+                        .map_or("Unknown", |entry| entry.name());
+                    append_menu(
+                        pair_menu,
+                        MF_GRAYED,
+                        0,
+                        &format!("Current local pair: {first_name} ↔ {second_name}"),
+                    );
+                    append_popup(
+                        menu,
+                        pair_menu,
+                        "Choose quick-switch pair (Ctrl+Alt+P; selection does not apply)",
+                    );
+                }
+            }
+        } else {
+            append_menu(menu, MF_GRAYED, 0, "Saved profiles unavailable");
+        }
+
         let profile_line = self
             .presentation
             .as_ref()
-            .map_or_else(|| "Reading\u{2026}".to_owned(), |p| p.profile_line.clone());
-        append_menu(menu, MF_GRAYED, 0, &format!("Viper V4 Pro: {profile_line}"));
+            .map_or_else(|| "Reading…".to_owned(), |p| p.profile_line.clone());
+        append_menu(
+            menu,
+            MF_GRAYED,
+            0,
+            &format!("Observed device: {profile_line}"),
+        );
         append_menu(
             menu,
             MF_STRING | checked(self.config.start_with_windows),
@@ -1794,23 +3047,84 @@ impl TrayApp {
         );
         append_menu(menu, disabled, MENU_EXIT, "Exit");
 
-        let mut point = POINT::default();
-        if unsafe { GetCursorPos(&mut point) }.is_ok() {
-            let _ = unsafe { SetForegroundWindow(window) };
-            let _ = unsafe {
-                TrackPopupMenu(
-                    menu,
-                    TPM_RIGHTBUTTON,
-                    point.x,
-                    point.y,
-                    Some(0),
-                    window,
-                    None,
-                )
-            };
-        }
-        let _ = unsafe { DestroyMenu(menu) };
+        Some(menu)
     }
+}
+
+fn track_popup_menu(window: HWND, menu: HMENU) -> usize {
+    let mut selected_command = 0;
+    let mut point = POINT::default();
+    if unsafe { GetCursorPos(&mut point) }.is_ok() {
+        let _ = unsafe { SetForegroundWindow(window) };
+        selected_command = unsafe {
+            TrackPopupMenu(
+                menu,
+                TPM_RIGHTBUTTON | TPM_RETURNCMD,
+                point.x,
+                point.y,
+                Some(0),
+                window,
+                None,
+            )
+        }
+        .0 as usize;
+    }
+    let _ = unsafe { DestroyMenu(menu) };
+    selected_command
+}
+
+fn append_popup(
+    menu: windows::Win32::UI::WindowsAndMessaging::HMENU,
+    submenu: windows::Win32::UI::WindowsAndMessaging::HMENU,
+    text: &str,
+) {
+    let mut wide: Vec<u16> = text.encode_utf16().chain(Some(0)).collect();
+    let _ = unsafe {
+        AppendMenuW(
+            menu,
+            MF_POPUP,
+            submenu.0 as usize,
+            PCWSTR(wide.as_mut_ptr()),
+        )
+    };
+}
+
+fn append_quick_slot_menu(
+    parent: windows::Win32::UI::WindowsAndMessaging::HMENU,
+    library: &ProfileLibraryV1,
+    slot: usize,
+    command_base: usize,
+    disabled: windows::Win32::UI::WindowsAndMessaging::MENU_ITEM_FLAGS,
+) {
+    let Ok(submenu) = (unsafe { CreatePopupMenu() }) else {
+        return;
+    };
+    let selected = &library.quick_switch()[slot];
+    for (index, entry) in library.entries().iter().enumerate() {
+        let marker = if entry.id() == selected { "✓ " } else { "" };
+        let label = format!(
+            "{marker}{} — saved local alias · {} preset",
+            entry.name(),
+            entry.source_preset()
+        );
+        let entry_flags = if quick_slot_entry_eligible(library, slot, entry.id()) {
+            disabled
+        } else {
+            MF_GRAYED
+        };
+        append_menu(submenu, entry_flags, command_base + index, &label);
+    }
+    let selected_name = library
+        .entries()
+        .iter()
+        .find(|entry| entry.id() == selected)
+        .map_or("Unavailable", |entry| entry.name());
+    let label = if slot == 0 {
+        "First target"
+    } else {
+        "Second target"
+    };
+    append_popup(parent, submenu, &format!("{label}: {selected_name}"));
 }
 
 fn draw_panel(hdc: HDC, rect: RECT, fill: COLORREF, border: COLORREF, corner_radius: i32) {
@@ -1983,16 +3297,16 @@ fn load_app_icon(width: i32, height: i32) -> Result<HICON, String> {
 /// asset being present. The installer should place the BMP beside the EXE;
 /// development launches also look under the package working directory's
 /// `assets/` folder.
-fn load_dashboard_mouse_bitmap() -> Option<DashboardBitmap> {
+fn load_mouse_bitmap(file_name: &str) -> Option<DashboardBitmap> {
     let mut candidates = Vec::new();
-    if let Ok(executable) = std::env::current_exe() {
-        if let Some(directory) = executable.parent() {
-            candidates.push(directory.join(DASHBOARD_MOUSE_BMP));
-            candidates.push(directory.join("assets").join(DASHBOARD_MOUSE_BMP));
-        }
+    if let Ok(executable) = std::env::current_exe()
+        && let Some(directory) = executable.parent()
+    {
+        candidates.push(directory.join(file_name));
+        candidates.push(directory.join("assets").join(file_name));
     }
     if let Ok(directory) = std::env::current_dir() {
-        candidates.push(directory.join("assets").join(DASHBOARD_MOUSE_BMP));
+        candidates.push(directory.join("assets").join(file_name));
     }
     for path in candidates {
         if !path.is_file() {
@@ -2095,11 +3409,21 @@ fn worker_loop(
 
 fn handle_worker_command(command: WorkerCommand) -> Result<WorkerEvent, String> {
     let paths = StoragePaths::discover().map_err(|error| error.to_string())?;
+    if matches!(&command, WorkerCommand::LoadLibrary) {
+        return Ok(match load_profile_library(&paths) {
+            Ok(library) => WorkerEvent::LibraryUpdated(library),
+            Err(error) => WorkerEvent::LibraryError(error.to_string()),
+        });
+    }
     let mut config = load_config(&paths).map_err(|error| error.to_string())?;
-    let diagnostic_event = match command {
+    let diagnostic_event = match &command {
+        WorkerCommand::LoadLibrary => "load saved profiles",
         WorkerCommand::Refresh => "refresh",
         WorkerCommand::Apply(ProfileName::Developer) => "apply developer",
         WorkerCommand::Apply(ProfileName::Gaming) => "apply gaming",
+        WorkerCommand::ApplySaved { .. } => "apply saved local profile",
+        WorkerCommand::SetQuickSwitch { .. } => "change quick-switch pair",
+        WorkerCommand::ToggleQuickSwitch => "toggle quick-switch pair",
         WorkerCommand::SetStartWithWindows(_) => "change startup option",
         WorkerCommand::SetDiagnostics(_) => "change diagnostics option",
         WorkerCommand::SetExitAfterGaming(_) => "change exit-after-gaming option",
@@ -2109,8 +3433,50 @@ fn handle_worker_command(command: WorkerCommand) -> Result<WorkerEvent, String> 
             .map_err(|error| error.to_string())?;
     }
     let result = match command {
+        WorkerCommand::LoadLibrary => unreachable!("handled before loading config"),
         WorkerCommand::Refresh => refresh_state(&paths, &mut config),
         WorkerCommand::Apply(profile) => apply_profile(&paths, &mut config, profile),
+        WorkerCommand::ApplySaved {
+            id,
+            expected_preset,
+        } => {
+            let library = match load_profile_library(&paths) {
+                Ok(library) => library,
+                Err(error) => return Ok(WorkerEvent::LibraryError(error.to_string())),
+            };
+            let profile = match resolve_saved_apply(&library, &id, expected_preset) {
+                Ok(profile) => profile,
+                Err(error) => return Ok(WorkerEvent::LibraryError(error)),
+            };
+            apply_profile(&paths, &mut config, profile)
+        }
+        WorkerCommand::SetQuickSwitch { slot, profile_id } => {
+            if slot > 1 {
+                return Ok(WorkerEvent::LocalError(
+                    "quick-switch pair slot must be 0 or 1".to_owned(),
+                ));
+            }
+            let mut library = match load_profile_library(&paths) {
+                Ok(library) => library,
+                Err(error) => return Ok(WorkerEvent::LibraryError(error.to_string())),
+            };
+            let mut pair = library.quick_switch().clone();
+            pair[slot] = profile_id;
+            if let Err(error) = library.set_quick_switch(&pair[0], &pair[1]) {
+                return Ok(WorkerEvent::LocalError(error));
+            }
+            if let Err(error) = save_profile_library(&paths, &library) {
+                return Ok(WorkerEvent::LocalError(error.to_string()));
+            }
+            Ok(WorkerEvent::LibraryUpdated(library))
+        }
+        WorkerCommand::ToggleQuickSwitch => {
+            let library = match load_profile_library(&paths) {
+                Ok(library) => library,
+                Err(error) => return Ok(WorkerEvent::LibraryError(error.to_string())),
+            };
+            toggle_saved_profile(&paths, &mut config, &library)
+        }
         WorkerCommand::SetStartWithWindows(enabled) => {
             set_startup_value(enabled)?;
             config.start_with_windows = enabled;
@@ -2171,6 +3537,37 @@ fn refresh_state(
     })
 }
 
+fn toggle_saved_profile(
+    paths: &StoragePaths,
+    config: &mut UtilityConfigV1,
+    library: &ProfileLibraryV1,
+) -> Result<WorkerEvent, String> {
+    refuse_if_synapse_running()?;
+    let mut device = RazerDevice::open_unique()?;
+    let before = crate::engine::DeviceControl::read_snapshot(&mut device)?;
+    let baseline = read_snapshot(&paths.baseline_path(&before.device.serial)).map_err(|error| {
+        format!("immutable baseline is required before quick switching: {error}")
+    })?;
+    let observed = match classify_profile(&before, &baseline)? {
+        ProfileMatch::Developer => Some(ProfileName::Developer),
+        ProfileMatch::Gaming => Some(ProfileName::Gaming),
+        ProfileMatch::OutOfSync => None,
+    };
+    let target = library
+        .toggle_target(observed)
+        .map_err(|error| error.to_string())?;
+    // Reuse this device, observed snapshot, and baseline for both selection
+    // and planning; the write engine retains its own preflight and readback gates.
+    apply_profile_from_snapshot(
+        paths,
+        config,
+        &mut device,
+        before,
+        baseline,
+        target.source_preset(),
+    )
+}
+
 fn apply_profile(
     paths: &StoragePaths,
     config: &mut UtilityConfigV1,
@@ -2182,6 +3579,17 @@ fn apply_profile(
     let baseline = read_snapshot(&paths.baseline_path(&before.device.serial)).map_err(|error| {
         format!("immutable baseline is required before any tray write: {error}")
     })?;
+    apply_profile_from_snapshot(paths, config, &mut device, before, baseline, profile)
+}
+
+fn apply_profile_from_snapshot<D: crate::engine::DeviceControl>(
+    paths: &StoragePaths,
+    config: &mut UtilityConfigV1,
+    device: &mut D,
+    before: crate::model::DeviceSnapshotV1,
+    baseline: crate::model::DeviceSnapshotV1,
+    profile: ProfileName,
+) -> Result<WorkerEvent, String> {
     let plan = plan_profile_with_baseline(&before, &baseline, profile)
         .map_err(|error| error.to_string())?;
     // This gate is deliberately before both the journal and apply engine: an
@@ -2189,7 +3597,7 @@ fn apply_profile(
     require_proven_polling_writes(&plan).map_err(|error| error.to_string())?;
     write_plan_journal(paths, &plan).map_err(|error| error.to_string())?;
     let no_changes_needed = plan.is_noop();
-    let report = apply_write_plan(&mut device, &plan);
+    let report = apply_write_plan(device, &plan);
     let report_path = write_verification_report(paths, &report, &before.device.serial)
         .map_err(|error| error.to_string())?;
     let final_dpi = report.final_state.as_ref().map(|state| state.dpi.current);
@@ -2278,5 +3686,78 @@ fn registry_ok(status: WIN32_ERROR, action: &str) -> Result<(), String> {
         Ok(())
     } else {
         Err(format!("{action} failed with Win32 error {}", status.0))
+    }
+}
+
+#[cfg(test)]
+mod quick_switch_tray_tests {
+    use super::*;
+
+    #[test]
+    fn direct_actions_resolve_pair_aliases_and_explain_the_preset() {
+        let library = ProfileLibraryV1::default();
+        let first = quick_switch_action(&library, 0).unwrap();
+        let second = quick_switch_action(&library, 1).unwrap();
+
+        assert_eq!(first.profile_id, "developer");
+        assert_eq!(first.expected_preset, ProfileName::Developer);
+        assert_eq!(
+            first.label,
+            "Switch to Developer — complete Developer preset"
+        );
+        assert_eq!(second.profile_id, "gaming");
+        assert_eq!(second.expected_preset, ProfileName::Gaming);
+        assert_eq!(second.label, "Switch to Gaming — complete Gaming preset");
+        assert_eq!(
+            quick_switch_slot_for_command(MENU_QUICK_APPLY_FIRST),
+            Some(0)
+        );
+        assert_eq!(
+            quick_switch_slot_for_command(MENU_QUICK_APPLY_SECOND),
+            Some(1)
+        );
+        assert_eq!(
+            quick_switch_slot_for_command(MENU_QUICK_APPLY_FIRST + 2),
+            None
+        );
+    }
+
+    #[test]
+    fn saved_apply_requires_the_menu_displayed_preset_to_match() {
+        let mut displayed = ProfileLibraryV1::default();
+        displayed.duplicate("developer", "work", "Work").unwrap();
+        assert_eq!(
+            resolve_saved_apply(&displayed, "work", ProfileName::Developer).unwrap(),
+            ProfileName::Developer
+        );
+
+        // A different process can replace a valid local library while the
+        // popup is open. The same saved ID must not silently change the write.
+        let mut changed = serde_json::to_value(&displayed).unwrap();
+        let entries = changed["entries"].as_array_mut().unwrap();
+        let work = entries
+            .iter_mut()
+            .find(|entry| entry["id"] == "work")
+            .unwrap();
+        work["source_preset"] = serde_json::Value::String("gaming".to_owned());
+        let changed: ProfileLibraryV1 = serde_json::from_value(changed).unwrap();
+        changed.validate().unwrap();
+        let error = resolve_saved_apply(&changed, "work", ProfileName::Developer).unwrap_err();
+        assert!(error.contains("changed since the menu was opened"));
+        assert!(error.contains("reload saved profiles"));
+        assert!(resolve_saved_apply(&changed, "missing", ProfileName::Developer).is_err());
+    }
+
+    #[test]
+    fn pair_selector_disables_entries_that_cannot_form_an_opposite_preset_pair() {
+        let mut library = ProfileLibraryV1::default();
+        library
+            .duplicate("developer", "developer-copy", "Work")
+            .unwrap();
+        assert!(!quick_slot_entry_eligible(&library, 0, "gaming"));
+        assert!(quick_slot_entry_eligible(&library, 0, "developer-copy"));
+        assert!(!quick_slot_entry_eligible(&library, 1, "developer-copy"));
+        assert!(!quick_slot_entry_eligible(&library, 0, "unknown"));
+        assert!(!quick_slot_entry_eligible(&library, 2, "gaming"));
     }
 }
