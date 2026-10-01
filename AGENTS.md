@@ -44,9 +44,11 @@ conditions and evidence. Label protocol or product assumptions as unproven.
 ## Project direction
 
 For a new session, read `docs/continue-here.md` before making changes. Continue
-the public implementation PR on `codex/sanitized-quick-switch`; GitHub is the
-implementation source. Do not reapply the historical ZIP patch or restart the
-saved-profile foundation. Keep the PR in draft while its validation gates are
+the public stack documented in `docs/continue-here.md`; GitHub is the
+implementation source. `codex/sanitized-quick-switch` remains the catalog/top
+layer. Make each feature change on its owning layer; create a small new PR for
+a new concern instead of accumulating unrelated work on the top branch. Do not reapply the historical ZIP patch or restart the
+saved-profile foundation. Keep PR #3 and the new split PRs in draft while their validation gates are
 open. The owner is away from the PC as of 2026-09-29; defer manual desktop and
 physical-device tests until an observed session is available.
 
@@ -57,14 +59,38 @@ boundary, and recorded validation blockers before continuing the profile work.
 Do not mistake local named configurations for independently stored onboard slots.
 
 The local draft editor (#12) and read-only capability contract (#4) are
-implemented in the draft PR. Read `docs/capability-contract.md` before promotion
-work (#13). No custom combination is approved; Apply stays disabled until the
+implemented in focused draft PRs #15 and #16 respectively. Read `docs/capability-contract.md` before promotion
+work (#13), and `docs/profile-catalog.md` for the opt-in offline projection.
+Catalog export never replaces V1 production files. No custom combination is approved; Apply stays disabled until the
 documented device, field, recovery and complete-profile gates pass. See `docs/tooling-decision.md` for the Cargo/mise decision; Aube was not
 adopted, and its embedded Rust library was not compiled or benchmarked.
 
 `ROADMAP.md` describes possible expansion. It is planning material, not evidence
 that a capability is supported. Update the roadmap and its validation gates as
 measured support changes.
+
+## Small PRs and stacked work
+
+2026-09-29: the owner requested focused PRs so each feature can be reviewed and
+fixed independently. Use GitHub's official `gh-stack` skill and `github/gh-stack`
+CLI extension when creating or changing dependent PR layers. Read the skill before
+stack operations; if it is unavailable locally, consult the
+[official skill](https://github.com/github/gh-stack/blob/v0.1.1/skills/gh-stack/SKILL.md).
+
+- Keep one coherent concern per PR. Independent work gets a separate branch/PR;
+  dependent work gets a focused layer based on the preceding branch.
+- Reconcile current GitHub heads and stack membership before editing. Use the
+  ownership table in `docs/continue-here.md`, and make fixes on the layer that
+  owns them. Preserve upper-layer work when reconciling dependencies.
+- Use explicit non-interactive flags and the intended remote. For existing PRs
+  across worktrees, `gh stack link` with full PR URLs registers the chain without
+  rewriting commits; local navigation needs local stack tracking first.
+- Preserve draft states and existing write/merge authorization. Do not use
+  `--open` to mark drafts ready, force-push, or merge as an incidental stack step.
+  A stack merge can include every unmerged layer below its target.
+- Verify current integration checks after bases or heads change. Keep issue
+  ownership and the existing Project dashboard current. Small PRs do not relax
+  Apply, immutable-baseline, manual Windows/mouse or tray-release gates.
 
 ## Public issue tracking
 

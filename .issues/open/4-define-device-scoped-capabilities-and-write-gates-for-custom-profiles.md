@@ -3,13 +3,15 @@ title: Define device-scoped capabilities and write gates for custom profiles
 labels:
     - codex-created
     - enhancement
+projects:
+    - ViperPilot dashboard
 state: open
-state_reason: ""
-synced_at: 2026-09-30T02:34:48.421499093Z
+state_reason: null
+synced_at: 2026-09-30T06:28:41.357994846Z
 info:
     author: spencer-life
     created_at: 2026-09-29T18:22:37Z
-    updated_at: 2026-09-29T21:45:06Z
+    updated_at: 2026-09-30T02:34:47Z
 ---
 
 ## Context
@@ -37,3 +39,7 @@ The optional editor shows offline evidence/blockers without implying a verified 
 Hardware-free validation passed: core CI (114 library + 3 integration tests, strict Clippy, formatting, native release and CLI help); preview CI (120 library + 9 editor + 3 integration tests); sequential production/editor Windows MSVC cross-builds. Independent final review found no remaining material issues after fixing unit-action unknown-field parsing. Tests cover all eight scope axes and metadata/order changes without inherited support or false stale-state rejection. Default dependencies exclude egui/eframe.
 
 No manual Windows, tray/hotkey, startup, performance or mouse test ran; owner remains away from the PC. Caller-supplied snapshots are not proof of a fresh GET, immutable baseline or reviewed serials. Keep this issue open for review/delivery, PR #3 draft, and promotion #13 blocked until complete field/combination/readback/restoration evidence permits it. Hosted checks for the new published head require their own status review.
+
+## Focused PR ownership — 2026-09-29
+
+Capability software is now isolated in [PR #16](https://github.com/spencer-life/viperpilot/pull/16), based on editable drafts [PR #15](https://github.com/spencer-life/viperpilot/pull/15). Existing commits and runtime behavior were preserved when the owner requested smaller PRs. PR #3 and the new PRs remain draft; issues stay open until their delivery and validation criteria pass. No merge, release or mouse operation occurred. Earlier references to the combined PR #3 describe historical checkpoints.

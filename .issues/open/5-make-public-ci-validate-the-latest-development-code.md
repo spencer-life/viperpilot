@@ -3,9 +3,15 @@ title: Make public CI validate the latest development code
 labels:
     - codex-created
     - enhancement
+projects:
+    - ViperPilot dashboard
 state: open
 state_reason: null
-synced_at: 2026-09-29T21:45:12.50006097Z
+synced_at: 2026-09-30T06:30:19.763636374Z
+info:
+    author: spencer-life
+    created_at: 2026-09-29T18:22:39Z
+    updated_at: 2026-09-30T03:20:20Z
 ---
 
 ## Context
@@ -27,3 +33,18 @@ Implementation baseline: [public PR #3](https://github.com/spencer-life/viperpil
 ## Checkpoint — 2026-09-29
 
 Public hosted Core Linux and Windows CI passed at sanitized PR #3 head `7cb0440` ([run](https://github.com/spencer-life/viperpilot/actions/runs/36612610509)); Security also passed ([run](https://github.com/spencer-life/viperpilot/actions/runs/36612610273)). `main` currently has no required checks or rulesets, so defining checks and validating the stacked PR merge order remains open.
+
+
+## Enforcement preparation — 2026-09-29
+
+Hosted Linux/Windows Core checks passed at `1db3cc7` ([run](https://github.com/spencer-life/viperpilot/actions/runs/36660537944)); Security also passed ([run](https://github.com/spencer-life/viperpilot/actions/runs/36660538070)). These results predate the catalog slice.
+
+Core job names are aligned with foundation PR #1: `ci (ubuntu-24.04)` and `ci (windows-2025)`, so a main-only requirement can serve both stacked PRs. Workflow triggers, native host/local tasks, checkout behavior, stable contexts and staged merge order are recorded in [CI and merge gates](https://github.com/spencer-life/viperpilot/blob/codex/sanitized-quick-switch/docs/ci-and-merge-gates.md). Security must be added as a requirement after #1 merges and before #3 is merged; #1's historical head does not emit it. No merge queue or merge is enabled.
+
+A minimal two-Core-check ruleset was prepared and independently reviewed, with requirements bound to the observed GitHub Actions integration, no bypass actors, and a captured empty-rule rollback baseline. Automatic approval review rejected activating it because explicit authorization is required for the persistent settings change and its ability to block main updates. No repository settings changed; authorization is pending. This issue remains open.
+
+## Focused PR ownership — 2026-09-29
+
+The official review stack is PR #1 → #14 → #15 → #16 → #3. The shared Core check-name alignment is in #16; enforcement still follows the staged policy and requires explicit settings authorization. Existing commits and runtime behavior were preserved when the owner requested smaller PRs. PR #3 and the new PRs remain draft; issues stay open until their delivery and validation criteria pass. No merge, release or mouse operation occurred. Earlier references to the combined PR #3 describe historical checkpoints.
+
+The split exposes a check-name mismatch: preserved #14/#15 heads emit `Core CI (...)`, while #1/#16/#3 emit `ci (...)`. The earlier two-PR ruleset proposal must be revised or contexts normalized and validated before activation across the official stack. Do not enable known-missing checks. Updated policy: [CI and merge gates](https://github.com/spencer-life/viperpilot/blob/codex/sanitized-quick-switch/docs/ci-and-merge-gates.md).

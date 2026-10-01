@@ -42,6 +42,14 @@ uses an exact model, firmware, transport and HID collection scope. It never
 authorizes a custom profile or creates a device write plan; other mice inherit
 no support.
 
+## Offline catalog preview
+
+`viperctl catalog-preview --root DIRECTORY` previews existing preset aliases and
+frozen local draft copies without writing. `catalog-export` creates a separate
+`profile-catalog-v1.json` and refuses to replace any existing export. Production
+files and the quick-switch pair stay unchanged; drafts remain unverified. See
+[catalog and rollback details](docs/profile-catalog.md).
+
 ## Validation and safety
 
 Its GitHub Actions checks are hardware-free; they validate source and tests without connecting to or writing to a mouse. Historical raw device measurements and diagnostics are deliberately not published here; their absence does not prove hardware support. See [quick-switch status](docs/quick-switch-status.md) for software implementation and validation boundaries.

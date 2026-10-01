@@ -85,12 +85,40 @@ created. No manual Windows, tray/hotkey, performance, startup or mouse test was
 run. PR #3 remains draft; #4 stays open for review/delivery and #13 remains gated.
 Hosted checks for the published head must be checked separately.
 
+## Issue #13 offline software checkpoint — 2026-09-29
+
+Catalog source `26da843` adds frozen projection, preview and no-clobber export;
+`b034547` corrects a Windows-only duplicate path import. See [catalog and rollback](profile-catalog.md).
+
+- Core CI passed **122 library, 2 CLI, 3 capability integration and 6 catalog
+  integration tests**, formatting, strict Clippy, native release and CLI help.
+- Preview CI passed **128 library, 2 CLI, 9 editor, 3 capability integration
+  and 6 catalog integration tests**, with strict feature Clippy.
+- Sequential production and editor Windows MSVC release cross-builds passed
+  after the import correction. The initial production build failed with E0252;
+  this was a source import conflict, not protocol or mouse evidence. Linux code
+  was unaffected by the cfg-only correction, so its suites were not repeated.
+- Independent review found no material implementation findings. Distinct tests
+  cover actual CLI preview/export, existing-output preservation, source/config/
+  baseline isolation, strict catalog variants, protected built-ins, draft pair
+  rejection and concurrent one-winner publication. Default dependencies still
+  exclude egui/eframe.
+- Workflow actionlint and security analysis passed. CI contexts are aligned
+  with PR #1; see [CI and merge gates](ci-and-merge-gates.md). Required-check
+  activation remains pending explicit authorization after automatic review rejection.
+
+No automatic migration or production reader changed. No custom combination is
+approved; Apply remains disabled. No desktop, startup or mouse operation was run.
+Issues #6–#11 retain their owner-present gates; #13's production promotion remains
+blocked by device/combination/recovery evidence. Hosted checks for later heads
+must be assessed separately.
+
 ## Next work and deferred tests
 
 - [Issue #12](https://github.com/spencer-life/viperpilot/issues/12): local editing and persistence are implemented in the optional editor; review software checks and complete deferred owner-observed Windows UI validation. Every enabled setting maps to V1 intent; unsupported settings are explicitly unsavable.
 - [Issue #4](https://github.com/spencer-life/viperpilot/issues/4): [read-only exact-scope contract](capability-contract.md) and strict request preflight implemented; all custom combinations remain blocked. Review and delivery remain; no production allowlist changed.
-- [Issue #13](https://github.com/spencer-life/viperpilot/issues/13): later promote proven custom settings into quick switching, after storage, contract, field and combination evidence gates pass.
-- [Issue #5](https://github.com/spencer-life/viperpilot/issues/5): software CI is green at the recorded checkpoint; required-check enforcement and the stacked PR merge order remain open. Public `main` was unprotected with no rulesets when rechecked on 2026-09-29.
+- [Issue #13](https://github.com/spencer-life/viperpilot/issues/13): [offline catalog preview/export](profile-catalog.md) preserves V1 files and copies drafts without approval. Actual promotion waits for complete-profile and recovery evidence.
+- [Issue #5](https://github.com/spencer-life/viperpilot/issues/5): software CI is green at the recorded checkpoint; required-check enforcement and the stacked PR merge order remain open. Main was unprotected with no rulesets on 2026-09-29. [Aligned check names and a staged policy](ci-and-merge-gates.md) are prepared; activation awaits explicit authorization after automatic approval review rejection.
 - Manual desktop/device gates remain open in [#6](https://github.com/spencer-life/viperpilot/issues/6), [#7](https://github.com/spencer-life/viperpilot/issues/7), [#8](https://github.com/spencer-life/viperpilot/issues/8), [#9](https://github.com/spencer-life/viperpilot/issues/9), [#10](https://github.com/spencer-life/viperpilot/issues/10), and [#11](https://github.com/spencer-life/viperpilot/issues/11). The owner is away from the PC; no new manual tests are authorized by this documentation refresh.
 
 ## Release gates

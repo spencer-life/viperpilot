@@ -1,10 +1,11 @@
 use std::env;
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 #[cfg(windows)]
 use serde::Serialize;
 #[cfg(windows)]
-use std::path::{Path, PathBuf};
+use std::path::Path;
 #[cfg(windows)]
 use viper_v4_utility::engine::{DeviceControl, apply_write_plan};
 #[cfg(windows)]
@@ -48,7 +49,26 @@ fn run() -> Result<(), String> {
         print_help();
         return Ok(());
     }
+    if let Some(json) = run_catalog_command(&arguments)? {
+        println!("{json}");
+        return Ok(());
+    }
     run_platform(&arguments)
+}
+
+/// Handle hardware-free catalog commands before platform dispatch. They are
+/// available in the native CLI on Windows, Linux, and macOS.
+fn run_catalog_command(arguments: &[String]) -> Result<Option<String>, String> {
+    let command = match arguments.first().map(String::as_str) {
+        Some("catalog-preview") => viper_v4_utility::catalog_export::preview,
+        Some("catalog-export") => viper_v4_utility::catalog_export::export,
+        _ => return Ok(None),
+    };
+    if arguments.len() != 3 || arguments[1] != "--root" {
+        return Err(format!("expected {} --root DIRECTORY", arguments[0]));
+    }
+    let catalog = command(&PathBuf::from(&arguments[2]))?;
+    catalog.to_json().map(Some)
 }
 
 #[cfg(not(windows))]
@@ -546,6 +566,8 @@ fn print_help() {
 viperctl — Viper V4 Pro backup, verification, and diagnostics
 
 USAGE:
+  viperctl catalog-preview --root DIRECTORY
+  viperctl catalog-export --root DIRECTORY
   viperctl enumerate [--json]
   viperctl probe-polling
   viperctl snapshot [--output PATH]
@@ -563,10 +585,82 @@ USAGE:
   viperctl restore PATH --confirm-device SERIAL_SUFFIX
   viperctl listen
 
+catalog-preview reads the local alias and draft libraries without writing
+files. catalog-export freezes the same catalog to profile-catalog-v1.json
+without replacing an existing file. Both commands are offline and hardware-free.
+
 enumerate performs OS enumeration only. snapshot, plan, plan-polling, and verify
 use documented GET reports only. apply, isolated apply commands, and restore require an
 immutable baseline and exact serial suffix, deduplicate writes, independently
 read back each field, and roll back on failure. The isolated commands can only
 touch their named field. The tray application remains gated on successful hardware proof."
     );
+}
+
+#[cfg(test)]
+mod catalog_command_tests {
+    use std::fs;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    use super::run_catalog_command;
+    use viper_v4_utility::profile_catalog::ProfileCatalogV1;
+
+    static NEXT_ROOT: AtomicU64 = AtomicU64::new(0);
+
+    fn temp_root() -> PathBuf {
+        let root = std::env::temp_dir().join(format!(
+            "viperctl-catalog-{}-{}",
+            std::process::id(),
+            NEXT_ROOT.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir(&root).unwrap();
+        root
+    }
+
+    #[test]
+    fn catalog_commands_are_available_before_platform_dispatch() {
+        let root = temp_root();
+        let root_arg = root.to_string_lossy().into_owned();
+        let preview = run_catalog_command(&[
+            "catalog-preview".to_owned(),
+            "--root".to_owned(),
+            root_arg.clone(),
+        ])
+        .unwrap()
+        .unwrap();
+        let preview_catalog = ProfileCatalogV1::from_json(&preview).unwrap();
+        assert_eq!(preview_catalog.entries().len(), 2);
+        assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
+
+        let exported =
+            run_catalog_command(&["catalog-export".to_owned(), "--root".to_owned(), root_arg])
+                .unwrap()
+                .unwrap();
+        assert_eq!(
+            ProfileCatalogV1::from_json(&exported).unwrap(),
+            preview_catalog
+        );
+        assert!(root.join("profile-catalog-v1.json").is_file());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn catalog_commands_reject_malformed_arguments() {
+        assert!(run_catalog_command(&["catalog-preview".to_owned()]).is_err());
+        assert!(
+            run_catalog_command(&[
+                "catalog-export".to_owned(),
+                "--root".to_owned(),
+                "/tmp".to_owned(),
+                "extra".to_owned(),
+            ])
+            .is_err()
+        );
+        assert!(
+            run_catalog_command(&["snapshot".to_owned()])
+                .unwrap()
+                .is_none()
+        );
+    }
 }
