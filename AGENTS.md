@@ -69,6 +69,20 @@ adopted, and its embedded Rust library was not compiled or benchmarked.
 that a capability is supported. Update the roadmap and its validation gates as
 measured support changes.
 
+## Preserve the installed app
+
+2026-09-29: the owner uses the legacy app daily. Development must preserve its
+installed binaries, `%LOCALAPPDATA%/ViperV4Utility` data, shortcuts, startup,
+process and device state. Build and test only in repository output or temporary
+folders. Default development data is `%LOCALAPPDATA%/ViperPilotDevelopment`;
+never import or overwrite the legacy config or immutable baseline automatically.
+`install-windows`, `scripts/install.ps1` and the production tray entry point
+deliberately fail before installer/tray effects.
+Do not bypass them or run the production tray while the owner is away. Explicit
+editor/catalog roots must also point at separate development or fixture data.
+Read `docs/development-isolation.md` before any later manual test. Separate
+folders do not isolate the same physical mouse or global hotkeys/startup.
+
 ## Small PRs and stacked work
 
 2026-09-29: the owner requested focused PRs so each feature can be reviewed and

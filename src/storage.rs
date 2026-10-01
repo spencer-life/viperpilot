@@ -30,9 +30,14 @@ impl StoragePaths {
         let local_app_data = std::env::var_os("LOCALAPPDATA").ok_or_else(|| {
             StorageError::Path("LOCALAPPDATA is not defined; run the Windows executable".to_owned())
         })?;
-        Ok(Self::under(
-            PathBuf::from(local_app_data).join("ViperV4Utility"),
-        ))
+        Ok(Self::under_local_app_data(Path::new(&local_app_data)))
+    }
+
+    fn under_local_app_data(local_app_data: &Path) -> Self {
+        // 2026-09-29: development must not read or replace the owner's installed
+        // legacy app's config, library, reports or first immutable baseline.
+        // No automatic import from ViperV4Utility is permitted.
+        Self::under(local_app_data.join("ViperPilotDevelopment"))
     }
 
     #[must_use]
@@ -515,6 +520,42 @@ mod tests {
             std::process::id(),
             unix_nanos()
         )))
+    }
+
+    #[test]
+    fn development_defaults_do_not_read_or_replace_legacy_app_data() {
+        let parent = isolated_paths("legacy-isolation").root;
+        let legacy = StoragePaths::under(parent.join("ViperV4Utility"));
+        fs::create_dir_all(&legacy.backups).unwrap();
+        let legacy_library = legacy.root.join("profiles-v1.json");
+        let legacy_baseline = legacy.baseline_path("legacy-test-device");
+        let protected = [&legacy.config, &legacy_library, &legacy_baseline];
+        for path in protected {
+            fs::write(path, b"legacy bytes must remain untouched").unwrap();
+        }
+
+        let development = StoragePaths::under_local_app_data(&parent);
+        assert_eq!(development.root, parent.join("ViperPilotDevelopment"));
+        assert_eq!(
+            load_config(&development).unwrap(),
+            UtilityConfigV1::default()
+        );
+        assert_eq!(
+            load_profile_library(&development).unwrap(),
+            ProfileLibraryV1::default()
+        );
+        assert!(!development.root.exists());
+        save_config(&development, &UtilityConfigV1::default()).unwrap();
+        save_profile_library(&development, &ProfileLibraryV1::default()).unwrap();
+        write_snapshot(&development, &snapshot(), None).unwrap();
+
+        for path in protected {
+            assert_eq!(
+                fs::read(path).unwrap(),
+                b"legacy bytes must remain untouched"
+            );
+        }
+        fs::remove_dir_all(parent).unwrap();
     }
 
     #[test]
