@@ -29,11 +29,18 @@ use windows::Win32::Graphics::Gdi::{
     RDW_INVALIDATE, RedrawWindow, RoundRect, SRCCOPY, SelectObject, SetBkMode, SetStretchBltMode,
     SetTextColor, StretchBlt, TRANSPARENT,
 };
+use windows::Win32::System::Com::{
+    CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx,
+    CoUninitialize,
+};
 use windows::Win32::System::Registry::{
     HKEY, HKEY_CURRENT_USER, REG_SZ, RegCloseKey, RegCreateKeyW, RegDeleteValueW, RegSetValueExW,
 };
 use windows::Win32::System::SystemInformation::GetLocalTime;
 use windows::Win32::System::Threading::CreateMutexW;
+use windows::Win32::UI::Accessibility::{
+    CLSID_AccPropServices, IAccPropServices, Name_Property_GUID,
+};
 use windows::Win32::UI::Controls::{DRAWITEMSTRUCT, ODS_DISABLED, ODS_FOCUS, ODS_SELECTED};
 use windows::Win32::UI::HiDpi::{
     AdjustWindowRectExForDpi, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, GetDpiForWindow,
@@ -121,10 +128,13 @@ const HOTSPOT_REAR_SIDE: usize = 2104;
 const HOTSPOT_FRONT_SIDE: usize = 2105;
 const HOTSPOT_DPI: usize = 2106;
 
-// Button and static styles are numeric window styles. The named constants live
-// in the very large Win32_System_SystemServices feature group, so the few raw
-// values needed here are pinned instead of enabling that group.
-const BS_OWNERDRAW_STYLE: u32 = 0x0000_000B;
+// Numeric button/static styles follow the existing WINDOW_STYLE representation.
+// 2026-09-30: button values verified against the pinned windows 0.62.2
+// Win32_UI_WindowsAndMessaging constants (BS_PUSHBUTTON=0, BS_MULTILINE=8192).
+// 2026-09-30: earlier UIA evidence exposed owner-drawn buttons as panes without
+// InvokePattern. Use standard BUTTON semantics; verify actual UIA on Windows.
+const BS_PUSHBUTTON_STYLE: u32 = 0x0000_0000;
+const BS_MULTILINE_STYLE: u32 = 0x0000_2000;
 const SS_NOPREFIX_STYLE: u32 = 0x0000_0080;
 const SS_EDITCONTROL_STYLE: u32 = 0x0000_2000;
 
@@ -343,6 +353,7 @@ struct StatusWindow {
     assignment_raw: HWND,
     assignment_hint: HWND,
     mouse_hotspots: [HWND; 6],
+    hotspot_names: HotspotNames,
     verification_value: HWND,
     developer_button: HWND,
     gaming_button: HWND,
@@ -351,6 +362,79 @@ struct StatusWindow {
     title_font: HFONT,
     body_font: HFONT,
     button_font: HFONT,
+}
+
+// 2026-09-30: retain compact visual numbers while annotating standard buttons
+// with semantic UIA names. This is Windows' annotation service, not a custom
+// provider. Its COM initialization and annotations are scoped to the UI window.
+struct ComApartment;
+
+impl ComApartment {
+    fn initialize() -> Result<Self, String> {
+        unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) }
+            .ok()
+            .map_err(|error| format!("could not initialize accessible button names: {error}"))?;
+        Ok(Self)
+    }
+}
+
+impl Drop for ComApartment {
+    fn drop(&mut self) {
+        unsafe { CoUninitialize() };
+    }
+}
+
+struct HotspotNames {
+    services: IAccPropServices,
+    controls: Vec<HWND>,
+    // Must outlive the interface above; fields are dropped in declaration order.
+    _apartment: ComApartment,
+}
+
+impl HotspotNames {
+    fn new(controls: &[HWND; 6]) -> Result<Self, String> {
+        let apartment = ComApartment::initialize()?;
+        let services =
+            unsafe { CoCreateInstance(&CLSID_AccPropServices, None, CLSCTX_INPROC_SERVER) }
+                .map_err(|error| {
+                    format!("could not create accessible button name service: {error}")
+                })?;
+        let mut names = Self {
+            services,
+            controls: Vec::new(),
+            _apartment: apartment,
+        };
+        for (&control, semantic) in controls.iter().zip(gui_logic::MouseControl::ALL) {
+            // OBJID_CLIENT is DWORD(-4), and CHILDID_SELF is zero.
+            unsafe {
+                names.services.SetHwndPropStr(
+                    control,
+                    0xffff_fffc,
+                    0,
+                    Name_Property_GUID,
+                    PCWSTR(wide(semantic.title()).as_ptr()),
+                )
+            }
+            .map_err(|error| format!("could not name {} button: {error}", semantic.title()))?;
+            names.controls.push(control);
+        }
+        Ok(names)
+    }
+
+    fn clear(&mut self) {
+        for control in self.controls.drain(..) {
+            let _ = unsafe {
+                self.services
+                    .ClearHwndProps(control, 0xffff_fffc, 0, &[Name_Property_GUID])
+            };
+        }
+    }
+}
+
+impl Drop for HotspotNames {
+    fn drop(&mut self) {
+        self.clear();
+    }
 }
 
 /// A packaged, opaque BMP used only for the native dashboard's product visual.
@@ -634,7 +718,7 @@ pub fn run(show_window_at_start: bool) -> Result<(), String> {
     let controls = match create_status_controls(window) {
         Ok(controls) => controls,
         Err(error) => {
-            let _ = unsafe { DestroyWindow(window) };
+            destroy_status_window(&runtime, window);
             return Err(error);
         }
     };
@@ -654,12 +738,12 @@ pub fn run(show_window_at_start: bool) -> Result<(), String> {
         .spawn(move || worker_loop(command_rx, event_tx, worker_window))
         .map_err(|error| format!("could not start serialized device worker: {error}"));
     if let Err(error) = worker {
-        let _ = unsafe { DestroyWindow(window) };
+        destroy_status_window(&runtime, window);
         return Err(error);
     }
 
     if let Err(error) = add_tray_icon(window) {
-        let _ = unsafe { DestroyWindow(window) };
+        destroy_status_window(&runtime, window);
         return Err(error);
     }
     let hotkey = unsafe {
@@ -673,7 +757,7 @@ pub fn run(show_window_at_start: bool) -> Result<(), String> {
     .map_err(|error| format!("could not register Ctrl+Alt+P: {error}"));
     if let Err(error) = hotkey {
         remove_tray_icon(window);
-        let _ = unsafe { DestroyWindow(window) };
+        destroy_status_window(&runtime, window);
         return Err(error);
     }
     let startup_request = runtime
@@ -686,7 +770,7 @@ pub fn run(show_window_at_start: bool) -> Result<(), String> {
     if let Err(error) = startup_request {
         let _ = unsafe { UnregisterHotKey(Some(window), HOTKEY_ID) };
         remove_tray_icon(window);
-        let _ = unsafe { DestroyWindow(window) };
+        destroy_status_window(&runtime, window);
         return Err(error);
     }
     if show_window_at_start {
@@ -697,7 +781,7 @@ pub fn run(show_window_at_start: bool) -> Result<(), String> {
     let result = message_loop(window);
     let _ = unsafe { UnregisterHotKey(Some(window), HOTKEY_ID) };
     remove_tray_icon(window);
-    let _ = unsafe { DestroyWindow(window) };
+    destroy_status_window(&runtime, window);
     drop(runtime);
     drop(instance_mutex);
     result
@@ -751,7 +835,7 @@ pub fn run_preview(reversed_pair: bool, unavailable_library: bool) -> Result<(),
     let controls = match create_status_controls(window) {
         Ok(controls) => controls,
         Err(error) => {
-            let _ = unsafe { DestroyWindow(window) };
+            destroy_status_window(&runtime, window);
             return Err(error);
         }
     };
@@ -771,7 +855,7 @@ pub fn run_preview(reversed_pair: bool, unavailable_library: bool) -> Result<(),
     let _ = unsafe { ShowWindow(window, SW_SHOW) };
     let _ = unsafe { SetForegroundWindow(window) };
     let result = message_loop(window);
-    let _ = unsafe { DestroyWindow(window) };
+    destroy_status_window(&runtime, window);
     drop(runtime);
     result
 }
@@ -1016,6 +1100,16 @@ fn create_main_window(runtime: &WindowRuntime) -> Result<HWND, String> {
     Ok(window)
 }
 
+fn destroy_status_window(runtime: &WindowRuntime, window: HWND) {
+    // Call outside callbacks/TrayApp borrows, before child HWNDs are destroyed.
+    if let Ok(mut app) = runtime.app.try_borrow_mut()
+        && let Some(status) = app.status.as_mut()
+    {
+        status.hotspot_names.clear();
+    }
+    let _ = unsafe { DestroyWindow(window) };
+}
+
 fn create_status_controls(window: HWND) -> Result<StatusWindow, String> {
     let static_style = WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0 | SS_NOPREFIX_STYLE);
     let wrap_style =
@@ -1080,7 +1174,8 @@ fn create_status_controls(window: HWND) -> Result<StatusWindow, String> {
         wrap_style,
         0,
     )?;
-    let hotspot_style = WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0 | WS_TABSTOP.0 | BS_OWNERDRAW_STYLE);
+    let hotspot_style =
+        WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0 | WS_TABSTOP.0 | BS_PUSHBUTTON_STYLE);
     let mouse_hotspots = [
         create_child(window, w!("BUTTON"), "1", hotspot_style, HOTSPOT_LEFT)?,
         create_child(window, w!("BUTTON"), "2", hotspot_style, HOTSPOT_RIGHT)?,
@@ -1100,23 +1195,30 @@ fn create_status_controls(window: HWND) -> Result<StatusWindow, String> {
         window,
         w!("BUTTON"),
         "Apply Developer recovery preset",
-        WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0 | WS_TABSTOP.0 | BS_OWNERDRAW_STYLE),
+        WINDOW_STYLE(
+            WS_CHILD.0 | WS_VISIBLE.0 | WS_TABSTOP.0 | BS_PUSHBUTTON_STYLE | BS_MULTILINE_STYLE,
+        ),
         BUTTON_DEVELOPER,
     )?;
     let gaming_button = create_child(
         window,
         w!("BUTTON"),
         "Apply Gaming recovery preset",
-        WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0 | WS_TABSTOP.0 | BS_OWNERDRAW_STYLE),
+        WINDOW_STYLE(
+            WS_CHILD.0 | WS_VISIBLE.0 | WS_TABSTOP.0 | BS_PUSHBUTTON_STYLE | BS_MULTILINE_STYLE,
+        ),
         BUTTON_GAMING,
     )?;
     let view_mode_button = create_child(
         window,
         w!("BUTTON"),
         "Details",
-        WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0 | WS_TABSTOP.0 | BS_OWNERDRAW_STYLE),
+        WINDOW_STYLE(
+            WS_CHILD.0 | WS_VISIBLE.0 | WS_TABSTOP.0 | BS_PUSHBUTTON_STYLE | BS_MULTILINE_STYLE,
+        ),
         BUTTON_VIEW_MODE,
     )?;
+    let hotspot_names = HotspotNames::new(&mouse_hotspots)?;
     Ok(StatusWindow {
         brand_title,
         brand_subtitle,
@@ -1134,6 +1236,7 @@ fn create_status_controls(window: HWND) -> Result<StatusWindow, String> {
         assignment_raw,
         assignment_hint,
         mouse_hotspots,
+        hotspot_names,
         verification_value,
         developer_button,
         gaming_button,
@@ -2117,9 +2220,9 @@ impl TrayApp {
         self.presentation = Some(presentation);
     }
 
-    /// Draws the non-control dashboard chrome. The colored button controls are
-    /// ordinary owner-draw Win32 buttons layered over a packaged product image;
-    /// clicking one only updates the selected display card.
+    /// Draws non-control dashboard chrome behind standard Windows buttons.
+    /// The current-profile and selected-assignment text provide status separately
+    /// from the buttons' native system appearance.
     fn paint_compact_switcher(&self, window: HWND) {
         let mut paint = PAINTSTRUCT::default();
         let hdc = unsafe { BeginPaint(window, &mut paint) };

@@ -126,3 +126,17 @@ must be assessed separately.
 Keep the tray integration in draft until the documented full-profile and hotkey paths pass with owner-observed evidence. Before a hardware write, review a complete immutable baseline, device identity, and exact plan; test one logical field at a time; independently read it back; and restore the reviewed baseline before the next experiment. Do not kill Synapse or use input interception/injection as a fallback. Record process-exit and mouse power-cycle results before claiming persistence.
 
 For customization, unverified values may be saved only as clearly marked local drafts; Apply must stay disabled until the target device, field, and complete combination pass their documented evidence gates. Local saved profiles are not additional onboard slots.
+
+## Native button semantics remediation — 2026-09-30
+
+The earlier UIA pane/no-Invoke finding was a software blocker. The current
+native accessibility layer replaces owner-draw control styles with standard
+Windows push buttons, preserving existing actions, enabled-state guards and
+status text. Custom-colored control painting is replaced by system rendering.
+The preview script now requires UIA Button/InvokePattern and exercises Details
+via Invoke. It has not been executed during the owner-away session; real
+Windows accessibility/keyboard/scaling validation remains open.
+
+Microsoft documents [standard button styles](https://learn.microsoft.com/en-us/windows/win32/controls/button-styles)
+and [Button control pattern requirements](https://learn.microsoft.com/en-us/dotnet/framework/ui-automation/ui-automation-support-for-the-button-control-type).
+Those requirements inform the fix; they do not substitute for measured results.

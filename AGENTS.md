@@ -110,8 +110,11 @@ stack operations; if it is unavailable locally, consult the
 
 Track development work in the public issue tracker at
 https://github.com/spencer-life/viperpilot/issues using `gh-issue-sync` and the
-Markdown files under `.issues/open/`. Pull remote issue state before editing or
-pushing. Keep full device identifiers, raw reports, local paths, private-repository
+Markdown files under `.issues/open/`. Pull selected issue state with `--full`
+before editing or pushing so Project-only changes are included. Preserve Project
+membership in frontmatter and verify it after pushing; an incremental pull can
+miss membership changes that do not update the issue timestamp. Use credentials
+that can read the Project, not a repository-only integration. Keep full device identifiers, raw reports, local paths, private-repository
 links, and unredacted screenshots in private local records; public issues may
 contain only redacted summaries. An issue does not authorize hardware writes;
 follow the safety gates above.

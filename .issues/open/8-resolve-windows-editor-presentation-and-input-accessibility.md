@@ -4,9 +4,15 @@ labels:
     - accessibility
     - bug
     - codex-created
+projects:
+    - ViperPilot dashboard
 state: open
-state_reason: null
-synced_at: 2026-09-30T07:11:20.708001134Z
+state_reason: ""
+synced_at: 2026-09-30T07:26:12.425561666Z
+info:
+    author: spencer-life
+    created_at: 2026-09-29T18:22:45Z
+    updated_at: 2026-09-30T07:11:11Z
 ---
 
 ## Context
