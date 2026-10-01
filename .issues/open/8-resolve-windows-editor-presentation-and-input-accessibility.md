@@ -8,7 +8,7 @@ projects:
     - ViperPilot dashboard
 state: open
 state_reason: ""
-synced_at: 2026-09-30T07:26:12.425561666Z
+synced_at: 2026-09-30T09:12:59.529927343Z
 info:
     author: spencer-life
     created_at: 2026-09-29T18:22:45Z
@@ -35,3 +35,17 @@ The optional editor's Windows presentation and real input/accessibility behavior
 ## Software readiness — 2026-09-30
 
 Independent source/UI audit found and fixed unnamed duplicate input and indistinct side-button controls. Headless tests confirm associated names/roles and duplicate-name editing; all 11 editor tests and strict preview checks pass. Actual Windows monitor/capture, screen reader, keyboard/IME/paste and scaling remain unobserved. See [manual handoff](https://github.com/spencer-life/viperpilot/blob/codex/ui-readiness/docs/manual-handoff.md). Installed app unchanged; no GUI/HID or startup operation ran. Issue remains open for its manual and delivery gates.
+
+## Owner-present editor smoke — 2026-09-30
+
+The isolated editor passed window rendering, screenshot pixel checks, actual UIA Profile name/Edit, enabled Save and disabled Apply, and exit code 0 on Windows 11 Pro build 26200. An owner-focused screen capture shows readable initial profile/sensitivity controls and visible Save/disabled Apply. The first screen capture was occluded; Windows rejected automatic foreground focus, and the owner brought the preview forward for the successful capture. Full images remain private.
+
+A dedicated temporary draft root is open for owner Save/reopen testing; that result is not recorded yet. Mouse5 needs scrolling in the initial viewport. Keyboard-only navigation, IME/paste/non-Latin names, screen-reader output, other scales/window sizes and production integration remain unverified. See [manual results](https://github.com/spencer-life/viperpilot/blob/codex/native-uia-test-client/docs/manual-handoff.md). No installed app or mouse change; issue remains open.
+
+### Owner-present persistence result — 2026-09-30
+
+The owner saved and closed the isolated preview. Reopening the same staged editor
+with the same temporary draft library preserved `Manual Test`, DPI X/Y
+`1200`/`1200` and `1000 Hz` polling. Saved JSON and actual reopened UIA values
+agreed; Apply remained disabled. Keyboard, IME, screen-reader and scaling checks
+remain open. No legacy app or hardware state was changed.

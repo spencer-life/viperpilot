@@ -119,6 +119,7 @@ run = [
 description = "Cross-build and package the hardware-free native UI preview without launching it."
 run = [
   "mise exec -- cargo xwin build --target x86_64-pc-windows-msvc --features ui-preview --bin viperpilot-ui-preview --release --locked",
+  "mise exec -- cargo xwin build --target x86_64-pc-windows-msvc --features ui-preview --bin viperpilot-ui-test-client --release --locked",
   "cp assets/viper-utility-icon.ico assets/viperpilot-mouse-silhouette.bmp assets/viper-v4-black-dashboard.bmp target/x86_64-pc-windows-msvc/release/",
 ]
 
@@ -126,9 +127,9 @@ run = [
 description = "Check preview UIA names/states and native button actions; requires an interactive desktop."
 depends = ["build-ui-preview-windows"]
 run = [
-  'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w scripts/test-ui-preview.ps1)" -Executable "$(wslpath -w target/x86_64-pc-windows-msvc/release/viperpilot-ui-preview.exe)" -Scenario default',
-  'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w scripts/test-ui-preview.ps1)" -Executable "$(wslpath -w target/x86_64-pc-windows-msvc/release/viperpilot-ui-preview.exe)" -Scenario reversed',
-  'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w scripts/test-ui-preview.ps1)" -Executable "$(wslpath -w target/x86_64-pc-windows-msvc/release/viperpilot-ui-preview.exe)" -Scenario unavailable',
+  'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w scripts/test-ui-preview.ps1)" -Executable "$(wslpath -w target/x86_64-pc-windows-msvc/release/viperpilot-ui-preview.exe)" -TestClient "$(wslpath -w target/x86_64-pc-windows-msvc/release/viperpilot-ui-test-client.exe)" -Scenario default',
+  'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w scripts/test-ui-preview.ps1)" -Executable "$(wslpath -w target/x86_64-pc-windows-msvc/release/viperpilot-ui-preview.exe)" -TestClient "$(wslpath -w target/x86_64-pc-windows-msvc/release/viperpilot-ui-test-client.exe)" -Scenario reversed',
+  'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w scripts/test-ui-preview.ps1)" -Executable "$(wslpath -w target/x86_64-pc-windows-msvc/release/viperpilot-ui-preview.exe)" -TestClient "$(wslpath -w target/x86_64-pc-windows-msvc/release/viperpilot-ui-test-client.exe)" -Scenario unavailable',
 ]
 
 # 2026-09-29: isolated egui/eframe settings editor exploration.

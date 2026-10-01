@@ -3,6 +3,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string] $Executable,
 
+    [Parameter(Mandatory = $true)]
+    [string] $TestClient,
+
     [ValidateSet('default', 'reversed', 'unavailable')]
     [string] $Scenario = 'default'
 )
@@ -25,6 +28,10 @@ if (-not (Test-Path -LiteralPath $resolvedExecutable -PathType Leaf)) {
 }
 if ([System.IO.Path]::GetFileName($resolvedExecutable) -cne 'viperpilot-ui-preview.exe') {
     throw 'Executable must be named exactly viperpilot-ui-preview.exe.'
+}
+$resolvedTestClient = (Resolve-Path -LiteralPath $TestClient -ErrorAction Stop).ProviderPath
+if ([System.IO.Path]::GetFileName($resolvedTestClient) -cne 'viperpilot-ui-test-client.exe') {
+    throw 'Test client must be named exactly viperpilot-ui-test-client.exe.'
 }
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
@@ -70,7 +77,9 @@ try {
     Write-ProgressMarker "Staging the preview and three artwork files for scenario '$Scenario'."
     New-Item -ItemType Directory -Path $stagingRoot -ErrorAction Stop | Out-Null
     $stagedExecutable = Join-Path $stagingRoot 'viperpilot-ui-preview.exe'
+    $stagedTestClient = Join-Path $stagingRoot 'viperpilot-ui-test-client.exe'
     Copy-Item -LiteralPath $resolvedExecutable -Destination $stagedExecutable -ErrorAction Stop
+    Copy-Item -LiteralPath $resolvedTestClient -Destination $stagedTestClient -ErrorAction Stop
     foreach ($artworkFile in $artworkFiles) {
         Copy-Item -LiteralPath (Join-Path $assetRoot $artworkFile) -Destination (Join-Path $stagingRoot $artworkFile) -ErrorAction Stop
     }
@@ -115,32 +124,80 @@ try {
         throw 'UI Automation could not inspect the preview main window.'
     }
 
+    function Invoke-NativeUiAutomationClient {
+        param(
+            [Parameter(Mandatory = $true)][ValidateSet('inspect', 'invoke')][string] $Action,
+            [Parameter(Mandatory = $true)][int] $ControlId
+        )
+
+        $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $startInfo.FileName = $stagedTestClient
+        $startInfo.Arguments = ('{0} --parent-hwnd {1} --expected-pid {2} --control-id {3}' -f $Action, $mainWindowHandle.ToInt64(), $previewProcess.Id, $ControlId)
+        $startInfo.UseShellExecute = $false
+        $startInfo.CreateNoWindow = $true
+        $startInfo.RedirectStandardOutput = $true
+        $startInfo.RedirectStandardError = $true
+        $startInfo.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+        $startInfo.StandardErrorEncoding = [System.Text.Encoding]::UTF8
+        $client = New-Object System.Diagnostics.Process
+        $client.StartInfo = $startInfo
+        try {
+            if (-not $client.Start()) {
+                throw 'Could not start the native UI Automation test client.'
+            }
+            $stdoutTask = $client.StandardOutput.ReadToEndAsync()
+            $stderrTask = $client.StandardError.ReadToEndAsync()
+            if (-not $client.WaitForExit(5000)) {
+                try {
+                    $client.Kill()
+                } catch {
+                    # The helper may have exited between the timeout and Kill().
+                }
+                if (-not $client.WaitForExit(2000)) {
+                    throw "Native UI Automation helper PID $($client.Id) did not exit after the timeout kill."
+                }
+                throw "Native UI Automation $Action timed out for control ID $ControlId; stopped helper PID $($client.Id)."
+            }
+            $drainTasks = [System.Threading.Tasks.Task[]]@($stdoutTask, $stderrTask)
+            if (-not [System.Threading.Tasks.Task]::WaitAll($drainTasks, 2000)) {
+                throw "Native UI Automation output drain timed out for control ID $ControlId."
+            }
+            $stdout = $stdoutTask.GetAwaiter().GetResult()
+            $stderr = $stderrTask.GetAwaiter().GetResult()
+            if ($client.ExitCode -ne 0) {
+                throw "Native UI Automation $Action failed for control ID ${ControlId}: $($stderr.Trim())"
+            }
+            return ($stdout | ConvertFrom-Json -ErrorAction Stop)
+        } finally {
+            $client.Dispose()
+        }
+    }
+
     function Get-PreviewButton {
         param([Parameter(Mandatory = $true)][int] $ControlId)
 
-        $buttonHandle = [ViperPreviewSmokeNative]::GetDlgItem($mainWindowHandle, $ControlId)
-        if ($buttonHandle -eq [IntPtr]::Zero) {
-            throw "GetDlgItem did not find control ID $ControlId."
+        $native = Invoke-NativeUiAutomationClient -Action inspect -ControlId $ControlId
+        $controlType = if ($native.ControlTypeId -eq 50000) {
+            [System.Windows.Automation.ControlType]::Button
+        } else {
+            [System.Windows.Automation.ControlType]::Pane
         }
-        $button = [System.Windows.Automation.AutomationElement]::FromHandle($buttonHandle)
-        if ($null -eq $button) {
-            throw "UI Automation could not inspect control ID $ControlId."
+        $button = [pscustomobject]@{
+            Current = [pscustomobject]@{
+                Name = [string]$native.Name
+                IsEnabled = [bool]$native.Enabled
+                ControlType = $controlType
+            }
+            InvokeAvailable = [bool]$native.InvokeAvailable
         }
-        $invokeAvailable = $false
-        try {
-            [void]$button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
-            $invokeAvailable = $true
-        } catch {
-            $invokeAvailable = $false
-        }
-        # 2026-09-30: panes/no-Invoke was a known defect, not a passing result.
+        # A non-button role is a failing assertion, not a successful name-only probe.
         if ($button.Current.ControlType -ne [System.Windows.Automation.ControlType]::Button) {
-            throw "Control ID $ControlId is not exposed as a UIA Button."
+            throw "Control ID $ControlId is not exposed as a UIA Button (type $($native.ControlTypeId))."
         }
-        if (-not $invokeAvailable) {
+        if (-not $button.InvokeAvailable) {
             throw "Control ID $ControlId lacks the required UIA InvokePattern."
         }
-        Write-ProgressMarker ("Control {0}: UIA type={1}; name='{2}'; enabled={3}; InvokePattern={4}" -f $ControlId, $button.Current.ControlType.ProgrammaticName, $button.Current.Name, $button.Current.IsEnabled, $invokeAvailable)
+        Write-ProgressMarker ("Control {0}: UIA type={1}; name='{2}'; enabled={3}; InvokePattern={4}" -f $ControlId, $button.Current.ControlType.ProgrammaticName, $button.Current.Name, $button.Current.IsEnabled, $button.InvokeAvailable)
         return $button
     }
 
@@ -150,8 +207,7 @@ try {
         if (-not $button.Current.IsEnabled) {
             throw "Refusing UIA Invoke for disabled control ID $ControlId."
         }
-        $pattern = $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
-        $pattern.Invoke()
+        [void](Invoke-NativeUiAutomationClient -Action invoke -ControlId $ControlId)
     }
 
     function Click-PreviewButton {
@@ -161,8 +217,8 @@ try {
         if ($buttonHandle -eq [IntPtr]::Zero) {
             throw "GetDlgItem did not find control ID $ControlId for BM_CLICK."
         }
-        $button = [System.Windows.Automation.AutomationElement]::FromHandle($buttonHandle)
-        if ($null -eq $button.Current.IsEnabled -or -not $button.Current.IsEnabled) {
+        $button = Get-PreviewButton -ControlId $ControlId
+        if (-not $button.Current.IsEnabled) {
             throw "Refusing BM_CLICK for disabled control ID $ControlId."
         }
         $messageResult = [IntPtr]::Zero

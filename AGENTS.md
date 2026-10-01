@@ -57,6 +57,11 @@ saved-profile foundation. Keep PR #3 and the new split PRs in draft while their 
 open. The owner is away from the PC as of 2026-09-29; defer manual desktop and
 physical-device tests until an observed session is available.
 
+2026-09-30: the owner returned and authorized isolated preview/editor Windows
+tests. Record actual results and distinguish automation from owner observations.
+This does not authorize production tray launch, installation, startup changes,
+device writes or legacy-app interference; those gates remain in effect.
+
 The owner's 2026-09-28 priority is quick access and fast profile switching with
 minimal background overhead, not merely replacing the Synapse settings editor.
 Read `docs/quick-switch-status.md` for this decision, the current source-only

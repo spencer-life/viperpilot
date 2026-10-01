@@ -8,7 +8,7 @@ projects:
     - ViperPilot dashboard
 state: open
 state_reason: ""
-synced_at: 2026-09-30T07:26:12.425204186Z
+synced_at: 2026-09-30T09:02:33.488244733Z
 info:
     author: spencer-life
     created_at: 2026-09-29T18:22:41Z
@@ -47,3 +47,9 @@ review passed. The PowerShell script, GUI/UIA and screen reader were not run;
 actual roles, names, invocation, keyboard, contrast and scaling remain manual
 validation gates. The production tray/installer stay blocked and the installed
 app remains unchanged.
+
+## Owner-present preview result — 2026-09-30
+
+Windows 11 Pro build 26200 / PowerShell 5.1 STA: all three isolated native scenarios now pass strict native UIA Button/Invoke, action names and enabled states, all six semantic hotspot names, actual UIA Details invocation, synthetic profile/view transitions and clean exit. The earlier managed-client Pane result alone was insufficient to attribute an app defect: the same current HWND reports Button/Invoke through native CUIAutomation. A separate feature-gated, PID/class/child/control-guarded native test client corrects the harness; process/output waits are bounded. Windows lint and independent review pass.
+
+See [tested harness and private-evidence summary](https://github.com/spencer-life/viperpilot/tree/codex/native-uia-test-client). Keyboard, screen-reader speech, contrast/scaling and production tray/device behavior remain separate manual gates. Installed app untouched; no production, startup or mouse action ran. Issue stays open.
