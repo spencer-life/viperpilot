@@ -118,8 +118,10 @@ try {
         throw 'The runtime smoke staging directory must contain only the preview executable.'
     }
 
-    Write-ProgressMarker 'Starting the staged egui preview (synthetic state only).'
-    $previewProcess = Start-Process -FilePath $stagedExecutable -WorkingDirectory $stagingRoot -PassThru
+    # 2026-09-29: isolate the persistent editor from real user draft storage.
+    $draftRoot = Join-Path $stagingRoot 'drafts'
+    Write-ProgressMarker 'Starting the staged local draft editor with temporary storage.'
+    $previewProcess = Start-Process -FilePath $stagedExecutable -ArgumentList @('--draft-root', ('"{0}"' -f $draftRoot)) -WorkingDirectory $stagingRoot -PassThru
     $windowHandle = [IntPtr]::Zero
     $windowTitle = ''
     $windowDeadline = [DateTime]::UtcNow.AddSeconds($windowTimeoutSeconds)
@@ -229,7 +231,7 @@ try {
             if ($current.ControlType -eq [System.Windows.Automation.ControlType]::Button -and $current.Name -eq 'Apply changes') {
                 $applyButton = $element
             }
-            if ($current.ControlType -eq [System.Windows.Automation.ControlType]::Button -and $current.Name -eq 'Save draft (unavailable)') {
+            if ($current.ControlType -eq [System.Windows.Automation.ControlType]::Button -and $current.Name -eq 'Save draft') {
                 $saveButton = $element
             }
         }
@@ -248,10 +250,10 @@ try {
         }
         Write-ProgressMarker ("UIA action: role={0}; name='{1}'; enabled={2}" -f $applyButton.Current.ControlType.ProgrammaticName, $applyButton.Current.Name, $applyButton.Current.IsEnabled)
         if ($null -eq $saveButton) {
-            throw 'UI Automation is available, but the unavailable Save draft button was not exposed by name.'
+            throw 'UI Automation is available, but the Save draft button was not exposed by name.'
         }
-        if ($saveButton.Current.IsEnabled) {
-            throw 'Save draft must remain disabled because this preview has no persistence.'
+        if (-not $saveButton.Current.IsEnabled) {
+            throw 'Save draft must be enabled for the initial valid local draft.'
         }
         Write-ProgressMarker ("UIA action: role={0}; name='{1}'; enabled={2}" -f $saveButton.Current.ControlType.ProgrammaticName, $saveButton.Current.Name, $saveButton.Current.IsEnabled)
     $uiAutomationStatus = 'available; required controls verified'

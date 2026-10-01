@@ -11,7 +11,9 @@ try {
         $process = $null
         try {
             $clock = [System.Diagnostics.Stopwatch]::StartNew()
-            $process = Start-Process -FilePath $staged -WorkingDirectory $stage -PassThru
+            # 2026-09-29: measurements must never load the user's persistent drafts.
+            $draftRoot = Join-Path $stage ('drafts-' + $sample)
+            $process = Start-Process -FilePath $staged -ArgumentList @('--draft-root', ('"{0}"' -f $draftRoot)) -WorkingDirectory $stage -PassThru
             $deadline = [DateTime]::UtcNow.AddSeconds(15)
             do {
                 Start-Sleep -Milliseconds 50

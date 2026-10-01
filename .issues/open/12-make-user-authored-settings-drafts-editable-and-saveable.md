@@ -4,13 +4,17 @@ labels:
     - codex-created
     - enhancement
 state: open
-state_reason: null
-synced_at: 2026-09-29T21:45:10.524461402Z
+state_reason: ""
+synced_at: 2026-09-30T00:06:58.441749214Z
+info:
+    author: spencer-life
+    created_at: 2026-09-29T18:22:54Z
+    updated_at: 2026-09-29T21:45:05Z
 ---
 
 ## Context
 
-The application has a local draft model for profile settings, but the user-facing editor is still a preview and does not yet provide a complete persistent editing workflow. The product direction allows users to save clearly marked drafts for unverified settings while keeping Apply unavailable until device-specific safety gates pass.
+The optional local draft editor now provides a persistent editing workflow on the existing versioned intent model. It saves clearly marked unverified drafts while keeping Apply unavailable until device-specific safety gates pass. Production tray launch integration and owner-observed Windows presentation remain separate gates.
 
 Implementation baseline: [public PR #3](https://github.com/spencer-life/viperpilot/pull/3) (draft).
 
@@ -26,4 +30,8 @@ Any full device evidence stays in private local records; only a redacted summary
 
 ## Checkpoint — 2026-09-29
 
-Next implementation slice: real local create, edit, duplicate, rename, delete, and reopen of persisted drafts while offline. Save is currently disabled/disconnected; Apply must remain disabled until device-specific gates pass. The sequence continues through capability contract #4 and profile promotion #13. No interactive Windows UI or device tests were run; headless preview checks remain software-only.
+Software implemented in the same draft PR #3: local create, edit/rename, duplicate, delete, Save and reopen using stable identities. Enabled fields round-trip name, X/Y DPI, polling and semantic Mouse4/Mouse5 actions; unsupported settings are unsavable. Saves use validated copies, atomic replacement, a short-lived editor lock and external-change checks. Failed saves preserve the buffer and prior data. Corrupt, invalid and future-schema files block editing without reset. Default production builds exclude the editor and eframe; draft operations have no planner, worker or HID path.
+
+Validation and review results are recorded in [the local editor document](https://github.com/spencer-life/viperpilot/blob/codex/sanitized-quick-switch/docs/local-draft-editor.md) and [the continuation brief](https://github.com/spencer-life/viperpilot/blob/codex/sanitized-quick-switch/docs/continue-here.md). This issue remains open while the implementation PR is draft. The next software slice is capability contract #4, followed by hardware-gated promotion #13. No manual Windows UI, production tray/hotkey, installation/startup or physical-device tests were run; the owner remains away from the PC.
+
+Software checkpoint `6792c6f`: `mise run ci` passed 108 core tests and lint/build/smoke; `mise run ci-preview` passed strict Clippy, 114 library tests and seven editor tests. Production and editor Windows cross-builds passed without launching. Independent review found no remaining material findings. These are local software results; hosted CI for the new head must be checked separately.

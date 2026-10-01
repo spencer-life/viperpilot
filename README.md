@@ -14,9 +14,27 @@ Start with [the continuation brief](docs/continue-here.md), then read
 `AGENTS.md`. Current development is on `codex/sanitized-quick-switch` in
 [draft PR #3](https://github.com/spencer-life/viperpilot/pull/3), stacked on
 [foundation PR #1](https://github.com/spencer-life/viperpilot/pull/1).
-The next code task is [editable, saved local drafts (issue #12)](https://github.com/spencer-life/viperpilot/issues/12).
-The editor remains a preview with Save and Apply disabled; this is not finished
-user-facing customization. Owner-observed manual tests remain pending.
+The optional editor now supports [editable, saved local drafts (issue #12)](https://github.com/spencer-life/viperpilot/issues/12).
+Save persists local intent; Apply remains disabled. Owner-observed Windows UI
+and mouse tests remain pending; PR #3 stays draft.
+
+## Local draft editor
+
+Build the separate Windows editor with `mise run build-egui-preview-windows`,
+then open `viperpilot-egui-preview.exe` on demand. It is excluded from the default
+tray build and is not started or installed by this change. Create a draft, edit
+its name, X/Y DPI, polling or Mouse4/Mouse5 actions, and choose **Save draft**.
+Select a saved draft to reopen it; **Duplicate draft** and **Delete draft** affect
+only the local draft store. Renaming uses the name field and Save. Unsaved edits
+require Save or Discard before switching or closing.
+
+Drafts use the existing versioned `profile-drafts-v1.json` under
+`%LOCALAPPDATA%/ViperV4Utility`. Corrupt, invalid or future-format files show an
+error and are preserved. Drafts are separate from recovery presets, aliases,
+configuration, diagnostics and immutable baselines. No draft action plans or
+sends a device write. Unsupported fields are explicitly unsavable. For isolated
+editor checks, pass `--draft-root <temporary-directory>`; this uses a separate
+store. See [draft persistence details](docs/local-draft-editor.md).
 
 ## Validation and safety
 
