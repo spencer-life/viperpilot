@@ -63,3 +63,19 @@ Production Windows MSVC cross-build passed without launching. Independent review
 verified the startup finding is resolved: the production tray rejects at its
 first statement before legacy process/window/registry/hotkey or HID effects.
 These are software checks; native interactive Windows behavior remains deferred.
+
+## Development Windows identities — 2026-09-30
+
+Source now reserves `ViperPilotDevelopment` window class, single-instance mutex,
+show-window message and startup value names, including a distinct preview class.
+This prepares a separate namespace instead of reusing the legacy app's process
+signaling or Run value. The production tray still rejects at its first statement;
+no registry, process, hotkey or device operation was performed. The executable
+build filename is unchanged; do not copy it over the installed executable.
+
+The global shortcut and physical mouse remain shared resources. A separate
+reviewed launch arrangement, owner-present coexistence/hotkey checks and all
+hardware gates are still required. No installer or production launch is enabled.
+Rollback is a source revert; do not erase either app's data or registry entries.
+The supervised checklist now uses isolated fixtures and defers production steps
+rather than staging test files in the legacy app's folder.
