@@ -45,8 +45,8 @@ conditions and evidence. Label protocol or product assumptions as unproven.
 
 For a new session, read `docs/continue-here.md` before making changes. Continue
 the public stack documented in `docs/continue-here.md`; GitHub is the
-implementation source. `codex/sanitized-quick-switch` remains the catalog/top
-layer. Make each feature change on its owning layer; create a small new PR for
+implementation source. `codex/sanitized-quick-switch` owns the catalog layer;
+use the handoff table for the current top and any safety layers above it. Make each feature change on its owning layer; create a small new PR for
 a new concern instead of accumulating unrelated work on the top branch. Do not reapply the historical ZIP patch or restart the
 saved-profile foundation. Keep PR #3 and the new split PRs in draft while their validation gates are
 open. The owner is away from the PC as of 2026-09-29; defer manual desktop and

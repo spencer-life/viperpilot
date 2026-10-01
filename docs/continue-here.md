@@ -5,8 +5,8 @@ Updated 2026-09-29. This brief is the starting point for a new coding session.
 ## Project and source
 
 - Public development repository: https://github.com/spencer-life/viperpilot
-- Current top/catalog PR: https://github.com/spencer-life/viperpilot/pull/3; the focused implementation stack is listed below.
-- Starting branch: `codex/sanitized-quick-switch`; fetch and reconcile the latest remote head before editing. The historical software checkpoint is `7cb0440a8b21f54154c1042757c810f3b9552c24`. Issue #12 adds a later local editor implementation; use the validation record below and reconcile the latest head rather than treating historical checks as validation of new code.
+- Catalog PR: https://github.com/spencer-life/viperpilot/pull/3; the focused implementation stack is listed below.
+- Choose the owning branch from the table below; the current safety work starts on `codex/current-state-verification`. Fetch and reconcile the latest remote head before editing. The historical software checkpoint is `7cb0440a8b21f54154c1042757c810f3b9552c24`. Issue #12 adds a later local editor implementation; use the validation record below and reconcile the latest head rather than treating historical checks as validation of new code.
 - PR #3 now targets `codex/profile-capabilities` (PR #16). The stack ultimately targets `main` through the original foundation PR #1.
 - This is in-progress development. Keep PR #3 in draft until its documented gates pass. Do not merge, release, install the tray, enable startup, or reapply the historical ZIP as part of resuming work.
 
@@ -18,7 +18,7 @@ The owner requested smaller PRs. Existing feature checkpoints were published as
 prefix branches and linked with GitHub's official `gh-stack` extension. The
 split preserves all existing commits and the runtime source tree; only branch
 boundaries, PR bases, descriptions and this handoff were reorganized. No merge,
-release or hardware operation occurred. PR #3 and all three new PRs remain draft.
+release or hardware operation occurred. PR #3 and all new implementation PRs remain draft.
 
 | Order | PR | Branch | Scope / split checkpoint |
 | --- | --- | --- | --- |
@@ -27,6 +27,10 @@ release or hardware operation occurred. PR #3 and all three new PRs remain draft
 | 3 | [#15](https://github.com/spencer-life/viperpilot/pull/15) | `codex/local-profile-drafts` | Persisted editable draft CRUD, issue #12; `6406e17` |
 | 4 | [#16](https://github.com/spencer-life/viperpilot/pull/16) | `codex/profile-capabilities` | Read-only capability contract/evidence, issue #4, plus shared Core check-name alignment; `aa17779` |
 | 5 | [#3](https://github.com/spencer-life/viperpilot/pull/3) | `codex/sanitized-quick-switch` | Offline catalog preview/export, issue #13 software slice, and continuation/gate documentation; runtime checkpoint `4ed29f1` |
+
+| 6 | [#18](https://github.com/spencer-life/viperpilot/pull/18) | `codex/development-isolation` | Separate default data and block installer/tray effects before touching the legacy app; `25ab4fb` |
+
+| 7 | [Current-state verification](https://github.com/spencer-life/viperpilot/tree/codex/current-state-verification) | `codex/current-state-verification` | Fresh final-read reporting and unavailable/wrong-device UI after failed verification; separate draft safety follow-up |
 
 Official [stack #17](https://github.com/spencer-life/viperpilot/pull/3) is
 registered on GitHub. The first sanitized import is still broad; its original
@@ -249,3 +253,11 @@ Every hardware write still requires immutable baseline, full identity and exact-
 - Planning board: https://www.figma.com/board/1DhV61xcYdFD3SbtWbGBHN/ViperPilot-%25E2%2580%2594-Project-Brain---Roadmap
 
 Figma/HTML roadmaps are planning and design references, not implementation or validation evidence. This documentation refresh does not claim that the Figma boards were changed.
+
+## Installed-app preservation and CI proposal — 2026-09-29
+
+Draft PR #18 adds [development isolation](development-isolation.md). The installed legacy app remains untouched. Default data now uses `ViperPilotDevelopment`; installer and production tray entry points reject before effects. Both core/preview checks and Windows production/editor cross-builds passed without launching. Installation or concurrent production use still requires separate executable/startup/hotkey identity and reviewed manual gates.
+
+Independent draft [PR #19](https://github.com/spencer-life/viperpilot/pull/19) supplies the concrete staged CI proposal for issue #5. It preserves historical check names: A for #1, B after #1 lands for #14/#15, C after both land for #16 and later. No settings changed. Each activation needs explicit authorization, captured rollback and fresh reconciled checks; no merge is authorized.
+
+The current-state safety layer above #18 fixes historical observations being presented as current after failed final reads. See [fresh verification](current-state-verification.md). Core checks passed 128 library + 2 CLI + 3 capability + 6 catalog tests; preview checks passed 134 library + 2 CLI + 9 editor + 3 capability + 6 catalog tests. Strict lint, formatting, native release and production Windows cross-build passed without launching. These checks do not satisfy manual device gates.

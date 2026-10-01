@@ -222,6 +222,7 @@ enum WorkerEvent {
         profile: ProfileName,
         detail: String,
         report_path: Option<String>,
+        final_connection: ConnectionStatus,
         final_profile: Option<ProfileMatch>,
         polling_hz: Option<u16>,
         dpi: Option<DpiPair>,
@@ -2632,6 +2633,7 @@ impl TrayApp {
                     profile,
                     detail,
                     report_path,
+                    final_connection,
                     final_profile,
                     polling_hz,
                     dpi,
@@ -2639,11 +2641,24 @@ impl TrayApp {
                     button_assignments,
                 }) => {
                     self.busy = None;
-                    self.current = final_profile.unwrap_or(ProfileMatch::OutOfSync);
-                    self.polling_hz = polling_hz;
-                    self.dpi = dpi;
-                    self.power = power;
-                    self.button_assignments = button_assignments;
+                    let state_is_usable = final_connection == ConnectionStatus::Connected;
+                    self.current = if state_is_usable {
+                        final_profile.unwrap_or(ProfileMatch::OutOfSync)
+                    } else {
+                        ProfileMatch::OutOfSync
+                    };
+                    self.connection = final_connection;
+                    if state_is_usable {
+                        self.polling_hz = polling_hz;
+                        self.dpi = dpi;
+                        self.power = power;
+                        self.button_assignments = button_assignments;
+                    } else {
+                        self.polling_hz = None;
+                        self.dpi = None;
+                        self.power = None;
+                        self.button_assignments = None;
+                    }
                     self.last_error = None;
                     self.last_verification = Some(VerificationOutcome {
                         profile,
@@ -2702,6 +2717,9 @@ impl TrayApp {
     }
 
     fn handle_hotkey(&mut self, window: HWND) {
+        if self.connection != ConnectionStatus::Connected {
+            return;
+        }
         // The worker rereads the mouse and library before resolving the pair.
         // This UI-side busy gate only deduplicates repeated shortcut input.
         if self.busy.is_some() {
@@ -3608,24 +3626,33 @@ fn apply_profile_from_snapshot<D: crate::engine::DeviceControl>(
         .as_ref()
         .map(|state| state.button_assignments.clone());
     if !report.success {
-        let final_profile = report
+        let final_profile_result = report
             .final_state
             .as_ref()
-            .and_then(|state| classify_profile(state, &baseline).ok());
+            .map(|state| classify_profile(state, &baseline));
+        let final_profile = final_profile_result
+            .as_ref()
+            .and_then(|result| result.as_ref().ok().copied());
+        let final_connection = gui_logic::failure_connection_status(
+            report.final_state.is_some(),
+            final_profile.is_some(),
+        );
         let polling_hz = report
             .final_state
             .as_ref()
             .and_then(|state| state.polling.hertz());
         return Ok(WorkerEvent::ApplyFailed {
             profile,
-            detail: gui_logic::failure_detail(
+            detail: gui_logic::failure_detail_for_final_state(
                 report
                     .rollback_result
                     .as_ref()
                     .map(|rollback| rollback.final_state_restored),
                 final_profile,
+                report.final_state.is_some(),
             ),
             report_path: Some(report_path.display().to_string()),
+            final_connection,
             final_profile,
             polling_hz,
             dpi: final_dpi,
