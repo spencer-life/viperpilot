@@ -51,7 +51,8 @@ use windows::Win32::UI::HiDpi::{
     SetProcessDpiAwarenessContext,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    EnableWindow, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, RegisterHotKey, SetFocus, UnregisterHotKey,
+    EnableWindow, IsWindowEnabled, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, RegisterHotKey, SetFocus,
+    UnregisterHotKey,
 };
 use windows::Win32::UI::Shell::{
     NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_TIP, NIIF_ERROR, NIIF_INFO, NIM_ADD, NIM_DELETE,
@@ -62,8 +63,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     DefWindowProcW, DestroyMenu, DestroyWindow, DispatchMessageW, FindWindowW, GWLP_USERDATA,
     GetClientRect, GetCursorPos, GetDlgItem, GetMessageW, GetWindowLongPtrW, HICON, HMENU,
     ICON_BIG, ICON_SMALL, IDC_ARROW, IDI_APPLICATION, IMAGE_BITMAP, IMAGE_ICON, IsDialogMessageW,
-    IsIconic, LR_LOADFROMFILE, LoadCursorW, LoadIconW, LoadImageW, MF_CHECKED, MF_GRAYED, MF_POPUP,
-    MF_STRING, MSG, MoveWindow, PostMessageW, PostQuitMessage, RegisterClassW,
+    IsIconic, IsWindowVisible, LR_LOADFROMFILE, LoadCursorW, LoadIconW, LoadImageW, MF_CHECKED,
+    MF_GRAYED, MF_POPUP, MF_STRING, MSG, MoveWindow, PostMessageW, PostQuitMessage, RegisterClassW,
     RegisterWindowMessageW, SPI_GETHIGHCONTRAST, SW_HIDE, SW_RESTORE, SW_SHOW, SWP_NOACTIVATE,
     SWP_NOMOVE, SWP_NOZORDER, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos,
     SetWindowTextW, ShowWindow, SystemParametersInfoW, TPM_RETURNCMD, TPM_RIGHTBUTTON,
@@ -125,6 +126,8 @@ const MENU_QUICK_SECOND_BASE: usize = MENU_QUICK_FIRST_BASE + MAX_SAVED_PROFILES
 const BUTTON_DEVELOPER: usize = 2001;
 const BUTTON_GAMING: usize = 2002;
 const BUTTON_VIEW_MODE: usize = 2003;
+const BUTTON_CUSTOMIZE: usize = 2004;
+const BUTTON_DEVICE: usize = 2005;
 const HOTSPOT_LEFT: usize = 2101;
 const HOTSPOT_RIGHT: usize = 2102;
 const HOTSPOT_MIDDLE: usize = 2103;
@@ -141,6 +144,7 @@ const BS_PUSHBUTTON_STYLE: u32 = 0x0000_0000;
 const BS_MULTILINE_STYLE: u32 = 0x0000_2000;
 const SS_NOPREFIX_STYLE: u32 = 0x0000_0080;
 const SS_EDITCONTROL_STYLE: u32 = 0x0000_2000;
+const SS_CENTERIMAGE_STYLE: u32 = 0x0000_0200;
 
 const MAIN_WINDOW_STYLE: WINDOW_STYLE = WINDOW_STYLE(
     WS_OVERLAPPED.0 | WS_CAPTION.0 | WS_SYSMENU.0 | WS_MINIMIZEBOX.0 | WS_CLIPCHILDREN.0,
@@ -162,8 +166,8 @@ const BASE_RIGHT_PANEL_LEFT: i32 = BASE_LEFT_PANEL_LEFT + BASE_LEFT_PANEL_WIDTH 
 const BASE_RIGHT_PANEL_WIDTH: i32 = BASE_CLIENT_WIDTH - BASE_RIGHT_PANEL_LEFT - BASE_MARGIN;
 const BASE_STATUS_CARD_HEIGHT: i32 = 86;
 const BASE_STATUS_CARD_GAP: i32 = 12;
-const BASE_STATUS_CARD_WIDTH: i32 = (BASE_RIGHT_PANEL_WIDTH - 3 * BASE_STATUS_CARD_GAP) / 4;
-const BASE_ASSIGNMENT_PANEL_TOP: i32 = BASE_MAIN_TOP + BASE_STATUS_CARD_HEIGHT + 12;
+const BASE_STATUS_CARD_WIDTH: i32 = (BASE_RIGHT_PANEL_WIDTH - BASE_STATUS_CARD_GAP) / 2;
+const BASE_ASSIGNMENT_PANEL_TOP: i32 = BASE_MAIN_TOP + 2 * BASE_STATUS_CARD_HEIGHT + 24;
 const BASE_MAIN_PANEL_BOTTOM: i32 = 498;
 const BASE_MAIN_PANEL_HEIGHT: i32 = BASE_MAIN_PANEL_BOTTOM - BASE_MAIN_TOP;
 const BASE_ASSIGNMENT_PANEL_HEIGHT: i32 = BASE_MAIN_PANEL_BOTTOM - BASE_ASSIGNMENT_PANEL_TOP;
@@ -365,6 +369,9 @@ struct StatusWindow {
     developer_button: HWND,
     gaming_button: HWND,
     view_mode_button: HWND,
+    customize_button: HWND,
+    device_button: HWND,
+    disabled_nav: [HWND; 3],
     brand_font: HFONT,
     title_font: HFONT,
     body_font: HFONT,
@@ -470,14 +477,22 @@ struct TrayApp {
     last_verification: Option<VerificationOutcome>,
     last_error: Option<String>,
     presentation: Option<StatusPresentation>,
-    detailed: bool,
+    view: NativeView,
     status: Option<StatusWindow>,
     base_brush: HBRUSH,
     surface_brush: HBRUSH,
+    row_brush: HBRUSH,
     mouse_bitmap: Option<DashboardBitmap>,
     compact_mouse_bitmap: Option<DashboardBitmap>,
     preview_mode: bool,
     quit_requested: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NativeView {
+    Compact,
+    Device,
+    Buttons,
 }
 
 /// Stable state installed in GWLP_USERDATA. Win32 can synchronously send
@@ -514,6 +529,8 @@ fn is_known_child_command(id: usize, notification: u16) -> bool {
             BUTTON_DEVELOPER
                 | BUTTON_GAMING
                 | BUTTON_VIEW_MODE
+                | BUTTON_CUSTOMIZE
+                | BUTTON_DEVICE
                 | HOTSPOT_LEFT
                 | HOTSPOT_RIGHT
                 | HOTSPOT_MIDDLE
@@ -566,6 +583,9 @@ fn valid_window_command(window: HWND, wparam: WPARAM, lparam: LPARAM) -> Option<
     unsafe { GetDlgItem(Some(window), id as i32) }
         .ok()
         .filter(|expected| *expected == child)
+        .filter(|child| unsafe {
+            IsWindowVisible(*child).as_bool() && IsWindowEnabled(*child).as_bool()
+        })
         .map(|_| id)
 }
 
@@ -579,7 +599,42 @@ mod window_command_tests {
         assert!(is_known_child_command(HOTSPOT_DPI, BN_CLICKED as u16));
         assert!(!is_known_child_command(9999, BN_CLICKED as u16));
         assert!(!is_known_child_command(BUTTON_DEVELOPER, 5));
+        assert!(is_known_child_command(BUTTON_CUSTOMIZE, BN_CLICKED as u16));
+        assert!(is_known_child_command(BUTTON_DEVICE, BN_CLICKED as u16));
         assert!(!is_known_menu_command(BUTTON_DEVELOPER));
+    }
+
+    #[test]
+    fn view_navigation_is_limited_to_the_three_reviewed_pages() {
+        assert_eq!(
+            view_after_command(NativeView::Compact, BUTTON_VIEW_MODE),
+            Some(NativeView::Device)
+        );
+        assert_eq!(
+            view_after_command(NativeView::Device, BUTTON_VIEW_MODE),
+            Some(NativeView::Compact)
+        );
+        assert_eq!(
+            view_after_command(NativeView::Buttons, BUTTON_VIEW_MODE),
+            Some(NativeView::Compact)
+        );
+        assert_eq!(
+            view_after_command(NativeView::Device, BUTTON_CUSTOMIZE),
+            Some(NativeView::Buttons)
+        );
+        assert_eq!(
+            view_after_command(NativeView::Buttons, BUTTON_DEVICE),
+            Some(NativeView::Device)
+        );
+        assert_eq!(
+            view_after_command(NativeView::Compact, BUTTON_CUSTOMIZE),
+            None
+        );
+        assert_eq!(view_after_command(NativeView::Device, BUTTON_DEVICE), None);
+        assert_eq!(
+            view_after_command(NativeView::Buttons, BUTTON_CUSTOMIZE),
+            None
+        );
     }
 
     #[test]
@@ -660,7 +715,7 @@ impl Drop for StatusWindow {
 
 impl Drop for TrayApp {
     fn drop(&mut self) {
-        for brush in [self.base_brush, self.surface_brush] {
+        for brush in [self.base_brush, self.surface_brush, self.row_brush] {
             if !brush.0.is_null() {
                 let _ = unsafe { DeleteObject(HGDIOBJ(brush.0)) };
             }
@@ -708,10 +763,11 @@ pub fn run(show_window_at_start: bool) -> Result<(), String> {
             last_verification: None,
             last_error: None,
             presentation: None,
-            detailed: false,
+            view: NativeView::Compact,
             status: None,
             base_brush: unsafe { CreateSolidBrush(CAT_BASE) },
             surface_brush: unsafe { CreateSolidBrush(CAT_SURFACE0) },
+            row_brush: unsafe { CreateSolidBrush(CAT_SURFACE1) },
             mouse_bitmap: load_mouse_bitmap(DASHBOARD_MOUSE_BMP),
             compact_mouse_bitmap: load_mouse_bitmap(COMPACT_MOUSE_BMP),
             preview_mode: false,
@@ -733,7 +789,7 @@ pub fn run(show_window_at_start: bool) -> Result<(), String> {
         let mut app = runtime.app.borrow_mut();
         app.status = Some(controls);
         if let Some(status) = app.status.as_mut() {
-            layout_status(window, status, false);
+            layout_status(window, status, NativeView::Compact);
         }
         app.update_ui(window);
     }
@@ -826,10 +882,11 @@ pub fn run_preview(reversed_pair: bool, unavailable_library: bool) -> Result<(),
             last_verification: None,
             last_error: None,
             presentation: None,
-            detailed: false,
+            view: NativeView::Compact,
             status: None,
             base_brush: unsafe { CreateSolidBrush(CAT_BASE) },
             surface_brush: unsafe { CreateSolidBrush(CAT_SURFACE0) },
+            row_brush: unsafe { CreateSolidBrush(CAT_SURFACE1) },
             mouse_bitmap: load_mouse_bitmap(DASHBOARD_MOUSE_BMP),
             compact_mouse_bitmap: load_mouse_bitmap(COMPACT_MOUSE_BMP),
             preview_mode: true,
@@ -850,7 +907,7 @@ pub fn run_preview(reversed_pair: bool, unavailable_library: bool) -> Result<(),
         let mut app = runtime.app.borrow_mut();
         app.status = Some(controls);
         if let Some(status) = app.status.as_mut() {
-            layout_status(window, status, false);
+            layout_status(window, status, NativeView::Compact);
             set_text(
                 status.brand_subtitle,
                 "PREVIEW / NO DEVICE ACCESS — synthetic in-memory state",
@@ -879,10 +936,16 @@ unsafe fn preview_window_proc(
         WM_DEVICECHANGE | WM_HOTKEY | TRAY_CALLBACK | WORKER_EVENT => LRESULT(0),
         WM_COMMAND => {
             let command = wparam.0 & 0xffff;
-            if command == BUTTON_VIEW_MODE {
-                app.detailed = !app.detailed;
+            if let Some(view) = view_after_command(app.view, command) {
+                app.view = view;
                 if let Some(status) = app.status.as_mut() {
-                    layout_status(window, status, app.detailed);
+                    layout_status(window, status, app.view);
+                    let focus = match app.view {
+                        NativeView::Compact => status.developer_button,
+                        NativeView::Device => status.view_mode_button,
+                        NativeView::Buttons => status.device_button,
+                    };
+                    let _ = unsafe { SetFocus(Some(focus)) };
                     set_text(
                         status.brand_subtitle,
                         "PREVIEW / NO DEVICE ACCESS — synthetic in-memory state",
@@ -899,7 +962,7 @@ unsafe fn preview_window_proc(
                     _ => None,
                 };
                 if let Some(slot) = slot {
-                    let target = if app.detailed {
+                    let target = if app.view == NativeView::Buttons {
                         Some(if slot == 0 {
                             ProfileName::Developer
                         } else {
@@ -956,7 +1019,7 @@ unsafe fn preview_window_proc(
                 )
             };
             if let Some(status) = app.status.as_mut() {
-                layout_status(window, status, app.detailed);
+                layout_status(window, status, app.view);
                 set_text(
                     status.brand_subtitle,
                     "PREVIEW / NO DEVICE ACCESS — synthetic in-memory state",
@@ -1119,6 +1182,7 @@ fn destroy_status_window(runtime: &WindowRuntime, window: HWND) {
 
 fn create_status_controls(window: HWND) -> Result<StatusWindow, String> {
     let static_style = WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0 | SS_NOPREFIX_STYLE);
+    let row_static_style = WINDOW_STYLE(static_style.0 | SS_CENTERIMAGE_STYLE);
     let wrap_style =
         WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0 | SS_NOPREFIX_STYLE | SS_EDITCONTROL_STYLE);
     let brand_title = create_child(window, w!("STATIC"), "Viper V4 Pro", static_style, 0)?;
@@ -1130,18 +1194,18 @@ fn create_status_controls(window: HWND) -> Result<StatusWindow, String> {
         0,
     )?;
     let labels = [
-        create_child(window, w!("STATIC"), "PROFILE", static_style, 0)?,
-        create_child(window, w!("STATIC"), "DPI", static_style, 0)?,
-        create_child(window, w!("STATIC"), "POLLING", static_style, 0)?,
+        create_child(window, w!("STATIC"), "PROFILE", row_static_style, 0)?,
+        create_child(window, w!("STATIC"), "DPI", row_static_style, 0)?,
+        create_child(window, w!("STATIC"), "POLLING", row_static_style, 0)?,
         create_child(window, w!("STATIC"), "BATT", static_style, 0)?,
         create_child(window, w!("STATIC"), "SLEEP", static_style, 0)?,
         create_child(window, w!("STATIC"), "LOW", static_style, 0)?,
         create_child(window, w!("STATIC"), "CONNECTION", static_style, 0)?,
         create_child(window, w!("STATIC"), "VERIFICATION", static_style, 0)?,
     ];
-    let profile_value = create_child(window, w!("STATIC"), "Reading\u{2026}", static_style, 0)?;
-    let dpi_value = create_child(window, w!("STATIC"), "Unavailable", static_style, 0)?;
-    let polling_value = create_child(window, w!("STATIC"), "Unknown", static_style, 0)?;
+    let profile_value = create_child(window, w!("STATIC"), "Reading\u{2026}", row_static_style, 0)?;
+    let dpi_value = create_child(window, w!("STATIC"), "Unavailable", row_static_style, 0)?;
+    let polling_value = create_child(window, w!("STATIC"), "Unknown", row_static_style, 0)?;
     let battery_value = create_child(window, w!("STATIC"), "Unavailable", static_style, 0)?;
     let sleep_value = create_child(window, w!("STATIC"), "Unavailable", static_style, 0)?;
     let low_power_value = create_child(window, w!("STATIC"), "Unavailable", static_style, 0)?;
@@ -1225,6 +1289,25 @@ fn create_status_controls(window: HWND) -> Result<StatusWindow, String> {
         ),
         BUTTON_VIEW_MODE,
     )?;
+    let customize_button = create_child(
+        window,
+        w!("BUTTON"),
+        "Customize buttons",
+        WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0 | WS_TABSTOP.0 | BS_PUSHBUTTON_STYLE),
+        BUTTON_CUSTOMIZE,
+    )?;
+    let device_button = create_child(
+        window,
+        w!("BUTTON"),
+        "Device",
+        WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0 | WS_TABSTOP.0 | BS_PUSHBUTTON_STYLE),
+        BUTTON_DEVICE,
+    )?;
+    let disabled_nav = [
+        create_child(window, w!("STATIC"), "Profiles", static_style, 0)?,
+        create_child(window, w!("STATIC"), "Settings", static_style, 0)?,
+        create_child(window, w!("STATIC"), "About", static_style, 0)?,
+    ];
     let hotspot_names = HotspotNames::new(&mouse_hotspots)?;
     Ok(StatusWindow {
         brand_title,
@@ -1248,6 +1331,9 @@ fn create_status_controls(window: HWND) -> Result<StatusWindow, String> {
         developer_button,
         gaming_button,
         view_mode_button,
+        customize_button,
+        device_button,
+        disabled_nav,
         brand_font: HFONT::default(),
         title_font: HFONT::default(),
         body_font: HFONT::default(),
@@ -1294,12 +1380,15 @@ fn scale(value: i32, dpi: u32) -> i32 {
 }
 
 fn status_card_bounds(index: i32, dpi: u32) -> RECT {
-    let left = BASE_RIGHT_PANEL_LEFT + index * (BASE_STATUS_CARD_WIDTH + BASE_STATUS_CARD_GAP);
+    let column = index % 2;
+    let row = index / 2;
+    let left = BASE_RIGHT_PANEL_LEFT + column * (BASE_STATUS_CARD_WIDTH + BASE_STATUS_CARD_GAP);
+    let top = BASE_MAIN_TOP + row * (BASE_STATUS_CARD_HEIGHT + BASE_STATUS_CARD_GAP);
     RECT {
         left: scale(left, dpi),
-        top: scale(BASE_MAIN_TOP, dpi),
+        top: scale(top, dpi),
         right: scale(left + BASE_STATUS_CARD_WIDTH, dpi),
-        bottom: scale(BASE_MAIN_TOP + BASE_STATUS_CARD_HEIGHT, dpi),
+        bottom: scale(top + BASE_STATUS_CARD_HEIGHT, dpi),
     }
 }
 
@@ -1365,6 +1454,16 @@ fn mouse_control_for_hotspot(command: usize) -> Option<gui_logic::MouseControl> 
     }
 }
 
+fn view_after_command(view: NativeView, command: usize) -> Option<NativeView> {
+    match (view, command) {
+        (NativeView::Compact, BUTTON_VIEW_MODE) => Some(NativeView::Device),
+        (NativeView::Device | NativeView::Buttons, BUTTON_VIEW_MODE) => Some(NativeView::Compact),
+        (NativeView::Device, BUTTON_CUSTOMIZE) => Some(NativeView::Buttons),
+        (NativeView::Buttons, BUTTON_DEVICE) => Some(NativeView::Device),
+        _ => None,
+    }
+}
+
 fn create_font(dpi: u32, point_size: i32, weight: FONT_WEIGHT) -> HFONT {
     let height = -(point_size * i32::try_from(dpi).unwrap_or(96) / 72);
     unsafe {
@@ -1400,7 +1499,7 @@ fn set_font(control: HWND, font: HFONT) {
 
 /// Positions every control and sizes the outer window for the window's current
 /// DPI. Called at creation and again on `WM_DPICHANGED`.
-fn layout_status(window: HWND, status: &mut StatusWindow, detailed: bool) {
+fn layout_status(window: HWND, status: &mut StatusWindow, view: NativeView) {
     let dpi = unsafe { GetDpiForWindow(window) };
     for old in [
         status.brand_font,
@@ -1444,12 +1543,41 @@ fn layout_status(window: HWND, status: &mut StatusWindow, detailed: bool) {
     set_font(status.developer_button, status.button_font);
     set_font(status.gaming_button, status.button_font);
     set_font(status.view_mode_button, status.button_font);
+    set_font(status.customize_button, status.button_font);
+    set_font(status.device_button, status.button_font);
+    for nav in status.disabled_nav {
+        set_font(nav, status.body_font);
+    }
 
-    if !detailed {
+    if view == NativeView::Compact {
+        set_control_visibility(status.customize_button, false);
+        set_control_visibility(status.device_button, false);
+        set_control_visibility(status.developer_button, true);
+        set_control_visibility(status.gaming_button, true);
+        set_control_visibility(status.labels[6], true);
+        set_control_visibility(status.labels[7], true);
+        set_control_visibility(status.verification_value, true);
+        for nav in status.disabled_nav {
+            set_control_visibility(nav, false);
+        }
         layout_compact_status(window, status, dpi);
         return;
     }
-    set_status_details_visible(status, true);
+    set_status_details_visible(status, view == NativeView::Buttons);
+    set_control_visibility(status.customize_button, view == NativeView::Device);
+    set_control_visibility(status.device_button, true);
+    set_control_visibility(status.developer_button, view != NativeView::Device);
+    set_control_visibility(status.gaming_button, view != NativeView::Device);
+    set_control_visibility(status.labels[6], view != NativeView::Device);
+    set_control_visibility(status.labels[7], view != NativeView::Device);
+    set_control_visibility(status.verification_value, view != NativeView::Device);
+    for nav in status.disabled_nav {
+        set_control_visibility(nav, view == NativeView::Device);
+    }
+    if view == NativeView::Device {
+        layout_device_status(window, status, dpi);
+        return;
+    }
     let _ = unsafe { SetWindowTextW(status.brand_title, PCWSTR(wide("ViperPilot").as_ptr())) };
     let _ = unsafe {
         SetWindowTextW(
@@ -1495,6 +1623,14 @@ fn layout_status(window: HWND, status: &mut StatusWindow, detailed: bool) {
         scale(100, dpi),
         scale(34, dpi),
     );
+    move_child(
+        status.device_button,
+        client_width - scale(238, dpi),
+        scale(12, dpi),
+        scale(100, dpi),
+        scale(34, dpi),
+    );
+    let _ = unsafe { SetWindowTextW(status.device_button, PCWSTR(wide("Device").as_ptr())) };
 
     let [profile_card, performance_card, power_card, link_card] = [
         status_card_bounds(0, dpi),
@@ -1549,48 +1685,28 @@ fn layout_status(window: HWND, status: &mut StatusWindow, detailed: bool) {
         scale(20, dpi),
     );
 
-    move_child(
-        status.labels[3],
-        power_card.left + card_inset,
-        power_card.top + scale(4, dpi),
-        card_width(power_card) - 2 * card_inset,
-        scale(12, dpi),
-    );
-    move_child(
-        status.battery_value,
-        power_card.left + card_inset,
-        power_card.top + scale(16, dpi),
-        card_width(power_card) - 2 * card_inset,
-        scale(15, dpi),
-    );
-    move_child(
-        status.labels[4],
-        power_card.left + card_inset,
-        power_card.top + scale(30, dpi),
-        card_width(power_card) - 2 * card_inset,
-        scale(12, dpi),
-    );
-    move_child(
-        status.sleep_value,
-        power_card.left + card_inset,
-        power_card.top + scale(42, dpi),
-        card_width(power_card) - 2 * card_inset,
-        scale(15, dpi),
-    );
-    move_child(
-        status.labels[5],
-        power_card.left + card_inset,
-        power_card.top + scale(56, dpi),
-        card_width(power_card) - 2 * card_inset,
-        scale(12, dpi),
-    );
-    move_child(
-        status.low_power_value,
-        power_card.left + card_inset,
-        power_card.top + scale(68, dpi),
-        card_width(power_card) - 2 * card_inset,
-        scale(15, dpi),
-    );
+    // 2026-09-30: wider inspector cards permit three separate label/value rows
+    // instead of six tightly stacked lines from the old narrow card.
+    for (label, value, row_top) in [
+        (status.labels[3], status.battery_value, 10),
+        (status.labels[4], status.sleep_value, 34),
+        (status.labels[5], status.low_power_value, 58),
+    ] {
+        move_child(
+            label,
+            power_card.left + card_inset,
+            power_card.top + scale(row_top, dpi),
+            scale(72, dpi),
+            scale(18, dpi),
+        );
+        move_child(
+            value,
+            power_card.left + card_inset + scale(84, dpi),
+            power_card.top + scale(row_top, dpi),
+            card_width(power_card) - 2 * card_inset - scale(84, dpi),
+            scale(18, dpi),
+        );
+    }
     move_child(
         status.labels[6],
         link_card.left + card_inset,
@@ -1612,37 +1728,37 @@ fn layout_status(window: HWND, status: &mut StatusWindow, detailed: bool) {
     move_child(
         status.assignment_heading,
         panel_left + scale(20, dpi),
-        panel_top + scale(18, dpi),
+        panel_top + scale(12, dpi),
         panel_width - scale(40, dpi),
         label_height,
     );
     move_child(
         status.assignment_name,
         panel_left + scale(20, dpi),
-        panel_top + scale(44, dpi),
+        panel_top + scale(34, dpi),
         panel_width - scale(40, dpi),
-        scale(27, dpi),
+        scale(26, dpi),
     );
     move_child(
         status.assignment_semantic,
         panel_left + scale(20, dpi),
-        panel_top + scale(82, dpi),
+        panel_top + scale(68, dpi),
         panel_width - scale(40, dpi),
-        scale(32, dpi),
+        scale(28, dpi),
     );
     move_child(
         status.assignment_raw,
         panel_left + scale(20, dpi),
-        panel_top + scale(126, dpi),
+        panel_top + scale(104, dpi),
         panel_width - scale(40, dpi),
-        scale(48, dpi),
+        scale(42, dpi),
     );
     move_child(
         status.assignment_hint,
         panel_left + scale(20, dpi),
-        panel_top + scale(226, dpi),
+        panel_top + scale(154, dpi),
         panel_width - scale(40, dpi),
-        scale(44, dpi),
+        scale(38, dpi),
     );
     for (hotspot, control) in status
         .mouse_hotspots
@@ -1719,10 +1835,9 @@ fn layout_status(window: HWND, status: &mut StatusWindow, detailed: bool) {
 }
 
 fn set_status_details_visible(status: &StatusWindow, visible: bool) {
-    let show = if visible { SW_SHOW } else { SW_HIDE };
-    let hide = if visible { SW_HIDE } else { SW_SHOW };
-    let show_detail_control = |window: HWND| unsafe { ShowWindow(window, show) };
-    let hide_detail_control = |window: HWND| unsafe { ShowWindow(window, hide) };
+    // 2026-09-30: use the same requested visibility for both control groups;
+    // the previous inverse branch accidentally showed hidden inspector controls.
+    let visibility = if visible { SW_SHOW } else { SW_HIDE };
     let detail_controls = [
         status.labels[3],
         status.labels[4],
@@ -1736,25 +1851,124 @@ fn set_status_details_visible(status: &StatusWindow, visible: bool) {
         status.assignment_raw,
         status.assignment_hint,
     ];
-    if visible {
-        for control in detail_controls {
-            let _ = show_detail_control(control);
-        }
-        for hotspot in status.mouse_hotspots {
-            let _ = show_detail_control(hotspot);
-        }
-    } else {
-        for control in detail_controls {
-            let _ = hide_detail_control(control);
-        }
-        for hotspot in status.mouse_hotspots {
-            let _ = hide_detail_control(hotspot);
-        }
+    for control in detail_controls.into_iter().chain(status.mouse_hotspots) {
+        let _ = unsafe { ShowWindow(control, visibility) };
     }
     let _ = unsafe {
         SetWindowTextW(
             status.view_mode_button,
             PCWSTR(wide(if visible { "Quick switch" } else { "Details" }).as_ptr()),
+        )
+    };
+}
+
+fn set_control_visibility(control: HWND, visible: bool) {
+    let _ = unsafe { ShowWindow(control, if visible { SW_SHOW } else { SW_HIDE }) };
+}
+
+fn layout_device_status(window: HWND, status: &mut StatusWindow, dpi: u32) {
+    set_status_details_visible(status, false);
+    for control in [
+        status.labels[3],
+        status.labels[4],
+        status.labels[5],
+        status.labels[6],
+        status.labels[7],
+        status.battery_value,
+        status.sleep_value,
+        status.low_power_value,
+        status.verification_value,
+        status.assignment_name,
+        status.assignment_semantic,
+        status.assignment_raw,
+        status.assignment_hint,
+        status.developer_button,
+        status.gaming_button,
+    ] {
+        set_control_visibility(control, false);
+    }
+    set_control_visibility(status.assignment_heading, true);
+    let place = |child: HWND, x: i32, y: i32, width: i32, height: i32| {
+        let _ = unsafe {
+            MoveWindow(
+                child,
+                scale(x, dpi),
+                scale(y, dpi),
+                scale(width, dpi),
+                scale(height, dpi),
+                true,
+            )
+        };
+    };
+    let _ = unsafe { SetWindowTextW(status.brand_title, PCWSTR(wide("ViperPilot").as_ptr())) };
+    let _ = unsafe {
+        SetWindowTextW(
+            status.brand_subtitle,
+            PCWSTR(wide("Device status · read-only").as_ptr()),
+        )
+    };
+    let _ = unsafe {
+        SetWindowTextW(
+            status.assignment_heading,
+            PCWSTR(wide("Viper V4 Pro").as_ptr()),
+        )
+    };
+    let _ = unsafe { SetWindowTextW(status.labels[0], PCWSTR(wide("Profile").as_ptr())) };
+    let _ = unsafe { SetWindowTextW(status.labels[1], PCWSTR(wide("DPI").as_ptr())) };
+    let _ = unsafe { SetWindowTextW(status.labels[2], PCWSTR(wide("Polling rate").as_ptr())) };
+    let _ = unsafe {
+        SetWindowTextW(
+            status.view_mode_button,
+            PCWSTR(wide("Quick switch").as_ptr()),
+        )
+    };
+    let _ = unsafe { SetWindowTextW(status.device_button, PCWSTR(wide("Device").as_ptr())) };
+    set_font(status.assignment_heading, status.brand_font);
+    set_font(status.profile_value, status.title_font);
+    set_font(status.dpi_value, status.title_font);
+    set_font(status.polling_value, status.title_font);
+    let _ = unsafe { SetWindowTextW(status.brand_title, PCWSTR(wide("ViperPilot").as_ptr())) };
+    place(status.brand_title, 24, 18, 500, 32);
+    place(status.brand_subtitle, 24, 52, 560, 22);
+    place(status.view_mode_button, 756, 18, 100, 36);
+    place(status.device_button, 20, 92, 150, 40);
+    place(status.disabled_nav[0], 24, 148, 142, 32);
+    place(status.disabled_nav[1], 24, 190, 142, 32);
+    place(status.disabled_nav[2], 24, 232, 142, 32);
+    place(status.assignment_heading, 600, 116, 238, 42);
+    place(status.connection_value, 600, 158, 238, 28);
+    place(status.labels[0], 612, 220, 100, 32);
+    place(status.profile_value, 724, 220, 100, 32);
+    place(status.labels[1], 612, 292, 100, 32);
+    place(status.dpi_value, 724, 292, 100, 32);
+    place(status.labels[2], 612, 364, 100, 32);
+    place(status.polling_value, 724, 364, 100, 32);
+    place(status.customize_button, 586, 464, 250, 52);
+
+    let mut outer = RECT {
+        left: 0,
+        top: 0,
+        right: scale(BASE_CLIENT_WIDTH, dpi),
+        bottom: scale(600, dpi),
+    };
+    let _ = unsafe {
+        AdjustWindowRectExForDpi(
+            &mut outer,
+            MAIN_WINDOW_STYLE,
+            false,
+            WINDOW_EX_STYLE(0),
+            dpi,
+        )
+    };
+    let _ = unsafe {
+        SetWindowPos(
+            window,
+            None,
+            0,
+            0,
+            outer.right - outer.left,
+            outer.bottom - outer.top,
+            SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
         )
     };
 }
@@ -2190,9 +2404,9 @@ fn dispatch_deferred(runtime: &WindowRuntime, window: HWND, action: DeferredActi
                             SWP_NOZORDER | SWP_NOACTIVATE,
                         )
                     };
-                    let detailed = app.detailed;
+                    let view = app.view;
                     if let Some(status) = app.status.as_mut() {
-                        layout_status(window, status, detailed);
+                        layout_status(window, status, view);
                         #[cfg(feature = "ui-preview")]
                         if runtime.preview_mode {
                             set_text(
@@ -2266,7 +2480,7 @@ impl TrayApp {
                     quick_switch_action(library, 0).is_ok()
                         && quick_switch_action(library, 1).is_ok()
                 });
-            let developer_enabled = if self.detailed {
+            let developer_enabled = if self.view == NativeView::Buttons {
                 presentation.buttons_enabled
             } else {
                 quick_pair_enabled
@@ -2358,9 +2572,16 @@ impl TrayApp {
     }
 
     fn paint_dashboard(&self, window: HWND) {
-        if !self.detailed {
-            self.paint_compact_switcher(window);
-            return;
+        match self.view {
+            NativeView::Compact => {
+                self.paint_compact_switcher(window);
+                return;
+            }
+            NativeView::Device => {
+                self.paint_device_dashboard(window);
+                return;
+            }
+            NativeView::Buttons => {}
         }
         let mut paint = PAINTSTRUCT::default();
         let hdc = unsafe { BeginPaint(window, &mut paint) };
@@ -2416,6 +2637,56 @@ impl TrayApp {
             scale(12, dpi),
         );
         self.draw_mouse_visual(hdc, dpi);
+        let _ = unsafe { EndPaint(window, &paint) };
+    }
+
+    fn paint_device_dashboard(&self, window: HWND) {
+        let mut paint = PAINTSTRUCT::default();
+        let hdc = unsafe { BeginPaint(window, &mut paint) };
+        let mut client = RECT::default();
+        let _ = unsafe { GetClientRect(window, &mut client) };
+        let _ = unsafe { FillRect(hdc, &client, self.base_brush) };
+        let dpi = unsafe { GetDpiForWindow(window) };
+        let panel = |left, top, right, bottom| RECT {
+            left: scale(left, dpi),
+            top: scale(top, dpi),
+            right: scale(right, dpi),
+            bottom: scale(bottom, dpi),
+        };
+        draw_panel(
+            hdc,
+            panel(578, 100, 856, 548),
+            CAT_SURFACE0,
+            CAT_BORDER,
+            scale(14, dpi),
+        );
+        for row_top in [208, 280, 352] {
+            draw_panel(
+                hdc,
+                panel(598, row_top, 838, row_top + 56),
+                CAT_SURFACE1,
+                CAT_BORDER,
+                scale(10, dpi),
+            );
+        }
+        let target = panel(214, 104, 542, 544);
+        let image = self.mouse_bitmap.as_ref().map_or(target, |bitmap| {
+            let target_width = target.right - target.left;
+            let target_height = target.bottom - target.top;
+            let ratio = (target_width as f64 / bitmap.width.max(1) as f64)
+                .min(target_height as f64 / bitmap.height.max(1) as f64);
+            let width = (bitmap.width as f64 * ratio).round() as i32;
+            let height = (bitmap.height as f64 * ratio).round() as i32;
+            RECT {
+                left: target.left + (target_width - width) / 2,
+                top: target.top + (target_height - height) / 2,
+                right: target.left + (target_width + width) / 2,
+                bottom: target.top + (target_height + height) / 2,
+            }
+        });
+        if !self.draw_dashboard_bitmap(hdc, image) {
+            draw_mouse_placeholder(hdc, image, dpi);
+        }
         let _ = unsafe { EndPaint(window, &paint) };
     }
 
@@ -2509,7 +2780,9 @@ impl TrayApp {
         let Some(status) = self.status.as_ref() else {
             return (CAT_TEXT, self.base_brush);
         };
-        let color = if control == status.brand_title {
+        let color = if status.disabled_nav.contains(&control) {
+            CAT_OVERLAY0
+        } else if control == status.brand_title || control == status.assignment_heading {
             CAT_TEXT
         } else if control == status.brand_subtitle
             || status.labels.contains(&control)
@@ -2560,7 +2833,19 @@ impl TrayApp {
         ]
         .contains(&control);
         let verification_card = [status.labels[7], status.verification_value].contains(&control);
-        let brush = if status_card || assignment_card || verification_card {
+        let device_row = self.view == NativeView::Device
+            && [
+                status.labels[0],
+                status.labels[1],
+                status.labels[2],
+                status.profile_value,
+                status.dpi_value,
+                status.polling_value,
+            ]
+            .contains(&control);
+        let brush = if device_row {
+            self.row_brush
+        } else if status_card || assignment_card || verification_card {
             self.surface_brush
         } else {
             self.base_brush
@@ -2576,6 +2861,8 @@ impl TrayApp {
             BUTTON_DEVELOPER => status.developer_button == control,
             BUTTON_GAMING => status.gaming_button == control,
             BUTTON_VIEW_MODE => status.view_mode_button == control,
+            BUTTON_CUSTOMIZE => status.customize_button == control,
+            BUTTON_DEVICE => status.device_button == control,
             HOTSPOT_LEFT..=HOTSPOT_DPI => {
                 status.mouse_hotspots.contains(&control) && mouse_control_for_hotspot(id).is_some()
             }
@@ -2603,7 +2890,7 @@ impl TrayApp {
         state: u32,
         hot: bool,
     ) -> bool {
-        let quick_label = if !self.detailed {
+        let quick_label = if self.view == NativeView::Compact {
             let slot = match control_id {
                 BUTTON_DEVELOPER => Some(0),
                 BUTTON_GAMING => Some(1),
@@ -2615,12 +2902,12 @@ impl TrayApp {
         };
         let (fixed_label, active, corner_radius, is_hotspot) = match control_id {
             BUTTON_DEVELOPER => (
-                if self.detailed {
+                if self.view == NativeView::Buttons {
                     "Apply Developer recovery preset"
                 } else {
                     "Saved profile unavailable"
                 },
-                if self.detailed {
+                if self.view == NativeView::Buttons {
                     self.current == ProfileMatch::Developer
                 } else {
                     self.quick_slot_is_current(0)
@@ -2629,12 +2916,12 @@ impl TrayApp {
                 false,
             ),
             BUTTON_GAMING => (
-                if self.detailed {
+                if self.view != NativeView::Compact {
                     "Apply Gaming recovery preset"
                 } else {
                     "Saved profile unavailable"
                 },
-                if self.detailed {
+                if self.view == NativeView::Buttons {
                     self.current == ProfileMatch::Gaming
                 } else {
                     self.quick_slot_is_current(1)
@@ -2643,7 +2930,7 @@ impl TrayApp {
                 false,
             ),
             BUTTON_VIEW_MODE => (
-                if self.detailed {
+                if self.view != NativeView::Compact {
                     "Quick switch"
                 } else {
                     "Details"
@@ -2652,6 +2939,8 @@ impl TrayApp {
                 8,
                 false,
             ),
+            BUTTON_CUSTOMIZE => ("Customize buttons", true, 12, false),
+            BUTTON_DEVICE => ("Device", self.view == NativeView::Device, 8, false),
             hotspot => {
                 let Some(control) = mouse_control_for_hotspot(hotspot) else {
                     return false;
@@ -2686,12 +2975,13 @@ impl TrayApp {
             .status
             .as_ref()
             .map_or(HFONT::default(), |status| status.button_font);
-        let parent_background =
-            if !self.detailed && matches!(control_id, BUTTON_DEVELOPER | BUTTON_GAMING) {
-                self.surface_brush
-            } else {
-                self.base_brush
-            };
+        let parent_background = if self.view == NativeView::Compact
+            && matches!(control_id, BUTTON_DEVELOPER | BUTTON_GAMING)
+        {
+            self.surface_brush
+        } else {
+            self.base_brush
+        };
         draw_button_gdi(
             hdc,
             rect,
@@ -2706,8 +2996,9 @@ impl TrayApp {
                 pen_width: scale(if active && is_hotspot { 3 } else { 1 }, dpi),
                 is_hotspot,
                 focused,
-                multiline: !self.detailed && matches!(control_id, BUTTON_DEVELOPER | BUTTON_GAMING),
-                text_inset: if !self.detailed
+                multiline: self.view == NativeView::Compact
+                    && matches!(control_id, BUTTON_DEVELOPER | BUTTON_GAMING),
+                text_inset: if self.view == NativeView::Compact
                     && matches!(control_id, BUTTON_DEVELOPER | BUTTON_GAMING)
                 {
                     scale(10, dpi)
@@ -2913,11 +3204,11 @@ impl TrayApp {
             self.apply_quick_switch_slot(window, slot);
             return;
         }
-        if !self.detailed && command == BUTTON_DEVELOPER {
+        if self.view == NativeView::Compact && command == BUTTON_DEVELOPER {
             self.apply_quick_switch_slot(window, 0);
             return;
         }
-        if !self.detailed && command == BUTTON_GAMING {
+        if self.view == NativeView::Compact && command == BUTTON_GAMING {
             self.apply_quick_switch_slot(window, 1);
             return;
         }
@@ -2958,14 +3249,17 @@ impl TrayApp {
         }
         match command {
             MENU_OPEN => self.show_window_now(window),
-            BUTTON_VIEW_MODE => {
-                self.detailed = !self.detailed;
+            BUTTON_VIEW_MODE | BUTTON_CUSTOMIZE | BUTTON_DEVICE => {
+                let Some(next_view) = view_after_command(self.view, command) else {
+                    return;
+                };
+                self.view = next_view;
                 if let Some(status) = self.status.as_mut() {
-                    layout_status(window, status, self.detailed);
-                    let focus = if self.detailed {
-                        status.view_mode_button
-                    } else {
-                        status.developer_button
+                    layout_status(window, status, self.view);
+                    let focus = match self.view {
+                        NativeView::Compact => status.developer_button,
+                        NativeView::Device => status.view_mode_button,
+                        NativeView::Buttons => status.device_button,
                     };
                     let _ = unsafe { SetFocus(Some(focus)) };
                 }
@@ -2999,7 +3293,7 @@ impl TrayApp {
     }
 
     fn profile_action_button_label(&self, slot: usize) -> String {
-        if self.detailed {
+        if self.view == NativeView::Buttons {
             return match slot {
                 0 => "Apply Developer recovery preset".to_owned(),
                 1 => "Apply Gaming recovery preset".to_owned(),

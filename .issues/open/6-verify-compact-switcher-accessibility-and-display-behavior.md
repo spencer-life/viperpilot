@@ -8,7 +8,7 @@ projects:
     - ViperPilot dashboard
 state: open
 state_reason: ""
-synced_at: 2026-09-30T10:20:26.815794778Z
+synced_at: 2026-09-30T11:09:04.970287424Z
 info:
     author: spencer-life
     created_at: 2026-09-29T18:22:41Z
@@ -68,3 +68,23 @@ white corners and old blue emphasis were caught in captures and fixed.
 retains failed experiments and limits. Keyboard activation, screen-reader speech,
 other DPI scales, high contrast and production tray remain separate gates. No
 installed app, startup or hardware operation occurred. Keep this issue open.
+
+## Owner spacing feedback and dashboard correction — 2026-09-30
+
+The owner reports working Tab navigation on both native views and marked compact
+action spacing, overlapping mouse-number borders and narrow detailed cards. They
+also rejected the old inspector layout as a match for the approved Figma render.
+[Draft #29](https://github.com/spencer-life/viperpilot/pull/29) separates the
+Device dashboard from the numbered read-only Buttons inspector. Compact action
+labels are padded/centered; hotspot targets are separate; inspector status cards
+are wider and power rows have spacing. The Device page follows the reference
+sidebar/large mouse/right summary structure with read-only rows and Customize
+buttons navigation. Existing illustration retained; pixel identity is not claimed.
+
+Final strict Windows checks and all three native UIA scenarios pass, including
+view visibility, direct Device-to-Compact restoration, hidden-control refusal and
+clean exit. Windows hotspot-geometry and view-routing tests pass. Captures and
+independent source review were checked; failed experiments remain in the
+[validation record](https://github.com/spencer-life/viperpilot/blob/codex/device-dashboard-layout/docs/native-visual-validation.md).
+Enter/Space activation of the revised views, screen-reader speech, other scales,
+high contrast and production/hardware gates remain open. Installed app untouched.

@@ -6,7 +6,7 @@ Updated 2026-09-30. This brief is the starting point for a new coding session.
 
 - Public development repository: https://github.com/spencer-life/viperpilot
 - Catalog PR: https://github.com/spencer-life/viperpilot/pull/3; the focused implementation stack is listed below.
-- Choose the owning branch from the table below; the current integration top is `codex/native-figma-polish` (native visual alignment); UI/accessibility source remains on `codex/native-button-accessibility`. Fetch and reconcile the latest remote head before editing. The historical software checkpoint is `7cb0440a8b21f54154c1042757c810f3b9552c24`. Issue #12 adds a later local editor implementation; use the validation record below and reconcile the latest head rather than treating historical checks as validation of new code.
+- Choose the owning branch from the table below; the current integration top is `codex/device-dashboard-layout` (Figma Device dashboard and separate Buttons inspector); UI/accessibility source remains on `codex/native-button-accessibility`. Fetch and reconcile the latest remote head before editing. The historical software checkpoint is `7cb0440a8b21f54154c1042757c810f3b9552c24`. Issue #12 adds a later local editor implementation; use the validation record below and reconcile the latest head rather than treating historical checks as validation of new code.
 - PR #3 now targets `codex/profile-capabilities` (PR #16). The stack ultimately targets `main` through the original foundation PR #1.
 - This is in-progress development. Keep PR #3 in draft until its documented gates pass. Do not merge, release, install the tray, enable startup, or reapply the historical ZIP as part of resuming work.
 
@@ -36,7 +36,8 @@ release or hardware operation occurred. PR #3 and all new implementation PRs rem
 | 12 | [Manual handoff](https://github.com/spencer-life/viperpilot/tree/codex/manual-validation-handoff) | `codex/manual-validation-handoff` | Audited preview/tray test boundaries, current hosted checks and Cloud access diagnostic handoff |
 | 13 | [Native UIA test client](https://github.com/spencer-life/viperpilot/tree/codex/native-uia-test-client) | `codex/native-uia-test-client` | Owner-present native/editor smoke results and guarded native COM test client replacing false managed Button/Invoke negatives |
 | 14 | [Editor visual alignment](https://github.com/spencer-life/viperpilot/tree/codex/figma-editor-styling) | `codex/figma-editor-styling` | Figma rose/charcoal editor tokens, readable controls and visual validation boundaries |
-| 15 | [Native visual alignment](https://github.com/spencer-life/viperpilot/tree/codex/native-figma-polish) | `codex/native-figma-polish` | Preview-only v6 manifest and standard-button custom draw, Figma palette and contained metrics |
+| 15 | [#28](https://github.com/spencer-life/viperpilot/pull/28) | `codex/native-figma-polish` | Preview-only standard-button custom draw, Figma palette, padded compact actions and separated mouse targets |
+| 16 | [#29](https://github.com/spencer-life/viperpilot/pull/29) | `codex/device-dashboard-layout` | Figma Device dashboard, separate read-only Buttons inspector, roomier status rows and guarded view navigation |
 
 Official [stack #17](https://github.com/spencer-life/viperpilot/pull/3) is
 registered on GitHub. The first sanitized import is still broad; its original

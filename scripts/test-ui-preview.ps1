@@ -187,8 +187,12 @@ try {
                 Name = [string]$native.Name
                 IsEnabled = [bool]$native.Enabled
                 ControlType = $controlType
+                IsVisible = [bool]$native.Visible
             }
             InvokeAvailable = [bool]$native.InvokeAvailable
+        }
+        if (-not $button.Current.IsVisible) {
+            throw "Control ID $ControlId is hidden in the current preview view."
         }
         # A non-button role is a failing assertion, not a successful name-only probe.
         if ($button.Current.ControlType -ne [System.Windows.Automation.ControlType]::Button) {
@@ -387,62 +391,108 @@ try {
         Write-ProgressMarker "Back-to-back profile commands settled on '$firstExpectedProfile'."
     }
 
-    Write-ProgressMarker 'Invoking Details through UI Automation.'
-    Invoke-PreviewButton -ControlId 2003
-
-    $recoveryDeadline = [DateTime]::UtcNow.AddSeconds($controlTimeoutSeconds)
-    $recoveryLabelsFound = $false
-    do {
-        try {
-            $firstRecovery = Get-PreviewButton -ControlId 2001
-            $secondRecovery = Get-PreviewButton -ControlId 2002
-            $recoveryLabelsFound = (
-                $firstRecovery.Current.Name -ceq 'Apply Developer recovery preset' -and
-                $secondRecovery.Current.Name -ceq 'Apply Gaming recovery preset'
-            )
-        } catch {
-            $recoveryLabelsFound = $false
+    # 2026-09-30: Device dashboard and read-only Buttons inspector are distinct.
+    function Assert-HiddenPreviewControl {
+        param([Parameter(Mandatory = $true)][int] $ControlId)
+        $state = Invoke-NativeUiAutomationClient -Action inspect -ControlId $ControlId
+        if ($state.Visible) { throw "Control $ControlId must be hidden outside its view." }
+        $refused = $false
+        try { [void](Invoke-NativeUiAutomationClient -Action invoke -ControlId $ControlId) }
+        catch {
+            if ($_.Exception.Message -notlike "*refusing to invoke hidden control ID $ControlId*") { throw }
+            $refused = $true
         }
-        if (-not $recoveryLabelsFound) {
+        if (-not $refused) { throw "Native helper invoked hidden control $ControlId." }
+    }
+
+    function Wait-PreviewView {
+        param([Parameter(Mandatory = $true)][ValidateSet('Compact', 'Device', 'Buttons')][string] $View)
+        $deadline = [DateTime]::UtcNow.AddSeconds($controlTimeoutSeconds)
+        do {
+            $customize = Invoke-NativeUiAutomationClient -Action inspect -ControlId 2004
+            $device = Invoke-NativeUiAutomationClient -Action inspect -ControlId 2005
+            $recovery = Invoke-NativeUiAutomationClient -Action inspect -ControlId 2001
+            $hotspots = @(2101..2106 | ForEach-Object { Invoke-NativeUiAutomationClient -Action inspect -ControlId $_ })
+            $allHotspotsVisible = @($hotspots | Where-Object { -not $_.Visible }).Count -eq 0
+            $allHotspotsHidden = @($hotspots | Where-Object { $_.Visible }).Count -eq 0
+            $ready = switch ($View) {
+                'Device' { $customize.Visible -and $device.Visible -and -not $recovery.Visible -and $allHotspotsHidden }
+                'Buttons' { -not $customize.Visible -and $device.Visible -and $recovery.Visible -and $allHotspotsVisible }
+                'Compact' { -not $customize.Visible -and -not $device.Visible -and $recovery.Visible -and $allHotspotsHidden }
+            }
+            if ($ready) { return }
             Start-Sleep -Milliseconds 100
+        } while ([DateTime]::UtcNow -lt $deadline)
+        throw "Timed out waiting for preview view $View."
+    }
+
+    function Assert-DeviceDashboard {
+        Wait-PreviewView -View Device
+        [void](Assert-Button -ControlId 2003 -ExpectedName 'Quick switch' -ExpectedEnabled $true)
+        [void](Assert-Button -ControlId 2004 -ExpectedName 'Customize buttons' -ExpectedEnabled $true)
+        [void](Assert-Button -ControlId 2005 -ExpectedName 'Device' -ExpectedEnabled $true)
+        Assert-HiddenPreviewControl -ControlId 2001
+        Assert-HiddenPreviewControl -ControlId 2002
+        Assert-HiddenPreviewControl -ControlId 2101
+    }
+
+    function Assert-CompactView {
+        Wait-PreviewView -View Compact
+        [void](Assert-Button -ControlId 2001 -ExpectedName $firstProfileName -ExpectedEnabled $profilesEnabled)
+        [void](Assert-Button -ControlId 2002 -ExpectedName $secondProfileName -ExpectedEnabled $profilesEnabled)
+        [void](Assert-Button -ControlId 2003 -ExpectedName 'Details' -ExpectedEnabled $true)
+        Assert-HiddenPreviewControl -ControlId 2004
+        Assert-HiddenPreviewControl -ControlId 2005
+        if (-not (Test-WindowHasName -ExpectedText 'LATEST STATUS')) { throw 'Compact latest-status label was not restored.' }
+    }
+
+    function Assert-ButtonsInspector {
+        Wait-PreviewView -View Buttons
+        [void](Assert-Button -ControlId 2001 -ExpectedName 'Apply Developer recovery preset' -ExpectedEnabled $true)
+        [void](Assert-Button -ControlId 2002 -ExpectedName 'Apply Gaming recovery preset' -ExpectedEnabled $true)
+        [void](Assert-Button -ControlId 2003 -ExpectedName 'Quick switch' -ExpectedEnabled $true)
+        [void](Assert-Button -ControlId 2005 -ExpectedName 'Device' -ExpectedEnabled $true)
+        Assert-HiddenPreviewControl -ControlId 2004
+        $hotspotNames = @('Left click', 'Right click', 'Middle click', ('Rear side {0} Mouse 4' -f [char]0x00b7), ('Front side {0} Mouse 5' -f [char]0x00b7), 'DPI button')
+        for ($hotspot = 1; $hotspot -le 6; $hotspot++) {
+            [void](Assert-Button -ControlId (2100 + $hotspot) -ExpectedName $hotspotNames[$hotspot - 1] -ExpectedEnabled $true)
         }
-    } while (-not $recoveryLabelsFound -and [DateTime]::UtcNow -lt $recoveryDeadline)
-
-    if (-not $recoveryLabelsFound) {
-        $firstName = (Get-PreviewButton -ControlId 2001).Current.Name
-        $secondName = (Get-PreviewButton -ControlId 2002).Current.Name
-        throw "Details did not expose recovery labels; got '$firstName' and '$secondName'."
-    }
-    [void](Assert-Button -ControlId 2001 -ExpectedName 'Apply Developer recovery preset' -ExpectedEnabled $true)
-    [void](Assert-Button -ControlId 2002 -ExpectedName 'Apply Gaming recovery preset' -ExpectedEnabled $true)
-    [void](Assert-Button -ControlId 2003 -ExpectedName 'Quick switch' -ExpectedEnabled $true)
-    # 2026-09-30: ASCII source also works in Windows PowerShell 5.1 without a UTF-8 BOM.
-    $hotspotNames = @('Left click', 'Right click', 'Middle click', ('Rear side {0} Mouse 4' -f [char]0x00b7), ('Front side {0} Mouse 5' -f [char]0x00b7), 'DPI button')
-    for ($hotspot = 1; $hotspot -le 6; $hotspot++) {
-        [void](Assert-Button -ControlId (2100 + $hotspot) -ExpectedName $hotspotNames[$hotspot - 1] -ExpectedEnabled $true)
     }
 
-    Write-ProgressMarker 'Details exposed both recovery labels.'
+    Write-ProgressMarker 'Invoking Details through UI Automation to open Device dashboard.'
+    Invoke-PreviewButton -ControlId 2003
+    Assert-DeviceDashboard
+    Write-ProgressMarker 'Checking direct Device-to-Compact restoration before opening inspector.'
+    Invoke-PreviewButton -ControlId 2003
+    Assert-CompactView
+    Invoke-PreviewButton -ControlId 2003
+    Assert-DeviceDashboard
+    $settledProfile = if ($Scenario -eq 'unavailable') { 'Developer' } else { $firstExpectedProfile }
+    $hiddenRecoveryControl = if ($settledProfile -eq 'Gaming') { 2001 } else { 2002 }
+    Write-ProgressMarker 'Sending a hidden recovery BN_CLICKED; expecting no synthetic profile change.'
+    Send-PreviewCommandNotification -ControlId $hiddenRecoveryControl -NotificationCode 0
+    Start-Sleep -Milliseconds 150
+    Wait-ForWindowName -ExpectedText $settledProfile -Context 'rejected hidden recovery command'
+    $wrongProfile = if ($settledProfile -eq 'Gaming') { 'Developer' } else { 'Gaming' }
+    if (Test-WindowHasName -ExpectedText $wrongProfile) { throw 'Hidden recovery command changed the profile.' }
 
-    Write-ProgressMarker 'Toggling Details twice back-to-back, then checking the final Details labels.'
-    Click-PreviewButton -ControlId 2003
-    Click-PreviewButton -ControlId 2003
-    [void](Assert-Button -ControlId 2001 -ExpectedName 'Apply Developer recovery preset' -ExpectedEnabled $true)
-    [void](Assert-Button -ControlId 2002 -ExpectedName 'Apply Gaming recovery preset' -ExpectedEnabled $true)
-    [void](Assert-Button -ControlId 2003 -ExpectedName 'Quick switch' -ExpectedEnabled $true)
+    Write-ProgressMarker 'Opening Customize buttons and checking inspector controls.'
+    Invoke-PreviewButton -ControlId 2004
+    Assert-ButtonsInspector
+    Invoke-PreviewButton -ControlId 2005
+    Assert-DeviceDashboard
+    Invoke-PreviewButton -ControlId 2004
+    Assert-ButtonsInspector
 
-    Write-ProgressMarker 'Switching to compact mode and checking both profile labels.'
+    Write-ProgressMarker 'Returning from inspector to compact and then Device twice.'
     Click-PreviewButton -ControlId 2003
-    [void](Assert-Button -ControlId 2001 -ExpectedName $firstProfileName -ExpectedEnabled $profilesEnabled)
-    [void](Assert-Button -ControlId 2002 -ExpectedName $secondProfileName -ExpectedEnabled $profilesEnabled)
-    [void](Assert-Button -ControlId 2003 -ExpectedName 'Details' -ExpectedEnabled $true)
-
-    Write-ProgressMarker 'Switching back to Details and checking both recovery labels.'
+    Assert-CompactView
     Click-PreviewButton -ControlId 2003
-    [void](Assert-Button -ControlId 2001 -ExpectedName 'Apply Developer recovery preset' -ExpectedEnabled $true)
-    [void](Assert-Button -ControlId 2002 -ExpectedName 'Apply Gaming recovery preset' -ExpectedEnabled $true)
-    [void](Assert-Button -ControlId 2003 -ExpectedName 'Quick switch' -ExpectedEnabled $true)
-    Write-ProgressMarker 'Repeated Details/compact transitions passed.'
+    Assert-DeviceDashboard
+    Click-PreviewButton -ControlId 2003
+    Click-PreviewButton -ControlId 2003
+    Assert-DeviceDashboard
+    Write-ProgressMarker 'Compact/Device/Buttons transitions and hidden-control guards passed.'
 
     Write-ProgressMarker 'Closing the preview window and waiting up to 5 seconds for exit.'
     if (-not $previewProcess.CloseMainWindow()) {
@@ -455,7 +505,7 @@ try {
         throw "Preview exited with code $($previewProcess.ExitCode); expected 0."
     }
 
-    Write-Output "PASS: $Scenario scenario verified UIA names/enabled states, back-to-back profile commands, repeated Details/compact transitions, and exit code 0."
+    Write-Output "PASS: $Scenario scenario verified UIA names/enabled states, back-to-back profile commands, Compact/Device/Buttons transitions, hidden-control guards, and exit code 0."
 } finally {
     if ($null -ne $previewProcess) {
         try {
