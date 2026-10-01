@@ -21,13 +21,14 @@ use windows::Win32::Foundation::{
 };
 use windows::Win32::Graphics::Dwm::{DWMWA_USE_IMMERSIVE_DARK_MODE, DwmSetWindowAttribute};
 use windows::Win32::Graphics::Gdi::{
-    BITMAP, BeginPaint, CLEARTYPE_QUALITY, CLIP_DEFAULT_PRECIS, CreateCompatibleDC, CreateFontW,
-    CreatePen, CreateSolidBrush, DEFAULT_CHARSET, DEFAULT_PITCH, DT_CENTER, DT_SINGLELINE,
-    DT_VCENTER, DeleteDC, DeleteObject, DrawFocusRect, DrawTextW, Ellipse, EndPaint, FONT_WEIGHT,
-    FW_BOLD, FW_NORMAL, FillRect, GetObjectW, HALFTONE, HBITMAP, HBRUSH, HDC, HFONT, HGDIOBJ,
-    InvalidateRect, LineTo, MoveToEx, OUT_DEFAULT_PRECIS, PAINTSTRUCT, PS_SOLID, RDW_ALLCHILDREN,
-    RDW_INVALIDATE, RedrawWindow, RoundRect, SRCCOPY, SelectObject, SetBkMode, SetStretchBltMode,
-    SetTextColor, StretchBlt, TRANSPARENT,
+    BITMAP, BeginPaint, CLEARTYPE_QUALITY, CLIP_DEFAULT_PRECIS, CLR_INVALID, CreateCompatibleDC,
+    CreateFontW, CreatePen, CreateSolidBrush, DEFAULT_CHARSET, DEFAULT_PITCH, DT_CALCRECT,
+    DT_CENTER, DT_SINGLELINE, DT_VCENTER, DeleteDC, DeleteObject, DrawFocusRect, DrawTextW,
+    Ellipse, EndPaint, FONT_WEIGHT, FW_BOLD, FW_NORMAL, FillRect, GetCurrentObject, GetObjectW,
+    HALFTONE, HBITMAP, HBRUSH, HDC, HFONT, HGDIOBJ, InvalidateRect, LineTo, MoveToEx, OBJ_BRUSH,
+    OBJ_PEN, OUT_DEFAULT_PRECIS, PAINTSTRUCT, PS_SOLID, RDW_ALLCHILDREN, RDW_INVALIDATE,
+    RedrawWindow, RestoreDC, RoundRect, SRCCOPY, SaveDC, SelectObject, SetBkMode,
+    SetStretchBltMode, SetTextColor, StretchBlt, TRANSPARENT,
 };
 use windows::Win32::System::Com::{
     CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx,
@@ -39,9 +40,12 @@ use windows::Win32::System::Registry::{
 use windows::Win32::System::SystemInformation::GetLocalTime;
 use windows::Win32::System::Threading::CreateMutexW;
 use windows::Win32::UI::Accessibility::{
-    CLSID_AccPropServices, IAccPropServices, Name_Property_GUID,
+    CLSID_AccPropServices, HCF_HIGHCONTRASTON, HIGHCONTRASTW, IAccPropServices, Name_Property_GUID,
 };
-use windows::Win32::UI::Controls::{DRAWITEMSTRUCT, ODS_DISABLED, ODS_FOCUS, ODS_SELECTED};
+use windows::Win32::UI::Controls::{
+    CDDS_PREPAINT, CDIS_DISABLED, CDIS_FOCUS, CDIS_HOT, CDIS_SELECTED, CDRF_SKIPDEFAULT,
+    DRAWITEMSTRUCT, NM_CUSTOMDRAW, NMCUSTOMDRAW, NMHDR, ODS_DISABLED, ODS_FOCUS, ODS_SELECTED,
+};
 use windows::Win32::UI::HiDpi::{
     AdjustWindowRectExForDpi, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, GetDpiForWindow,
     SetProcessDpiAwarenessContext,
@@ -60,14 +64,14 @@ use windows::Win32::UI::WindowsAndMessaging::{
     ICON_BIG, ICON_SMALL, IDC_ARROW, IDI_APPLICATION, IMAGE_BITMAP, IMAGE_ICON, IsDialogMessageW,
     IsIconic, LR_LOADFROMFILE, LoadCursorW, LoadIconW, LoadImageW, MF_CHECKED, MF_GRAYED, MF_POPUP,
     MF_STRING, MSG, MoveWindow, PostMessageW, PostQuitMessage, RegisterClassW,
-    RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER,
-    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow,
-    TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WINDOW_EX_STYLE,
-    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CTLCOLORSTATIC, WM_DESTROY,
-    WM_DEVICECHANGE, WM_DPICHANGED, WM_DRAWITEM, WM_HOTKEY, WM_LBUTTONDBLCLK, WM_LBUTTONUP,
-    WM_NCCREATE, WM_NCDESTROY, WM_PAINT, WM_RBUTTONUP, WM_SETFONT, WM_SETICON, WNDCLASSW,
-    WS_CAPTION, WS_CHILD, WS_CLIPCHILDREN, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP,
-    WS_VISIBLE,
+    RegisterWindowMessageW, SPI_GETHIGHCONTRAST, SW_HIDE, SW_RESTORE, SW_SHOW, SWP_NOACTIVATE,
+    SWP_NOMOVE, SWP_NOZORDER, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos,
+    SetWindowTextW, ShowWindow, SystemParametersInfoW, TPM_RETURNCMD, TPM_RIGHTBUTTON,
+    TrackPopupMenu, TranslateMessage, WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
+    WM_CONTEXTMENU, WM_CTLCOLORSTATIC, WM_DESTROY, WM_DEVICECHANGE, WM_DPICHANGED, WM_DRAWITEM,
+    WM_HOTKEY, WM_LBUTTONDBLCLK, WM_LBUTTONUP, WM_NCCREATE, WM_NCDESTROY, WM_NOTIFY, WM_PAINT,
+    WM_RBUTTONUP, WM_SETFONT, WM_SETICON, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_CLIPCHILDREN,
+    WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{BOOL, PCWSTR, w};
 
@@ -176,19 +180,22 @@ const fn rgb(red: u8, green: u8, blue: u8) -> COLORREF {
     COLORREF((blue as u32) << 16 | (green as u32) << 8 | red as u32)
 }
 
-// Catppuccin Mocha.
-const CAT_BASE: COLORREF = rgb(19, 22, 25);
-const CAT_CRUST: COLORREF = rgb(13, 15, 17);
+// 2026-09-30: align the native preview with the approved ViperPilot
+// rose-and-charcoal visual reference. This is presentation only.
+const CAT_BASE: COLORREF = rgb(15, 20, 25);
+const CAT_CRUST: COLORREF = rgb(15, 20, 25);
 const CAT_SURFACE0: COLORREF = rgb(26, 31, 36);
-const CAT_SURFACE1: COLORREF = rgb(48, 54, 61);
-const CAT_OVERLAY0: COLORREF = rgb(111, 119, 128);
-const CAT_TEXT: COLORREF = rgb(240, 242, 244);
-const CAT_SUBTEXT0: COLORREF = rgb(166, 174, 182);
+const CAT_SURFACE1: COLORREF = rgb(35, 41, 50);
+const CAT_BORDER: COLORREF = rgb(58, 65, 75);
+const CAT_OVERLAY0: COLORREF = rgb(163, 172, 183);
+const CAT_TEXT: COLORREF = rgb(234, 239, 244);
+const CAT_SUBTEXT0: COLORREF = rgb(163, 172, 183);
 const CAT_BLUE: COLORREF = rgb(137, 180, 250);
-const CAT_GREEN: COLORREF = rgb(166, 227, 161);
+const CAT_GREEN: COLORREF = rgb(60, 203, 143);
 const CAT_YELLOW: COLORREF = rgb(249, 226, 175);
 const CAT_RED: COLORREF = rgb(243, 139, 168);
-const VIPER_ROSE: COLORREF = rgb(235, 143, 164);
+const VIPER_ROSE: COLORREF = rgb(232, 125, 145);
+const VIPER_ACTIVE: COLORREF = rgb(162, 75, 92);
 const CAT_MAUVE: COLORREF = rgb(203, 166, 247);
 const CAT_PEACH: COLORREF = rgb(250, 179, 135);
 const MOUSE_BLACK: COLORREF = rgb(11, 11, 15);
@@ -1315,7 +1322,7 @@ fn mouse_hotspot_bounds(control: gui_logic::MouseControl) -> (i32, i32, i32, i32
         ),
         gui_logic::MouseControl::Right => (
             BASE_MOUSE_IMAGE_LEFT + 100,
-            BASE_MOUSE_IMAGE_TOP + 37,
+            BASE_MOUSE_IMAGE_TOP + 30,
             34,
             34,
         ),
@@ -1333,13 +1340,13 @@ fn mouse_hotspot_bounds(control: gui_logic::MouseControl) -> (i32, i32, i32, i32
         ),
         gui_logic::MouseControl::FrontSide => (
             BASE_MOUSE_IMAGE_LEFT + 32,
-            BASE_MOUSE_IMAGE_TOP + 122,
+            BASE_MOUSE_IMAGE_TOP + 126,
             34,
             34,
         ),
         gui_logic::MouseControl::Dpi => (
             BASE_MOUSE_IMAGE_LEFT + 78,
-            BASE_MOUSE_IMAGE_TOP + 97,
+            BASE_MOUSE_IMAGE_TOP + 102,
             34,
             34,
         ),
@@ -1443,12 +1450,7 @@ fn layout_status(window: HWND, status: &mut StatusWindow, detailed: bool) {
         return;
     }
     set_status_details_visible(status, true);
-    let _ = unsafe {
-        SetWindowTextW(
-            status.brand_title,
-            PCWSTR(wide("Viper V4 Pro Utility").as_ptr()),
-        )
-    };
+    let _ = unsafe { SetWindowTextW(status.brand_title, PCWSTR(wide("ViperPilot").as_ptr())) };
     let _ = unsafe {
         SetWindowTextW(
             status.brand_subtitle,
@@ -1502,8 +1504,6 @@ fn layout_status(window: HWND, status: &mut StatusWindow, detailed: bool) {
     ];
     let card_inset = scale(12, dpi);
     let label_height = scale(15, dpi);
-    let narrow_label_width = scale(42, dpi);
-    let narrow_value_left = scale(55, dpi);
     let card_width = |card: RECT| card.right - card.left;
 
     move_child(
@@ -1552,44 +1552,44 @@ fn layout_status(window: HWND, status: &mut StatusWindow, detailed: bool) {
     move_child(
         status.labels[3],
         power_card.left + card_inset,
-        power_card.top + scale(10, dpi),
-        narrow_label_width,
-        label_height,
+        power_card.top + scale(4, dpi),
+        card_width(power_card) - 2 * card_inset,
+        scale(12, dpi),
     );
     move_child(
         status.battery_value,
-        power_card.left + narrow_value_left,
-        power_card.top + scale(10, dpi),
-        card_width(power_card) - narrow_value_left - card_inset,
-        label_height,
+        power_card.left + card_inset,
+        power_card.top + scale(16, dpi),
+        card_width(power_card) - 2 * card_inset,
+        scale(15, dpi),
     );
     move_child(
         status.labels[4],
         power_card.left + card_inset,
-        power_card.top + scale(34, dpi),
-        narrow_label_width,
-        label_height,
+        power_card.top + scale(30, dpi),
+        card_width(power_card) - 2 * card_inset,
+        scale(12, dpi),
     );
     move_child(
         status.sleep_value,
-        power_card.left + narrow_value_left,
-        power_card.top + scale(34, dpi),
-        card_width(power_card) - narrow_value_left - card_inset,
-        label_height,
+        power_card.left + card_inset,
+        power_card.top + scale(42, dpi),
+        card_width(power_card) - 2 * card_inset,
+        scale(15, dpi),
     );
     move_child(
         status.labels[5],
         power_card.left + card_inset,
-        power_card.top + scale(58, dpi),
-        narrow_label_width,
-        label_height,
+        power_card.top + scale(56, dpi),
+        card_width(power_card) - 2 * card_inset,
+        scale(12, dpi),
     );
     move_child(
         status.low_power_value,
-        power_card.left + narrow_value_left,
-        power_card.top + scale(58, dpi),
-        card_width(power_card) - narrow_value_left - card_inset,
-        label_height,
+        power_card.left + card_inset,
+        power_card.top + scale(68, dpi),
+        card_width(power_card) - 2 * card_inset,
+        scale(15, dpi),
     );
     move_child(
         status.labels[6],
@@ -1761,6 +1761,22 @@ fn set_status_details_visible(status: &StatusWindow, visible: bool) {
 
 fn wide(text: &str) -> Vec<u16> {
     text.encode_utf16().chain(Some(0)).collect()
+}
+
+fn high_contrast_is_on_or_unknown() -> bool {
+    let mut settings = HIGHCONTRASTW {
+        cbSize: size_of::<HIGHCONTRASTW>() as u32,
+        ..Default::default()
+    };
+    unsafe {
+        SystemParametersInfoW(
+            SPI_GETHIGHCONTRAST,
+            0,
+            Some((&mut settings as *mut HIGHCONTRASTW).cast()),
+            Default::default(),
+        )
+    }
+    .map_or(true, |_| settings.dwFlags.contains(HCF_HIGHCONTRASTON))
 }
 
 fn layout_compact_status(window: HWND, status: &mut StatusWindow, dpi: u32) {
@@ -1964,6 +1980,54 @@ unsafe extern "system" fn window_proc(
                 validate_deferred_paint(runtime, window);
             }
             return LRESULT(0);
+        }
+        WM_NOTIFY if runtime.preview_mode => {
+            if lparam.0 == 0 {
+                return unsafe { DefWindowProcW(window, message, wparam, lparam) };
+            }
+            let header = unsafe { &*(lparam.0 as *const NMHDR) };
+            if header.code != NM_CUSTOMDRAW {
+                return unsafe { DefWindowProcW(window, message, wparam, lparam) };
+            }
+            let result = match runtime.app.try_borrow() {
+                Ok(app) if app.is_preview_button(header.hwndFrom, header.idFrom) => {
+                    let draw = unsafe { &*(lparam.0 as *const NMCUSTOMDRAW) };
+                    if draw.dwDrawStage != CDDS_PREPAINT || high_contrast_is_on_or_unknown() {
+                        None
+                    } else {
+                        let state = draw.uItemState;
+                        let mut button_state = 0;
+                        if state.0 & CDIS_DISABLED.0 != 0 {
+                            button_state |= ODS_DISABLED.0;
+                        }
+                        if state.0 & CDIS_SELECTED.0 != 0 {
+                            button_state |= ODS_SELECTED.0;
+                        }
+                        if state.0 & CDIS_FOCUS.0 != 0 {
+                            button_state |= ODS_FOCUS.0;
+                        }
+                        let drawn = app.draw_styled_button(
+                            header.idFrom,
+                            header.hwndFrom,
+                            draw.hdc,
+                            draw.rc,
+                            button_state,
+                            state.0 & CDIS_HOT.0 != 0,
+                        );
+                        drawn.then_some(LRESULT(CDRF_SKIPDEFAULT as isize))
+                    }
+                }
+                Ok(_) => None,
+                Err(_) => {
+                    runtime.paint_pending.set(true);
+                    None
+                }
+            };
+            if let Some(result) = result {
+                drain_deferred(runtime, window);
+                return result;
+            }
+            return unsafe { DefWindowProcW(window, message, wparam, lparam) };
         }
         WM_DRAWITEM => {
             #[allow(unused_mut)]
@@ -2240,42 +2304,42 @@ impl TrayApp {
             hdc,
             card(18, 78, 290, 480),
             CAT_SURFACE0,
-            CAT_SURFACE1,
+            CAT_BORDER,
             scale(14, dpi),
         );
         draw_panel(
             hdc,
             card(308, 77, 882, 140),
             CAT_SURFACE0,
-            CAT_SURFACE1,
+            CAT_BORDER,
             scale(12, dpi),
         );
         draw_panel(
             hdc,
             card(308, 145, 588, 210),
             CAT_SURFACE0,
-            CAT_SURFACE1,
+            CAT_BORDER,
             scale(12, dpi),
         );
         draw_panel(
             hdc,
             card(588, 145, 882, 210),
             CAT_SURFACE0,
-            CAT_SURFACE1,
+            CAT_BORDER,
             scale(12, dpi),
         );
         draw_panel(
             hdc,
             card(308, 216, 882, 332),
             CAT_SURFACE0,
-            CAT_SURFACE1,
+            CAT_BORDER,
             scale(12, dpi),
         );
         draw_panel(
             hdc,
             card(308, 337, 882, 456),
             CAT_SURFACE0,
-            CAT_SURFACE1,
+            CAT_BORDER,
             scale(12, dpi),
         );
         let mouse = card(66, 162, 256, 412);
@@ -2312,13 +2376,13 @@ impl TrayApp {
             right: scale(BASE_LEFT_PANEL_LEFT + BASE_LEFT_PANEL_WIDTH, dpi),
             bottom: scale(BASE_MAIN_TOP + BASE_MAIN_PANEL_HEIGHT, dpi),
         };
-        draw_panel(hdc, left_panel, CAT_SURFACE0, CAT_SURFACE1, scale(12, dpi));
+        draw_panel(hdc, left_panel, CAT_SURFACE0, CAT_BORDER, scale(12, dpi));
         for index in 0..4 {
             draw_panel(
                 hdc,
                 status_card_bounds(index, dpi),
                 CAT_SURFACE0,
-                CAT_SURFACE1,
+                CAT_BORDER,
                 scale(12, dpi),
             );
         }
@@ -2335,7 +2399,7 @@ impl TrayApp {
             hdc,
             assignment_panel,
             CAT_SURFACE0,
-            CAT_SURFACE1,
+            CAT_BORDER,
             scale(14, dpi),
         );
         let verification_panel = RECT {
@@ -2348,7 +2412,7 @@ impl TrayApp {
             hdc,
             verification_panel,
             CAT_SURFACE0,
-            CAT_SURFACE1,
+            CAT_BORDER,
             scale(12, dpi),
         );
         self.draw_mouse_visual(hdc, dpi);
@@ -2504,9 +2568,43 @@ impl TrayApp {
         (color, brush)
     }
 
+    fn is_preview_button(&self, control: HWND, id: usize) -> bool {
+        let Some(status) = self.status.as_ref() else {
+            return false;
+        };
+        match id {
+            BUTTON_DEVELOPER => status.developer_button == control,
+            BUTTON_GAMING => status.gaming_button == control,
+            BUTTON_VIEW_MODE => status.view_mode_button == control,
+            HOTSPOT_LEFT..=HOTSPOT_DPI => {
+                status.mouse_hotspots.contains(&control) && mouse_control_for_hotspot(id).is_some()
+            }
+            _ => false,
+        }
+    }
+
     fn draw_owner_button(&self, item: &DRAWITEMSTRUCT) -> bool {
+        self.draw_styled_button(
+            item.CtlID as usize,
+            item.hwndItem,
+            item.hDC,
+            item.rcItem,
+            item.itemState.0,
+            false,
+        )
+    }
+
+    fn draw_styled_button(
+        &self,
+        control_id: usize,
+        control: HWND,
+        hdc: HDC,
+        rect: RECT,
+        state: u32,
+        hot: bool,
+    ) -> bool {
         let quick_label = if !self.detailed {
-            let slot = match item.CtlID as usize {
+            let slot = match control_id {
                 BUTTON_DEVELOPER => Some(0),
                 BUTTON_GAMING => Some(1),
                 _ => None,
@@ -2515,14 +2613,13 @@ impl TrayApp {
         } else {
             None
         };
-        let (fixed_label, accent, active, corner_radius, is_hotspot) = match item.CtlID as usize {
+        let (fixed_label, active, corner_radius, is_hotspot) = match control_id {
             BUTTON_DEVELOPER => (
                 if self.detailed {
                     "Apply Developer recovery preset"
                 } else {
                     "Saved profile unavailable"
                 },
-                VIPER_ROSE,
                 if self.detailed {
                     self.current == ProfileMatch::Developer
                 } else {
@@ -2537,7 +2634,6 @@ impl TrayApp {
                 } else {
                     "Saved profile unavailable"
                 },
-                VIPER_ROSE,
                 if self.detailed {
                     self.current == ProfileMatch::Gaming
                 } else {
@@ -2552,7 +2648,6 @@ impl TrayApp {
                 } else {
                     "Details"
                 },
-                VIPER_ROSE,
                 false,
                 8,
                 false,
@@ -2563,7 +2658,6 @@ impl TrayApp {
                 };
                 (
                     control.hotspot_label(),
-                    hotspot_color(control),
                     self.selected_mouse_control == control,
                     8,
                     true,
@@ -2571,92 +2665,57 @@ impl TrayApp {
             }
         };
         let label = quick_label.as_deref().unwrap_or(fixed_label);
-        let disabled = item.itemState.0 & ODS_DISABLED.0 != 0;
-        let selected = item.itemState.0 & ODS_SELECTED.0 != 0;
-        let focused = item.itemState.0 & ODS_FOCUS.0 != 0;
+        let disabled = state & ODS_DISABLED.0 != 0;
+        let selected = state & ODS_SELECTED.0 != 0;
+        let focused = state & ODS_FOCUS.0 != 0;
         let (fill, border, text) = if disabled {
-            (CAT_SURFACE0, CAT_SURFACE1, CAT_OVERLAY0)
+            (CAT_SURFACE0, CAT_BORDER, CAT_OVERLAY0)
         } else if selected {
-            (CAT_SURFACE1, accent, CAT_TEXT)
+            (VIPER_ACTIVE, VIPER_ROSE, CAT_TEXT)
+        } else if hot {
+            (CAT_SURFACE1, VIPER_ROSE, CAT_TEXT)
         } else if active && is_hotspot {
-            (CAT_CRUST, accent, accent)
+            (CAT_CRUST, VIPER_ROSE, VIPER_ROSE)
         } else if active {
-            (accent, accent, CAT_CRUST)
+            (VIPER_ACTIVE, VIPER_ROSE, CAT_TEXT)
         } else {
-            (CAT_SURFACE0, accent, accent)
+            (CAT_SURFACE0, VIPER_ROSE, CAT_TEXT)
         };
-        let dpi = unsafe { GetDpiForWindow(item.hwndItem) };
-        if is_hotspot {
-            // Owner-draw child buttons otherwise retain the class brush in the
-            // corners outside the circle. Match the image's Mocha backdrop so
-            // the hotspot reads as a circle instead of a white square.
-            let _ = unsafe { FillRect(item.hDC, &item.rcItem, self.base_brush) };
-        }
-        let brush = unsafe { CreateSolidBrush(fill) };
-        let pen_width = if active && is_hotspot { 3 } else { 1 };
-        let pen = unsafe { CreatePen(PS_SOLID, scale(pen_width, dpi), border) };
-        let old_brush = unsafe { SelectObject(item.hDC, HGDIOBJ(brush.0)) };
-        let old_pen = unsafe { SelectObject(item.hDC, HGDIOBJ(pen.0)) };
-        if is_hotspot {
-            let _ = unsafe {
-                Ellipse(
-                    item.hDC,
-                    item.rcItem.left,
-                    item.rcItem.top,
-                    item.rcItem.right,
-                    item.rcItem.bottom,
-                )
-            };
-        } else {
-            let _ = unsafe {
-                RoundRect(
-                    item.hDC,
-                    item.rcItem.left,
-                    item.rcItem.top,
-                    item.rcItem.right,
-                    item.rcItem.bottom,
-                    scale(corner_radius, dpi),
-                    scale(corner_radius, dpi),
-                )
-            };
-        }
-        let old_font = self
+        let dpi = unsafe { GetDpiForWindow(control) };
+        let font = self
             .status
             .as_ref()
-            .map(|status| unsafe { SelectObject(item.hDC, HGDIOBJ(status.button_font.0)) });
-        let _ = unsafe { SetTextColor(item.hDC, text) };
-        let _ = unsafe { SetBkMode(item.hDC, TRANSPARENT) };
-        let mut wide: Vec<u16> = label.encode_utf16().collect();
-        let mut rect = item.rcItem;
-        let _ = unsafe {
-            DrawTextW(
-                item.hDC,
-                &mut wide,
-                &mut rect,
-                if !self.detailed && matches!(item.CtlID as usize, BUTTON_DEVELOPER | BUTTON_GAMING)
+            .map_or(HFONT::default(), |status| status.button_font);
+        let parent_background =
+            if !self.detailed && matches!(control_id, BUTTON_DEVELOPER | BUTTON_GAMING) {
+                self.surface_brush
+            } else {
+                self.base_brush
+            };
+        draw_button_gdi(
+            hdc,
+            rect,
+            label,
+            font,
+            parent_background,
+            ButtonPaintStyle {
+                fill,
+                border,
+                text_color: text,
+                corner_radius: scale(corner_radius, dpi),
+                pen_width: scale(if active && is_hotspot { 3 } else { 1 }, dpi),
+                is_hotspot,
+                focused,
+                multiline: !self.detailed && matches!(control_id, BUTTON_DEVELOPER | BUTTON_GAMING),
+                text_inset: if !self.detailed
+                    && matches!(control_id, BUTTON_DEVELOPER | BUTTON_GAMING)
                 {
-                    DT_CENTER | DT_VCENTER | windows::Win32::Graphics::Gdi::DT_WORDBREAK
+                    scale(10, dpi)
                 } else {
-                    DT_CENTER | DT_VCENTER | DT_SINGLELINE
+                    0
                 },
-            )
-        };
-        if focused {
-            let mut focus = item.rcItem;
-            focus.left += 4;
-            focus.top += 4;
-            focus.right -= 4;
-            focus.bottom -= 4;
-            let _ = unsafe { DrawFocusRect(item.hDC, &focus) };
-        }
-        if let Some(old_font) = old_font {
-            let _ = unsafe { SelectObject(item.hDC, old_font) };
-        }
-        let _ = unsafe { SelectObject(item.hDC, old_pen) };
-        let _ = unsafe { SelectObject(item.hDC, old_brush) };
-        let _ = unsafe { DeleteObject(HGDIOBJ(pen.0)) };
-        let _ = unsafe { DeleteObject(HGDIOBJ(brush.0)) };
-        true
+            },
+        )
     }
 
     fn show_window_now(&self, window: HWND) {
@@ -3274,6 +3333,208 @@ fn draw_panel(hdc: HDC, rect: RECT, fill: COLORREF, border: COLORREF, corner_rad
     let _ = unsafe { DeleteObject(HGDIOBJ(brush.0)) };
 }
 
+struct ButtonPaintStyle {
+    fill: COLORREF,
+    border: COLORREF,
+    text_color: COLORREF,
+    corner_radius: i32,
+    pen_width: i32,
+    is_hotspot: bool,
+    focused: bool,
+    multiline: bool,
+    text_inset: i32,
+}
+
+fn draw_button_gdi(
+    hdc: HDC,
+    rect: RECT,
+    label: &str,
+    font: HFONT,
+    background: HBRUSH,
+    style: ButtonPaintStyle,
+) -> bool {
+    let saved_dc = unsafe { SaveDC(hdc) };
+    if saved_dc == 0 {
+        return false;
+    }
+
+    let brush = unsafe { CreateSolidBrush(style.fill) };
+    if brush.0.is_null() {
+        let _ = unsafe { RestoreDC(hdc, saved_dc) };
+        return false;
+    }
+    let pen = unsafe { CreatePen(PS_SOLID, style.pen_width, style.border) };
+    if pen.0.is_null() {
+        let _ = unsafe { RestoreDC(hdc, saved_dc) };
+        let _ = unsafe { DeleteObject(HGDIOBJ(brush.0)) };
+        return false;
+    }
+
+    let mut old_brush = None;
+    let mut old_pen = None;
+    let mut old_font = None;
+    let mut old_text_color = None;
+    let mut old_background_mode = None;
+    let mut draw_ok = true;
+
+    if unsafe { FillRect(hdc, &rect, background) } == 0 {
+        draw_ok = false;
+    }
+    if draw_ok {
+        let previous = unsafe { SelectObject(hdc, HGDIOBJ(brush.0)) };
+        if gdi_selection_failed(previous) {
+            draw_ok = false;
+        } else {
+            old_brush = Some(previous);
+        }
+    }
+    if draw_ok {
+        let previous = unsafe { SelectObject(hdc, HGDIOBJ(pen.0)) };
+        if gdi_selection_failed(previous) {
+            draw_ok = false;
+        } else {
+            old_pen = Some(previous);
+        }
+    }
+    if draw_ok && !font.0.is_null() {
+        let previous = unsafe { SelectObject(hdc, HGDIOBJ(font.0)) };
+        if gdi_selection_failed(previous) {
+            draw_ok = false;
+        } else {
+            old_font = Some(previous);
+        }
+    }
+    if draw_ok {
+        let previous = unsafe { SetTextColor(hdc, style.text_color) };
+        if previous.0 == CLR_INVALID {
+            draw_ok = false;
+        } else {
+            old_text_color = Some(previous);
+        }
+    }
+    if draw_ok {
+        let previous = unsafe { SetBkMode(hdc, TRANSPARENT) };
+        if previous == 0 {
+            draw_ok = false;
+        } else {
+            old_background_mode = Some(previous);
+        }
+    }
+    if draw_ok {
+        let shape_drawn = if style.is_hotspot {
+            unsafe { Ellipse(hdc, rect.left, rect.top, rect.right, rect.bottom) }.as_bool()
+        } else {
+            unsafe {
+                RoundRect(
+                    hdc,
+                    rect.left,
+                    rect.top,
+                    rect.right,
+                    rect.bottom,
+                    style.corner_radius,
+                    style.corner_radius,
+                )
+            }
+            .as_bool()
+        };
+        draw_ok = shape_drawn;
+    }
+    if draw_ok {
+        let mut wide: Vec<u16> = label.encode_utf16().collect();
+        let format = if style.multiline {
+            DT_CENTER | windows::Win32::Graphics::Gdi::DT_WORDBREAK
+        } else {
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE
+        };
+        if style.multiline {
+            let content = RECT {
+                left: rect.left + style.text_inset,
+                top: rect.top + style.text_inset,
+                right: rect.right - style.text_inset,
+                bottom: rect.bottom - style.text_inset,
+            };
+            if content.right <= content.left || content.bottom <= content.top {
+                draw_ok = false;
+            } else {
+                let mut measured = content;
+                let required =
+                    unsafe { DrawTextW(hdc, &mut wide, &mut measured, format | DT_CALCRECT) };
+                let required_height = measured.bottom - measured.top;
+                let content_height = content.bottom - content.top;
+                if required <= 0 || required_height <= 0 || required_height > content_height {
+                    draw_ok = false;
+                } else {
+                    let top = content.top + (content_height - required_height) / 2;
+                    let mut text_rect = RECT {
+                        top,
+                        bottom: top + required_height,
+                        ..content
+                    };
+                    draw_ok = unsafe { DrawTextW(hdc, &mut wide, &mut text_rect, format) } > 0;
+                }
+            }
+        } else {
+            let mut text_rect = rect;
+            draw_ok = unsafe { DrawTextW(hdc, &mut wide, &mut text_rect, format) } > 0;
+        }
+    }
+    if draw_ok && style.focused {
+        let mut focus = rect;
+        focus.left += 4;
+        focus.top += 4;
+        focus.right -= 4;
+        focus.bottom -= 4;
+        draw_ok = unsafe { DrawFocusRect(hdc, &focus) }.as_bool();
+    }
+
+    let dc_restored = unsafe { RestoreDC(hdc, saved_dc) }.as_bool();
+    if !dc_restored {
+        if let Some(previous) = old_font {
+            draw_ok &= !gdi_selection_failed(unsafe { SelectObject(hdc, previous) });
+        }
+        if let Some(previous) = old_pen {
+            draw_ok &= !gdi_selection_failed(unsafe { SelectObject(hdc, previous) });
+        }
+        if let Some(previous) = old_brush {
+            draw_ok &= !gdi_selection_failed(unsafe { SelectObject(hdc, previous) });
+        }
+        if let Some(previous) = old_text_color {
+            draw_ok &= unsafe { SetTextColor(hdc, previous) }.0 != CLR_INVALID;
+        }
+        if let Some(previous) = old_background_mode {
+            draw_ok &= unsafe {
+                SetBkMode(
+                    hdc,
+                    windows::Win32::Graphics::Gdi::BACKGROUND_MODE(previous as u32),
+                )
+            } != 0;
+        }
+    }
+
+    let pen_deleted = delete_created_gdi_object(hdc, HGDIOBJ(pen.0), OBJ_PEN, dc_restored);
+    let brush_deleted = delete_created_gdi_object(hdc, HGDIOBJ(brush.0), OBJ_BRUSH, dc_restored);
+    draw_ok && dc_restored && pen_deleted && brush_deleted
+}
+
+fn gdi_selection_failed(object: HGDIOBJ) -> bool {
+    object.0.is_null() || object.0 as isize == -1
+}
+
+fn delete_created_gdi_object(
+    hdc: HDC,
+    object: HGDIOBJ,
+    object_type: windows::Win32::Graphics::Gdi::OBJ_TYPE,
+    dc_restored: bool,
+) -> bool {
+    if !dc_restored {
+        let selected = unsafe { GetCurrentObject(hdc, object_type) };
+        if gdi_selection_failed(selected) || selected == object {
+            return false;
+        }
+    }
+    unsafe { DeleteObject(object) }.as_bool()
+}
+
 /// Native fallback for a missing BMP. It is intentionally local to rendering:
 /// no input handling, state mutation, or device I/O is tied to this path.
 fn draw_mouse_placeholder(hdc: HDC, image: RECT, dpi: u32) {
@@ -3285,7 +3546,7 @@ fn draw_mouse_placeholder(hdc: HDC, image: RECT, dpi: u32) {
     };
     draw_panel(hdc, body, MOUSE_BLACK, CAT_OVERLAY0, scale(54, dpi));
 
-    let divider = unsafe { CreatePen(PS_SOLID, scale(1, dpi), CAT_SURFACE1) };
+    let divider = unsafe { CreatePen(PS_SOLID, scale(1, dpi), CAT_BORDER) };
     let old_pen = unsafe { SelectObject(hdc, HGDIOBJ(divider.0)) };
     let center = (body.left + body.right) / 2;
     let _ = unsafe { MoveToEx(hdc, center, body.top + scale(12, dpi), None) };
@@ -3345,7 +3606,7 @@ const fn hotspot_color(control: gui_logic::MouseControl) -> COLORREF {
 const fn tone_color(tone: Tone) -> COLORREF {
     match tone {
         Tone::Neutral => CAT_TEXT,
-        Tone::Developer => CAT_BLUE,
+        Tone::Developer => VIPER_ROSE,
         Tone::Gaming | Tone::Success => CAT_GREEN,
         Tone::Busy => CAT_SUBTEXT0,
         Tone::Warning => CAT_YELLOW,
@@ -3826,6 +4087,61 @@ fn registry_ok(status: WIN32_ERROR, action: &str) -> Result<(), String> {
 #[cfg(test)]
 mod quick_switch_tray_tests {
     use super::*;
+
+    #[test]
+    fn button_renderer_falls_back_for_an_invalid_device_context() {
+        assert!(!draw_button_gdi(
+            HDC::default(),
+            RECT::default(),
+            "Preview button",
+            HFONT::default(),
+            HBRUSH::default(),
+            ButtonPaintStyle {
+                fill: CAT_SURFACE0,
+                border: CAT_BORDER,
+                text_color: CAT_TEXT,
+                corner_radius: 8,
+                pen_width: 1,
+                is_hotspot: false,
+                focused: false,
+                multiline: false,
+                text_inset: 0,
+            },
+        ));
+    }
+
+    #[test]
+    fn numbered_mouse_hotspots_stay_separate_and_inside_the_image_at_common_dpis() {
+        for dpi in [96, 144, 192] {
+            let image = mouse_image_bounds(dpi);
+            let hotspots: Vec<RECT> = gui_logic::MouseControl::ALL
+                .into_iter()
+                .map(|control| {
+                    let (left, top, width, height) = mouse_hotspot_bounds(control);
+                    RECT {
+                        left: scale(left, dpi),
+                        top: scale(top, dpi),
+                        right: scale(left + width, dpi),
+                        bottom: scale(top + height, dpi),
+                    }
+                })
+                .collect();
+
+            for (index, hotspot) in hotspots.iter().enumerate() {
+                assert!(hotspot.left >= image.left, "left of image at {dpi} DPI");
+                assert!(hotspot.top >= image.top, "above image at {dpi} DPI");
+                assert!(hotspot.right <= image.right, "right of image at {dpi} DPI");
+                assert!(hotspot.bottom <= image.bottom, "below image at {dpi} DPI");
+                for other in &hotspots[index + 1..] {
+                    let overlaps = hotspot.left < other.right
+                        && other.left < hotspot.right
+                        && hotspot.top < other.bottom
+                        && other.top < hotspot.bottom;
+                    assert!(!overlaps, "mouse hotspots overlap at {dpi} DPI");
+                }
+            }
+        }
+    }
 
     #[test]
     fn direct_actions_resolve_pair_aliases_and_explain_the_preset() {
