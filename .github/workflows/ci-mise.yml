@@ -43,6 +43,8 @@ jobs:
           version: '2026.9.16'
           install: false
           cache: false
+      # 2026-10-02: Reuse native dependency builds across PR updates;
+      # exclude installed Cargo binaries from the shared cache.
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
