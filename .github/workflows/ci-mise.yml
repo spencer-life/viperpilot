@@ -43,6 +43,10 @@ jobs:
           version: '2026.9.16'
           install: false
           cache: false
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          cache-bin: false
       - name: Check, test, build, and smoke-test without hardware on Linux
         if: runner.os == 'Linux'
         run: mise run ci
