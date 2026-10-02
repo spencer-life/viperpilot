@@ -1,0 +1,12 @@
+[
+  {"file":"default.json","decode":true,"valid":true},
+  {"file":"work.json","decode":true,"valid":true},
+  {"file":"future-schema.json","decode":true,"valid":false},
+  {"file":"same-preset-pair.json","decode":true,"valid":false},
+  {"file":"missing-pair-target.json","decode":true,"valid":false},
+  {"file":"unproven-dpi.json","decode":false,"valid":false},
+  {"file":"embedded-baseline.json","decode":false,"valid":false},
+  {"file":"unknown-preset.json","decode":false,"valid":false},
+  {"file":"duplicate-id.json","decode":true,"valid":false},
+  {"file":"malformed.json","decode":false,"valid":false}
+]

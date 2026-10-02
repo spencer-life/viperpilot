@@ -8,6 +8,6 @@ Hardware support and writes must follow the evidence gates in `AGENTS.md` and `R
 
 Source is licensed under GPL-2.0-only. See `LICENSE` and `NOTICE.md` for license and provenance details.
 
-Snapshot source ref: `62ff682b320f146a36fd595550448127591ad355`
+Snapshot source ref: `origin/feat/quick-switch-profiles`
 
-Snapshot source commit: `62ff682b320f146a36fd595550448127591ad355`
+Snapshot source commit: `6d03bec87364744e3c8a5fde9674a716d6b400b5`

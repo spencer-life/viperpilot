@@ -24,11 +24,23 @@
     "src/lib.rs",
     "src/model.rs",
     "src/planning.rs",
+    "src/profile_library.rs",
     "src/protocol.rs",
     "src/storage.rs",
     "src/tray.rs",
     "src/tray_logic.rs",
-    "src/windows.rs"
+    "src/windows.rs",
+    "tests/fixtures/profiles/cases.json",
+    "tests/fixtures/profiles/default.json",
+    "tests/fixtures/profiles/duplicate-id.json",
+    "tests/fixtures/profiles/embedded-baseline.json",
+    "tests/fixtures/profiles/future-schema.json",
+    "tests/fixtures/profiles/malformed.json",
+    "tests/fixtures/profiles/missing-pair-target.json",
+    "tests/fixtures/profiles/same-preset-pair.json",
+    "tests/fixtures/profiles/unknown-preset.json",
+    "tests/fixtures/profiles/unproven-dpi.json",
+    "tests/fixtures/profiles/work.json"
   ],
   "generated_paths": [
     "README.md",
@@ -39,7 +51,7 @@
     ".github/workflows/ci-mise.yml",
     "assets/viper-utility-icon.png"
   ],
-  "source_commit": "62ff682b320f146a36fd595550448127591ad355",
+  "source_commit": "6d03bec87364744e3c8a5fde9674a716d6b400b5",
   "source_paths": [
     ".github/workflows/ci-mise.yml",
     ".gitignore",
@@ -62,11 +74,23 @@
     "src/lib.rs",
     "src/model.rs",
     "src/planning.rs",
+    "src/profile_library.rs",
     "src/protocol.rs",
     "src/storage.rs",
     "src/tray.rs",
     "src/tray_logic.rs",
-    "src/windows.rs"
+    "src/windows.rs",
+    "tests/fixtures/profiles/cases.json",
+    "tests/fixtures/profiles/default.json",
+    "tests/fixtures/profiles/duplicate-id.json",
+    "tests/fixtures/profiles/embedded-baseline.json",
+    "tests/fixtures/profiles/future-schema.json",
+    "tests/fixtures/profiles/malformed.json",
+    "tests/fixtures/profiles/missing-pair-target.json",
+    "tests/fixtures/profiles/same-preset-pair.json",
+    "tests/fixtures/profiles/unknown-preset.json",
+    "tests/fixtures/profiles/unproven-dpi.json",
+    "tests/fixtures/profiles/work.json"
   ],
-  "source_ref": "62ff682b320f146a36fd595550448127591ad355"
+  "source_ref": "origin/feat/quick-switch-profiles"
 }
