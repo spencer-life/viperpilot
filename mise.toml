@@ -1,5 +1,5 @@
 [tools]
-"cargo:cargo-xwin" = "0.22.0"
+"cargo:cargo-xwin" = "0.23.1"
 "conda:clang" = "22.1.8"
 "conda:lld" = "22.1.8"
 
