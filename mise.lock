@@ -111,9 +111,9 @@ url = "https://conda.anaconda.org/conda-forge/linux-64/zstd-1.5.7-hb78ec9c_7.con
 checksum = "sha256:47d682b9f6d6ec9eb1a6e6c3e75ea6273e899e78fb7fc59f81d39745009fbc60"
 
 [[tools."cargo:cargo-xwin"]]
-version = "0.22.0"
+version = "0.23.1"
 backend = "cargo:cargo-xwin"
-specifiers = ["0.22.0"]
+specifiers = ["0.23.1"]
 
 [[tools."conda:clang"]]
 version = "22.1.8"
