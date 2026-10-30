@@ -12,9 +12,27 @@ switcher/dashboard with synthetic state. Run `Editor.cmd` for the local draft
 editor; its files stay in this package's `data/editor` directory. Editor Apply
 remains disabled. These launchers do not install anything or change startup.
 
-The isolated preview has measured layout and keyboard coverage; the real
-notification-area icon/menu and production profile behavior still need observed
-validation. Synthetic previews are not evidence of device writes or persistence.
+The isolated preview has measured layout, keyboard, popup-menu and pair-swap
+coverage. For a separately labeled synthetic notification-area preview, run
+`.\viperpilot-ui-preview.exe --tray-icon --pilot-read-only`. Its tooltip is
+`ViperPilot PREVIEW — no device access`; Alt+F4 hides it and its menu Exit closes
+it. It has no worker or device access. Actual notification-area appearance,
+tooltip and Shell activation/hide-reopen remain unobserved because the UI tool
+could not target the notification area. Production profile behavior still needs
+approved live validation. Synthetic previews do not prove device persistence.
+
+## Review an existing baseline offline
+
+`.\viperctl.exe inspect-snapshot 'PATH_TO_EXISTING_BASELINE'` validates and prints
+only that supplied file without accessing a mouse or writing application data.
+Keep its identity-rich output private. Passing format validation does not prove
+that the file is the original baseline or matches the connected device.
+
+The new `observe` command performs GETs without creating a snapshot, baseline,
+configuration or journal. It still requires separate approval before any live
+device access. Do not substitute `snapshot`, which creates development storage
+and can create a first baseline. Review the [phased device preparation](https://github.com/spencer-life/viperpilot/blob/feat/pilot-candidate-refresh/docs/device-review-preparation.md)
+before any hardware command. No enumeration or GET capture has been performed.
 
 ## Prepare a supervised session
 

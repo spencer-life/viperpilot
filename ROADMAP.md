@@ -1,5 +1,10 @@
 # ViperPilot roadmap
 
+**Current assembled source:** [candidate refresh](docs/work/2026-10-29-candidate-refresh.md)
+integrates the reviewed UI fix, offline/read-only review CLI and package
+verifier on `feat/pilot-candidate-refresh`. Native integration CI passed;
+the owner has requested real-device preparation for review only.
+
 **Latest 2026-10-29 UI continuation:** [additional isolated coverage](docs/work/2026-10-29-remaining-ui.md)
 fixes pair reversal, adds an opt-in synthetic tray icon and extends composition
 and editor desktop checks. Local CI, pair-swap retesting and native harnesses

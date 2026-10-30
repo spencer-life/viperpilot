@@ -2,6 +2,14 @@
 
 Updated 2026-10-29. This brief is the starting point for a new coding session.
 
+**Current assembled source:** `feat/pilot-candidate-refresh` integrates the UI
+follow-up, read-only review CLI and static package verifier. Read the
+[candidate refresh record](work/2026-10-29-candidate-refresh.md) and
+[device review preparation](device-review-preparation.md). Final local native
+integration CI passed. Package manifests identify their exact source; the
+original `33adccf7dafa` archive must remain preserved. No live-device operation
+or production launch is authorized by this checkpoint.
+
 **Latest isolated UI continuation:** read [additional UI coverage](work/2026-10-29-remaining-ui.md)
 for the atomic pair-swap fix, opt-in synthetic notification-area icon, new editor
 composition tests and fresh desktop evidence. Local native CI passes. Follow-up
