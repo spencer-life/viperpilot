@@ -7,3 +7,8 @@ shell = "powershell"
 [tasks.package-pilot]
 description = "Build and package a clean-commit Windows pilot ZIP; never launch or install."
 run = "powershell -NoProfile -File scripts/package-pilot.ps1"
+
+# 2026-10-29: inspect a reviewed download without extracting or executing it.
+[tasks.verify-pilot-package]
+description = "Verify a pilot ZIP against its reviewed hash/commit, file manifest and x64 headers."
+run = "powershell -NoProfile -File scripts/verify-pilot-package.ps1"
