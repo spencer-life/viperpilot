@@ -9,6 +9,10 @@ follow-up, read-only review CLI and static package verifier. Read the
 integration CI passed. Package manifests identify their exact source; the
 original `33adccf7dafa` archive must remain preserved. No live-device operation
 or production launch is authorized by this checkpoint.
+The refreshed draft from `2df219c66db0` is uploaded with matching remote digest.
+Its static verification and three packaged native harnesses passed; extra
+Computer Use input smoke was blocked by window activation, with initial views
+only observed. Read the refresh record for exact hashes and cleanup results.
 
 **Latest isolated UI continuation:** read [additional UI coverage](work/2026-10-29-remaining-ui.md)
 for the atomic pair-swap fix, opt-in synthetic notification-area icon, new editor
