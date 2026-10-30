@@ -1,5 +1,12 @@
 # ViperPilot roadmap
 
+**2026-10-29 unattended checks:** [synthetic menu validation](docs/work/2026-10-29-synthetic-menu.md)
+adds real native menu structure/state tests and a preview-only popup. Windows
+CI now executes both preview features. A separate source branch verifies the
+portable ZIP statically. The draft candidate is uploaded and frozen at
+`33adccf7dafa`; live profiles, actual tray/hotkey, persistence and performance
+remain gated. These checks preserve the legacy app and physical device state.
+
 Read the [current readiness ledger](docs/work/2026-10-29-readiness-ledger.md) for the full completed/pending split and exact source sequence.
 
 ## Remote backups and next gate — 2026-10-29

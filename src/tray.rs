@@ -62,18 +62,18 @@ use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, BN_CLICKED, CREATESTRUCTW, CW_USEDEFAULT, CreatePopupMenu, CreateWindowExW,
     DC_HASDEFID, DM_GETDEFID, DefWindowProcW, DestroyMenu, DestroyWindow, DispatchMessageW,
     FindWindowW, GWLP_USERDATA, GetClientRect, GetCursorPos, GetDlgCtrlID, GetDlgItem, GetMessageW,
-    GetWindowLongPtrW, HICON, HMENU, ICON_BIG, ICON_SMALL, IDC_ARROW, IDI_APPLICATION,
-    IMAGE_BITMAP, IMAGE_ICON, IsDialogMessageW, IsIconic, IsWindowVisible, LR_LOADFROMFILE,
-    LoadCursorW, LoadIconW, LoadImageW, MF_CHECKED, MF_GRAYED, MF_POPUP, MF_STRING, MSG,
-    MoveWindow, PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW,
-    SPI_GETHIGHCONTRAST, SW_HIDE, SW_RESTORE, SW_SHOW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER,
-    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow,
-    SystemParametersInfoW, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage,
-    WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CTLCOLORSTATIC,
-    WM_DESTROY, WM_DEVICECHANGE, WM_DPICHANGED, WM_DRAWITEM, WM_HOTKEY, WM_LBUTTONDBLCLK,
-    WM_LBUTTONUP, WM_NCCREATE, WM_NCDESTROY, WM_NOTIFY, WM_PAINT, WM_RBUTTONUP, WM_SETFONT,
-    WM_SETICON, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_CLIPCHILDREN, WS_MINIMIZEBOX, WS_OVERLAPPED,
-    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    GetWindowLongPtrW, GetWindowRect, HICON, HMENU, ICON_BIG, ICON_SMALL, IDC_ARROW,
+    IDI_APPLICATION, IMAGE_BITMAP, IMAGE_ICON, IsDialogMessageW, IsIconic, IsWindowVisible,
+    LR_LOADFROMFILE, LoadCursorW, LoadIconW, LoadImageW, MF_CHECKED, MF_GRAYED, MF_POPUP,
+    MF_STRING, MSG, MoveWindow, PostMessageW, PostQuitMessage, RegisterClassW,
+    RegisterWindowMessageW, SPI_GETHIGHCONTRAST, SW_HIDE, SW_RESTORE, SW_SHOW, SWP_NOACTIVATE,
+    SWP_NOMOVE, SWP_NOZORDER, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos,
+    SetWindowTextW, ShowWindow, SystemParametersInfoW, TPM_RETURNCMD, TPM_RIGHTBUTTON,
+    TrackPopupMenu, TranslateMessage, WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
+    WM_CONTEXTMENU, WM_CTLCOLORSTATIC, WM_DESTROY, WM_DEVICECHANGE, WM_DPICHANGED, WM_DRAWITEM,
+    WM_HOTKEY, WM_LBUTTONDBLCLK, WM_LBUTTONUP, WM_NCCREATE, WM_NCDESTROY, WM_NOTIFY, WM_PAINT,
+    WM_RBUTTONUP, WM_SETFONT, WM_SETICON, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_CLIPCHILDREN,
+    WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{BOOL, PCWSTR, w};
 
@@ -92,6 +92,10 @@ use crate::storage::{
     save_profile_library, write_plan_journal, write_verification_report,
 };
 use crate::windows::{RazerDevice, refuse_if_synapse_running};
+
+#[cfg(all(test, feature = "ui-preview"))]
+#[path = "tray_menu_tests.rs"]
+mod menu_preview_tests;
 
 // 2026-09-30: reserve development-only Windows identities so future reviewed
 // launches cannot signal or reconcile startup for the installed legacy app.
@@ -521,7 +525,7 @@ enum DeferredAction {
     WorkerEvent,
     Refresh,
     TrayOpen,
-    TrayMenu,
+    TrayMenu(bool),
     Dpi(RECT),
     ShowWindow,
 }
@@ -571,6 +575,7 @@ fn ignored_while_closing(closing: bool, show_message: u32, message: u32) -> bool
                 | WM_DEVICECHANGE
                 | WM_COMMAND
                 | TRAY_CALLBACK
+                | WM_CONTEXTMENU
         ) || (show_message != 0 && message == show_message))
 }
 
@@ -940,7 +945,15 @@ fn run_inner(show_window_at_start: bool, pilot: Option<PilotSession>) -> Result<
 /// startup, hotkey, mutex, storage, or Synapse integrations.
 #[cfg(feature = "ui-preview")]
 pub fn run_preview(reversed_pair: bool, unavailable_library: bool) -> Result<(), String> {
-    let _ = unsafe { SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) };
+    run_preview_with_options(reversed_pair, unavailable_library, false)
+}
+
+#[cfg(feature = "ui-preview")]
+fn preview_app(
+    reversed_pair: bool,
+    unavailable_library: bool,
+    read_only_pilot: bool,
+) -> Result<TrayApp, String> {
     let (event_tx, event_rx) = mpsc::channel();
     let (command_tx, command_rx) = mpsc::channel();
     drop(event_tx);
@@ -949,36 +962,48 @@ pub fn run_preview(reversed_pair: bool, unavailable_library: bool) -> Result<(),
     if reversed_pair && let Some(library) = library.as_mut() {
         library.set_quick_switch("gaming", "developer")?;
     }
+    Ok(TrayApp {
+        command_tx,
+        event_rx,
+        current: ProfileMatch::Developer,
+        config: UtilityConfigV1::default(),
+        library,
+        initializing: false,
+        busy: None,
+        connection: ConnectionStatus::Connected,
+        polling_hz: Some(1000),
+        dpi: Some(DpiPair { x: 1600, y: 1600 }),
+        power: None,
+        button_assignments: None,
+        selected_mouse_control: gui_logic::MouseControl::RearSide,
+        last_verification: None,
+        last_error: None,
+        presentation: None,
+        view: NativeView::Compact,
+        status: None,
+        base_brush: unsafe { CreateSolidBrush(CAT_BASE) },
+        surface_brush: unsafe { CreateSolidBrush(CAT_SURFACE0) },
+        row_brush: unsafe { CreateSolidBrush(CAT_SURFACE1) },
+        mouse_bitmap: load_mouse_bitmap(DASHBOARD_MOUSE_BMP),
+        compact_mouse_bitmap: load_mouse_bitmap(COMPACT_MOUSE_BMP),
+        preview_mode: true,
+        pilot_mode: read_only_pilot,
+        device_writes_enabled: !read_only_pilot,
+        quit_requested: false,
+    })
+}
+
+/// Synthetic preview including the real popup-menu builder. Right-click the
+/// window or press Shift+F10; selections never enter production dispatch.
+#[cfg(feature = "ui-preview")]
+pub fn run_preview_with_options(
+    reversed_pair: bool,
+    unavailable_library: bool,
+    read_only_pilot: bool,
+) -> Result<(), String> {
+    let _ = unsafe { SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) };
     let runtime = Box::new(WindowRuntime::new(
-        TrayApp {
-            command_tx,
-            event_rx,
-            current: ProfileMatch::Developer,
-            config: UtilityConfigV1::default(),
-            library,
-            initializing: false,
-            busy: None,
-            connection: ConnectionStatus::Connected,
-            polling_hz: Some(1000),
-            dpi: Some(DpiPair { x: 1600, y: 1600 }),
-            power: None,
-            button_assignments: None,
-            selected_mouse_control: gui_logic::MouseControl::RearSide,
-            last_verification: None,
-            last_error: None,
-            presentation: None,
-            view: NativeView::Compact,
-            status: None,
-            base_brush: unsafe { CreateSolidBrush(CAT_BASE) },
-            surface_brush: unsafe { CreateSolidBrush(CAT_SURFACE0) },
-            row_brush: unsafe { CreateSolidBrush(CAT_SURFACE1) },
-            mouse_bitmap: load_mouse_bitmap(DASHBOARD_MOUSE_BMP),
-            compact_mouse_bitmap: load_mouse_bitmap(COMPACT_MOUSE_BMP),
-            preview_mode: true,
-            pilot_mode: false,
-            device_writes_enabled: true,
-            quit_requested: false,
-        },
+        preview_app(reversed_pair, unavailable_library, read_only_pilot)?,
         true,
         0,
     ));
@@ -1023,7 +1048,12 @@ unsafe fn preview_window_proc(
         WM_DEVICECHANGE | WM_HOTKEY | TRAY_CALLBACK | WORKER_EVENT => LRESULT(0),
         WM_COMMAND => {
             let command = wparam.0 & 0xffff;
-            if let Some(view) = view_after_command(app.view, command) {
+            if app.handle_preview_menu_command(command) {
+                if command == MENU_OPEN {
+                    app.show_window_now(window);
+                }
+                app.update_ui(window);
+            } else if let Some(view) = view_after_command(app.view, command) {
                 app.view = view;
                 if let Some(status) = app.status.as_mut() {
                     layout_status(window, status, app.view);
@@ -2254,10 +2284,19 @@ unsafe extern "system" fn window_proc(
                 runtime.defer(DeferredAction::Command(command));
             }
         }
+        // 2026-10-29: only the isolated preview opens the real menu without a
+        // tray icon. Display remains deferred, outside every TrayApp borrow.
+        WM_CONTEXTMENU if runtime.preview_mode => {
+            if !runtime.popup_pending.replace(true) {
+                runtime.defer(DeferredAction::TrayMenu(context_menu_from_keyboard(
+                    lparam.0,
+                )));
+            }
+        }
         TRAY_CALLBACK => match u32::from(crate::tray_logic::notification_event_code(lparam.0)) {
             WM_CONTEXTMENU | WM_RBUTTONUP if !runtime.preview_mode => {
                 if !runtime.popup_pending.replace(true) {
-                    runtime.defer(DeferredAction::TrayMenu);
+                    runtime.defer(DeferredAction::TrayMenu(false));
                 }
             }
             WM_LBUTTONUP | WM_LBUTTONDBLCLK if !runtime.preview_mode => {
@@ -2421,11 +2460,7 @@ fn drain_deferred(runtime: &WindowRuntime, window: HWND) {
 
 fn dispatch_deferred(runtime: &WindowRuntime, window: HWND, action: DeferredAction) -> bool {
     match action {
-        DeferredAction::TrayMenu => {
-            if runtime.preview_mode {
-                runtime.popup_pending.set(false);
-                return true;
-            }
+        DeferredAction::TrayMenu(from_keyboard) => {
             let menu = {
                 let Ok(app) = runtime.app.try_borrow() else {
                     return false;
@@ -2435,7 +2470,7 @@ fn dispatch_deferred(runtime: &WindowRuntime, window: HWND, action: DeferredActi
             if let Some(menu) = menu {
                 // TrackPopupMenu runs a modal loop. Its menu is a snapshot, and
                 // no TrayApp borrow crosses that loop.
-                let selected_command = track_popup_menu(window, menu);
+                let selected_command = track_popup_menu(window, menu, from_keyboard);
                 runtime.popup_pending.set(false);
                 if selected_command != 0 {
                     // The returned ID refers to the menu snapshot. Apply it
@@ -2504,7 +2539,7 @@ fn dispatch_deferred(runtime: &WindowRuntime, window: HWND, action: DeferredActi
                         }
                     }
                 }
-                DeferredAction::TrayMenu => unreachable!("handled before borrowing app"),
+                DeferredAction::TrayMenu(_) => unreachable!("handled before borrowing app"),
             }
             let should_quit = app.quit_requested;
             drop(app);
@@ -2559,10 +2594,22 @@ impl TrayApp {
                 );
                 set_text(
                     window,
-                    if self.device_writes_enabled {
+                    if self.preview_mode {
+                        "ViperPilot PREVIEW — read-only pilot"
+                    } else if self.device_writes_enabled {
                         "ViperPilot — supervised pilot"
                     } else {
                         "ViperPilot — read-only pilot"
+                    },
+                );
+            }
+            if self.preview_mode {
+                set_text(
+                    status.brand_subtitle,
+                    if self.pilot_mode {
+                        "PREVIEW · read-only pilot · no device access"
+                    } else {
+                        "PREVIEW · right-click for menu · no device access"
                     },
                 );
             }
@@ -3501,8 +3548,84 @@ impl TrayApp {
         self.update_ui(window);
     }
 
+    #[cfg(feature = "ui-preview")]
+    fn handle_preview_menu_command(&mut self, command: usize) -> bool {
+        if !is_known_menu_command(command) {
+            return false;
+        }
+        if command == MENU_OPEN || self.busy.is_some() {
+            return true;
+        }
+        // 2026-10-29: this simulation never calls production command dispatch,
+        // notifications, storage, startup helpers or the device channel.
+        match command {
+            MENU_EXIT => self.quit_requested = true,
+            MENU_STARTUP if !self.pilot_mode => {
+                self.config.start_with_windows = !self.config.start_with_windows
+            }
+            MENU_DIAGNOSTICS => self.config.diagnostics_enabled = !self.config.diagnostics_enabled,
+            MENU_EXIT_AFTER_GAMING => {
+                self.config.exit_after_gaming = !self.config.exit_after_gaming
+            }
+            MENU_RELOAD_LIBRARY | MENU_STARTUP => {}
+            id if (MENU_QUICK_FIRST_BASE..MENU_QUICK_SECOND_BASE + MAX_SAVED_PROFILES)
+                .contains(&id) =>
+            {
+                let (slot, base) = if id < MENU_QUICK_SECOND_BASE {
+                    (0, MENU_QUICK_FIRST_BASE)
+                } else {
+                    (1, MENU_QUICK_SECOND_BASE)
+                };
+                if let Some(library) = self.library.as_mut() {
+                    let id = library
+                        .entries()
+                        .get(id - base)
+                        .map(|entry| entry.id().to_owned());
+                    if let Some(id) = id {
+                        let mut pair = library.quick_switch().clone();
+                        pair[slot] = id;
+                        let _ = library.set_quick_switch(&pair[0], &pair[1]);
+                    }
+                }
+            }
+            id if self.device_writes_enabled && self.connection == ConnectionStatus::Connected => {
+                let target = match id {
+                    MENU_DEVELOPER => Some(ProfileName::Developer),
+                    MENU_GAMING => Some(ProfileName::Gaming),
+                    MENU_QUICK_APPLY_FIRST | MENU_QUICK_APPLY_SECOND => {
+                        let slot = usize::from(id == MENU_QUICK_APPLY_SECOND);
+                        self.library
+                            .as_ref()
+                            .and_then(|library| quick_switch_action(library, slot).ok())
+                            .map(|action| action.expected_preset)
+                    }
+                    id if (MENU_SAVED_APPLY_BASE..MENU_SAVED_APPLY_BASE + MAX_SAVED_PROFILES)
+                        .contains(&id) =>
+                    {
+                        self.library
+                            .as_ref()
+                            .and_then(|library| library.entries().get(id - MENU_SAVED_APPLY_BASE))
+                            .map(|entry| entry.source_preset())
+                    }
+                    _ => None,
+                };
+                if let Some(target) = target {
+                    self.current = match target {
+                        ProfileName::Developer => ProfileMatch::Developer,
+                        ProfileName::Gaming => ProfileMatch::Gaming,
+                    };
+                }
+            }
+            _ => {}
+        }
+        true
+    }
+
     fn build_menu(&self) -> Option<HMENU> {
         let menu = unsafe { CreatePopupMenu() }.ok()?;
+        if self.preview_mode {
+            append_menu(menu, MF_GRAYED, 0, "PREVIEW — simulated actions only");
+        }
         // Keep the popup in the native system theme. A dark MIM_BACKGROUND
         // without matching owner-drawn text can make the tray menu unreadable.
         let disabled = if self.busy.is_some() {
@@ -3658,10 +3781,33 @@ impl TrayApp {
     }
 }
 
-fn track_popup_menu(window: HWND, menu: HMENU) -> usize {
+fn context_menu_from_keyboard(lparam: isize) -> bool {
+    // WM_CONTEXTMENU packs signed x/y into the low 32 bits. Both words -1
+    // identify keyboard origin, whether x64 LPARAM is zero- or sign-extended.
+    lparam as u32 == u32::MAX
+}
+
+fn keyboard_menu_anchor(rect: RECT, dpi: u32) -> POINT {
+    POINT {
+        x: rect.left + scale(24, dpi.max(96)),
+        y: rect.top + scale(52, dpi.max(96)),
+    }
+}
+
+fn track_popup_menu(window: HWND, menu: HMENU, from_keyboard: bool) -> usize {
     let mut selected_command = 0;
     let mut point = POINT::default();
-    if unsafe { GetCursorPos(&mut point) }.is_ok() {
+    // 2026-10-29: Shift+F10 uses (-1,-1), not a cursor location. Anchor the
+    // synthetic keyboard menu to its window; pointer/tray invocation is unchanged.
+    let located = if from_keyboard {
+        let mut rect = RECT::default();
+        unsafe { GetWindowRect(window, &mut rect) }.map(|()| {
+            point = keyboard_menu_anchor(rect, unsafe { GetDpiForWindow(window) });
+        })
+    } else {
+        unsafe { GetCursorPos(&mut point) }
+    };
+    if located.is_ok() {
         let _ = unsafe { SetForegroundWindow(window) };
         selected_command = unsafe {
             TrackPopupMenu(

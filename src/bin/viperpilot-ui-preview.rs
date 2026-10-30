@@ -4,17 +4,23 @@
 fn main() -> std::process::ExitCode {
     let mut reversed_pair = false;
     let mut unavailable_library = false;
+    let mut read_only_pilot = false;
     for arg in std::env::args().skip(1) {
         match arg.as_str() {
             "--reversed" => reversed_pair = true,
             "--unavailable" => unavailable_library = true,
+            "--pilot-read-only" => read_only_pilot = true,
             _ => {
                 eprintln!("viperpilot-ui-preview: unknown argument {arg:?}");
                 return std::process::ExitCode::FAILURE;
             }
         }
     }
-    match viper_v4_utility::tray::run_preview(reversed_pair, unavailable_library) {
+    match viper_v4_utility::tray::run_preview_with_options(
+        reversed_pair,
+        unavailable_library,
+        read_only_pilot,
+    ) {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("viperpilot-ui-preview: {error}");

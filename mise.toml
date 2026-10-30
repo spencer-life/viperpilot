@@ -109,7 +109,8 @@ run = [
 description = "Compile, lint, and headlessly test the isolated Windows previews without launching them."
 run = [
   "cargo clippy --all-targets --features ui-preview,egui-preview --locked -- -D warnings -A clippy::pedantic",
-  "cargo test --all-targets --features egui-preview --locked",
+  # 2026-10-29: execute native menu regressions as well as editor tests.
+  "cargo test --all-targets --features ui-preview,egui-preview --locked",
   "cargo build --release --locked --features ui-preview --bin viperpilot-ui-preview",
 ]
 

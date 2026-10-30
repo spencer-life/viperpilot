@@ -2,6 +2,13 @@
 
 Updated 2026-09-30. This brief is the starting point for a new coding session.
 
+**2026-10-29 unattended follow-up:** see [synthetic menu validation](work/2026-10-29-synthetic-menu.md)
+for actual native menu objects, in-memory preview command routing, nine new menu
+regressions and the corrected Windows preview CI feature coverage. Independent
+package verification is on `test/portable-package-verification`. The uploaded
+draft download remains frozen at `33adccf7dafa`; neither follow-up enables a
+production launch or establishes live mouse behavior.
+
 **2026-10-29 tonight-use priority:** current native Windows work is in
 `feat/controlled-pilot`, above the published `fix/editor-storage-status`
 checkpoint. See [portable pilot instructions](pilot-candidate.md). The owner
