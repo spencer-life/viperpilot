@@ -1,6 +1,14 @@
 [CmdletBinding()]
 param()
 $ErrorActionPreference = 'Stop'
+# 2026-10-29: Windows PowerShell inherited a module path without Get-FileHash.
+# Use framework APIs for hashing/ZIP creation instead of optional module cmdlets.
+function Get-ViperSha256([string]$Path) {
+    $viperStream = [IO.File]::OpenRead($Path)
+    $viperHasher = [Security.Cryptography.SHA256]::Create()
+    try { return [BitConverter]::ToString($viperHasher.ComputeHash($viperStream)).Replace('-','').ToLowerInvariant() }
+    finally { $viperStream.Dispose(); $viperHasher.Dispose() }
+}
 $viperRepository = Split-Path $PSScriptRoot -Parent
 Push-Location $viperRepository
 try {
@@ -41,11 +49,12 @@ try {
         pilot_startup_changes = $false
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $viperStage 'build-info.json') -Encoding utf8
     $viperHashes = Get-ChildItem -LiteralPath $viperStage -File | Sort-Object Name | ForEach-Object {
-        (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $_.Name
+        (Get-ViperSha256 $_.FullName) + '  ' + $_.Name
     }
     $viperHashes | Set-Content -LiteralPath (Join-Path $viperStage 'SHA256SUMS.txt') -Encoding ascii
-    Compress-Archive -LiteralPath $viperStage -DestinationPath $viperZip -CompressionLevel Optimal
-    $viperZipHash = (Get-FileHash -LiteralPath $viperZip -Algorithm SHA256).Hash.ToLowerInvariant()
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [IO.Compression.ZipFile]::CreateFromDirectory($viperStage, $viperZip, [IO.Compression.CompressionLevel]::Optimal, $true)
+    $viperZipHash = Get-ViperSha256 $viperZip
     ($viperZipHash + '  ' + [IO.Path]::GetFileName($viperZip)) | Set-Content -LiteralPath ($viperZip + '.sha256') -Encoding ascii
     [pscustomobject]@{ Zip=$viperZip; SHA256=$viperZipHash; SourceCommit=$viperCommit }
 } finally { Pop-Location }
