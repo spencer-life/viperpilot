@@ -36,10 +36,21 @@ Actions runs were triggered. Earlier local-only/publication-blocked notes below
 are historical; local CI remains the validation route while hosted quota is
 exhausted. Read the [production validation proposal](work/2026-10-29-production-validation-proposal.md)
 before approaching any remaining production, startup, hotkey or mouse gate.
-The separate editor QA pass records further automated successes; Discard remains
-pending action-time confirmation. Do not claim complete UI or production readiness.
+The separate editor QA pass now includes user-confirmed Discard, independent
+clipboard paste/reopen and corrupt/future-store error preservation. All those
+owned windows closed. A misleading blocked-state badge is addressed by the
+editor-storage-status follow-up. Do not claim complete UI or production readiness.
 
 Read the [current readiness ledger](work/2026-10-29-readiness-ledger.md) for the full completed/pending split and exact source sequence.
+
+**Editor storage-status follow-up — 2026-10-29:** branch
+fix/editor-storage-status corrects NEW DRAFT to STORAGE UNAVAILABLE when the
+store cannot load. Local CI now passes 14 editor tests, including invalid/future
+byte preservation, Retry and external-repair recovery. Read the
+[focused status record](work/2026-10-29-editor-storage-status.md) for exact
+new-build validation: the Windows recheck passed normal/minimum containment,
+blocked-store Retry/byte preservation and normal empty-library state. Keep
+earlier interaction results scoped to their hash.
 
 ## Project and source
 

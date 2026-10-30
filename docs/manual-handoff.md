@@ -17,9 +17,12 @@ deferred while hosted quota is exhausted.
 The Windows Computer Use chat separately verified the Enter fix and expanded
 isolated editor keyboard/Unicode/Save/reopen/duplicate/rename/error-layout paths.
 These are automated observations, not owner physical-key, screen-reader, IME,
-clipboard-paste, display-scale or production results. Discard is pending an
-action-time confirmation and is not a passing result. Existing saved fixtures
-and raw evidence are preserved privately.
+display-scale or production results. The user-confirmed scratch-only Discard
+check passed, and a separate Ctrl+C/Ctrl+V/reopen check passed. Corrupt/schema99
+fixtures showed actionable errors and unchanged bytes after Retry, with editing
+and Apply disabled. All owned windows closed and evidence was preserved.
+The misleading NEW DRAFT badge in blocked storage is a separate corrected
+usability finding; the new editor build has its own validation record.
 
 Read the [current production validation proposal](work/2026-10-29-production-validation-proposal.md)
 for launch/storage/startup/hotkey/identity/baseline prerequisites. No production

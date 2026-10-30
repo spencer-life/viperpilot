@@ -10,8 +10,8 @@ This ledger is not release approval. The production entry point remains blocked.
 | Security | actionlint, redacted history scan and zizmor pass at the current runtime/test checkpoints | Preserve existing protections; no CI/rules changes are authorized |
 | Native preview | Computer Use passed the corrected Enter sequence; default/reversed/unavailable harness also passes queued Enter, roles, names, state and refusal checks | Owner physical input, screen-reader speech, actual monitor scales/high contrast and production UI remain open |
 | Editor storage and fields | Headless round trips and isolated Windows Save/reopen preserve stable identity and entered fields | Full acceptance and delivery are not implied |
-| Editor input/CRUD | Extra automated session passed keyboard create/save/reopen, mixed Latin/Japanese tool text entry, duplicate/rename identity preservation, dirty Cancel/Save, minimum-size validation | Discard awaits action-time confirmation; destructive UI deletion, actual clipboard paste, IME, screen reader and other scales remain unverified |
-| Editor conflict/corruption | Headless session/storage tests preserve invalid/future/conflicting bytes and errors | Separate isolated desktop observation if required; use a new fixture, retain failed inputs, never replace legacy data |
+| Editor input/CRUD | Extra automated session passed keyboard create/save/reopen, mixed Latin/Japanese tool text entry, duplicate/rename identity preservation, dirty Cancel/Save/Discard and minimum-size validation; independent Ctrl+C/Ctrl+V and reopen | Destructive UI deletion, IME, screen reader and other scales remain unverified |
+| Editor conflict/corruption | Headless session/storage tests preserve invalid/future/conflicting bytes; Windows corrupt/schema99 error/Retry tests preserve their hashes with disabled editing/Apply | External concurrent-edit desktop observation remains distinct; misleading blocked-state badge was corrected and visually rechecked in the editor-status layer |
 | Production launch arrangement | Concrete proposal identifies storage, incidental startup writes, hotkey and baseline prerequisites | Not yet a launchable/approved arrangement; read production-validation-proposal before source changes or live access |
 | Complete profiles/hotkey/persistence | Guarded source and synthetic tests only for this integration | Owner-present full identity, immutable baseline, exact plan, independent readback/recovery, process-exit and power-cycle evidence |
 | Performance | Methodology exists; preview observations are separately scoped | Production tray-only and switching measurements after safe launch is available |
@@ -31,9 +31,11 @@ This ledger is not release approval. The production entry point remains blocked.
 ## Evidence handling and issue updates
 
 The original QA reports/fixtures and the new editor session remain private.
-The new editor is left at its scratch-only Discard confirmation while the
-Computer Use chat awaits user input; cleanup is not claimed complete for that
-session. Earlier native harness sessions closed cleanly.
+The user confirmed the scratch-only Discard action at action time; it passed
+and all four saved entries remained intact. The owned editor closed, as did
+the independent clipboard and corrupt/future fixture sessions. Earlier native
+harness sessions also closed cleanly. Prior reports and invalid bytes remain
+preserved; the badge mismatch is recorded as a separate usability finding.
 
 Fresh issue-sync mirrors omitted V2 Project metadata despite successful scoped
 Project reads. No incomplete mirror was pushed. Only issue bodies were updated
@@ -52,3 +54,10 @@ The supervised-production proposal received independent read-only review with
 no material findings. Source/runtime/tooling equality was checked for this
 documentation layer, and its relative links and whitespace were validated.
 The proposal's execution prerequisites remain open.
+
+The editor-storage-status follow-up passed 14 headless editor tests, local
+core/editor CI, strict Windows cross-lint and the release editor build.
+Independent review found no material findings. A separate Windows recheck
+confirmed the longer blocked-state badge fits at normal/minimum sizes,
+preserves invalid/future bytes and keeps normal new-library state intact.
+The dated editor-storage-status record contains its own hash and limits.

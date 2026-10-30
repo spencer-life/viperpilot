@@ -445,7 +445,10 @@ impl EguiPreview {
                         );
                     });
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let state = if self.is_dirty() {
+                        // 2026-10-29: blocked storage is not a new editable draft.
+                        let state = if self.editor.is_none() {
+                            "STORAGE UNAVAILABLE"
+                        } else if self.is_dirty() {
                             "UNSAVED CHANGES"
                         } else if self.selected_id.is_some() {
                             "SAVED DRAFT"
@@ -1237,6 +1240,67 @@ mod tests {
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         )))
+    }
+
+    #[test]
+    fn blocked_storage_has_truthful_status_preserves_bytes_and_recovers_on_retry() {
+        for bytes in [
+            br#"{"schema_version":1,"entries":["#.as_slice(),
+            br#"{"schema_version":99,"entries":[]}"#.as_slice(),
+        ] {
+            let paths = temp_paths("blocked-storage-status");
+            let root = paths.root.clone();
+            fs::create_dir_all(&root).unwrap();
+            fs::write(&paths.profile_drafts, bytes).unwrap();
+            let app = EguiPreview::from_paths(Ok(paths.clone()));
+            let mut harness = Harness::builder()
+                .with_size(Vec2::new(850.0, 640.0))
+                .build_ui_state(|ui, app| app.view(ui), app);
+            harness.run();
+
+            for _ in 0..2 {
+                assert!(harness.query_by_label("STORAGE UNAVAILABLE").is_some());
+                assert!(harness.query_by_label("NEW DRAFT").is_none());
+                assert!(
+                    harness
+                        .query_by_role_and_label(Role::TextInput, "Profile name")
+                        .is_none()
+                );
+                for label in ["Save draft", "Apply changes"] {
+                    assert!(
+                        harness
+                            .get_by_role_and_label(Role::Button, label)
+                            .accesskit_node()
+                            .is_disabled()
+                    );
+                }
+                assert_eq!(fs::read(&paths.profile_drafts).unwrap(), bytes);
+                harness
+                    .get_by_role_and_label(Role::Button, "Retry opening draft library")
+                    .click();
+                harness.run();
+            }
+
+            // An external fixture repair, not an editor reset, permits recovery.
+            fs::write(
+                &paths.profile_drafts,
+                br#"{"schema_version":1,"entries":[]}"#,
+            )
+            .unwrap();
+            harness
+                .get_by_role_and_label(Role::Button, "Retry opening draft library")
+                .click();
+            harness.run();
+            assert!(harness.query_by_label("STORAGE UNAVAILABLE").is_none());
+            assert!(harness.query_by_label("NEW DRAFT").is_some());
+            assert!(
+                !harness
+                    .get_by_role_and_label(Role::Button, "Save draft")
+                    .accesskit_node()
+                    .is_disabled()
+            );
+            fs::remove_dir_all(root).unwrap();
+        }
     }
 
     #[test]

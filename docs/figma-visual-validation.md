@@ -183,14 +183,21 @@ independent identities and the original, dirty Cancel and Save-and-continue,
 and minimum-size validation with disabled Save/Apply on an empty name.
 
 UIA exposed labeled name Edit, DPI Spin buttons, polling/side-action Combo boxes
-and disabled Apply; inspected focus paths were visible. Discard remains pending
-action-time confirmation on a deliberately unsaved scratch suffix. No persistent
-draft was deleted. No physical-key, actual clipboard-paste, IME composition,
-screen-reader speech, other scale or high-contrast pass is claimed.
+and disabled Apply; inspected focus paths were visible. Following the user's
+action-time confirmation, Discard removed only the deliberately unsaved scratch
+suffix; saved entries and their IDs remained intact. No persistent draft was
+deleted. IME composition, screen-reader speech, other scales/high contrast and
+owner physical-key results remain unverified.
 
 One early GPU capture was white while UIA content existed; a later Tab/repaint
 showed the content. The cause and any general rendering remedy remain unproven.
 The saved fixtures and raw report are preserved privately. This session's editor
-window is still at the pending confirmation; cleanup is not yet a recorded pass.
+window subsequently closed and its staged-path process count was zero.
+A separate Ctrl+C/Ctrl+V/reopen check verified mixed Latin/Japanese text and
+independent saved IDs. Corrupt/schema99 fixture sessions showed actionable
+visible/UIA errors, disabled editing/Apply, and byte-preserving Retry; those
+windows also closed. Their old NEW DRAFT badge is retained as the failed
+usability checkpoint corrected in the
+[storage-status follow-up](work/2026-10-29-editor-storage-status.md).
 See the [current ledger](work/2026-10-29-readiness-ledger.md) for completed and
 remaining gates, including the separate production-launch proposal.

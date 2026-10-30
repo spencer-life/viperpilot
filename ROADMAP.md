@@ -13,8 +13,10 @@ changed. Earlier local-only notes below describe prior checkpoints.
 The next prerequisite is the [concrete supervised production proposal](docs/work/2026-10-29-production-validation-proposal.md):
 explicit tray storage isolation, refresh's startup side effect, hotkey ownership,
 and owner-reviewed identity/baseline provenance are not yet resolved for launch.
-Further isolated editor QA passed the recorded non-destructive paths; Discard
-confirmation and broader owner/accessibility gates remain pending.
+Further isolated editor QA passed the user-confirmed Discard, independent
+clipboard and corrupt/future-store error-preservation paths; owned windows
+closed. The editor-storage-status follow-up corrects a misleading error-state
+badge. Broader owner/accessibility gates remain pending.
 
 ## Current continuation checkpoint — 2026-10-29
 
