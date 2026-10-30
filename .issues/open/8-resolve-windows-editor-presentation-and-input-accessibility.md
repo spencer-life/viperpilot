@@ -8,11 +8,11 @@ projects:
     - ViperPilot dashboard
 state: open
 state_reason: ""
-synced_at: 2026-10-30T02:21:45.619850315Z
+synced_at: 2026-10-30T02:40:32.026874Z
 info:
     author: spencer-life
     created_at: 2026-09-29T18:22:45Z
-    updated_at: 2026-10-30T02:21:40Z
+    updated_at: 2026-10-30T02:40:31Z
 ---
 
 ## Context
@@ -101,6 +101,12 @@ speech and other display scales remain unobserved.
 
 Automated Windows Computer Use checked the isolated editor at 1080 x 790 and 850 x 640 client sizes. Inspected content remained contained, Mouse5/review were reachable by scrolling, and Save/disabled Apply stayed pinned. Tested DPI-field Tab/Shift+Tab and disclosure Enter/Space paths passed. Invalid empty Mouse5 Unmodeled description disabled Save until corrected.
 
-Save/close/reopen with the same explicit development fixture root preserved the draft identity, unequal DPI, polling and both side-button intents. [Recorded evidence and limits](https://github.com/spencer-life/viperpilot/blob/fix/native-enter-focus/docs/figma-visual-validation.md) remain separate from hardware and production validation. An additional isolated editor-input/accessibility pass is in progress; its results are not yet claimed.
+Save/close/reopen with the same explicit development fixture root preserved the draft identity, unequal DPI, polling and both side-button intents. [Recorded evidence and limits](https://github.com/spencer-life/viperpilot/blob/fix/native-enter-focus/docs/figma-visual-validation.md) remain separate from hardware and production validation. The extended isolated pass now verifies mixed Latin/Japanese tool entry, keyboard create/edit/Save/reopen, independent Ctrl+C/Ctrl+V, duplicate/rename identity preservation and user-confirmed scratch Discard. Corrupt/schema99 stores show actionable errors and disabled editing/Apply, preserving original bytes after Retry. All owned windows closed. Actual IME composition, screen-reader speech and other display scales/high contrast remain unverified.
 
 Keep this issue open for remaining owner-observed, screen-reader, IME and actual display-scale/high-contrast gates. The editor runtime is unchanged by the native Enter fix. No production tray, installation, startup, device or legacy-app change occurred.
+
+## Storage-status correction — 2026-10-29
+
+The corrupt/future-store checks found a misleading NEW DRAFT badge despite the blocked state. Follow-up a1c906e prioritizes STORAGE UNAVAILABLE when no editor session exists. A new headless regression checks malformed/schema99 byte preservation, disabled editing and Retry/recovery. Local CI now passes 14 editor tests, plus core/feature suites, strict Windows cross-lint, release build and security checks. Independent source review found no material findings.
+
+A separate Windows Computer Use recheck on the corrected editor confirmed the badge fits at normal/minimum sizes, error/Retry/disabled controls remain correct, both failed fixture hashes are unchanged, and an empty development root still shows normal NEW DRAFT with enabled Save and disabled Apply. Prior interaction evidence remains scoped to its earlier binary. [Exact evidence and hashes](https://github.com/spencer-life/viperpilot/blob/fix/editor-storage-status/docs/work/2026-10-29-editor-storage-status.md). Production, startup, installation and mouse/legacy state were untouched; remaining release gates stay open.

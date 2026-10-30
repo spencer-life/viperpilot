@@ -7,11 +7,11 @@ projects:
     - ViperPilot dashboard
 state: open
 state_reason: ""
-synced_at: 2026-10-30T02:21:45.619127791Z
+synced_at: 2026-10-30T02:40:33.776756Z
 info:
     author: spencer-life
     created_at: 2026-09-29T18:22:54Z
-    updated_at: 2026-10-30T02:21:42Z
+    updated_at: 2026-10-30T02:40:33Z
 ---
 
 ## Context
@@ -101,6 +101,12 @@ speech and other display scales remain unobserved.
 
 A separate Windows Computer Use session saved and reopened a development-only draft with the same stable ID, asymmetric DPI, polling and both side-button intents. Validation feedback, tested keyboard paths, scrolling and the pinned Save/disabled Apply footer passed at the recorded normal/minimum client sizes. Apply stayed disabled throughout.
 
-[The local validation record](https://github.com/spencer-life/viperpilot/blob/test/native-enter-regression/docs/work/2026-10-29-native-enter.md) distinguishes this automated fixture evidence from owner observations. Local core/editor CI and Windows cross-builds pass; current native helper/harness follow-ups remain separate review layers. The extended editor CRUD/dirty-navigation/Unicode pass is in progress and not counted as passed.
+[The local validation record](https://github.com/spencer-life/viperpilot/blob/test/native-enter-regression/docs/work/2026-10-29-native-enter.md) distinguishes this automated fixture evidence from owner observations. Local core/editor CI and Windows cross-builds pass; current native helper/harness follow-ups remain separate review layers. The extended isolated pass now verifies keyboard creation/editing/Save/reopen, Unicode tool entry, independent Ctrl+C/Ctrl+V, duplicate/rename identity preservation and user-confirmed scratch Discard. Saved entries remained intact. Corrupt/future-store UI tests preserved original bytes after Retry; Apply stayed disabled. Actual destructive UI deletion, IME, screen reader and other scales remain unverified.
 
 Keep this issue open pending its remaining acceptance and review/delivery gates. Saving intent never authorizes or performs a mouse write. No production tray, install, startup or legacy-app operation occurred.
+
+## Storage-status correction — 2026-10-29
+
+The corrupt/future-store checks found a misleading NEW DRAFT badge despite the blocked state. Follow-up a1c906e prioritizes STORAGE UNAVAILABLE when no editor session exists. A new headless regression checks malformed/schema99 byte preservation, disabled editing and Retry/recovery. Local CI now passes 14 editor tests, plus core/feature suites, strict Windows cross-lint, release build and security checks. Independent source review found no material findings.
+
+A separate Windows Computer Use recheck on the corrected editor confirmed the badge fits at normal/minimum sizes, error/Retry/disabled controls remain correct, both failed fixture hashes are unchanged, and an empty development root still shows normal NEW DRAFT with enabled Save and disabled Apply. Prior interaction evidence remains scoped to its earlier binary. [Exact evidence and hashes](https://github.com/spencer-life/viperpilot/blob/fix/editor-storage-status/docs/work/2026-10-29-editor-storage-status.md). Production, startup, installation and mouse/legacy state were untouched; remaining release gates stay open.
