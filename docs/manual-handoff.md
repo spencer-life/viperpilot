@@ -6,6 +6,27 @@ roadmap expansion is not an implementation requirement or evidence of support.
 All new implementation PRs remain draft. No merge, installation, startup edit,
 production/preview GUI launch or hardware operation occurred.
 
+## Current continuation — 2026-10-29
+
+Remote development backups now contain Rust 1.99 test repair, the native Enter
+fix and repeatable queued-Enter regression coverage. Local core/editor CI,
+Windows cross-checks, native default/reversed/unavailable scenarios and security
+checks pass; branch backups did not trigger hosted Actions. New PRs remain
+deferred while hosted quota is exhausted.
+
+The Windows Computer Use chat separately verified the Enter fix and expanded
+isolated editor keyboard/Unicode/Save/reopen/duplicate/rename/error-layout paths.
+These are automated observations, not owner physical-key, screen-reader, IME,
+clipboard-paste, display-scale or production results. Discard is pending an
+action-time confirmation and is not a passing result. Existing saved fixtures
+and raw evidence are preserved privately.
+
+Read the [current production validation proposal](work/2026-10-29-production-validation-proposal.md)
+for launch/storage/startup/hotkey/identity/baseline prerequisites. No production
+tray, install, startup change or mouse write is authorized by this handoff.
+Read the dated runtime/regression records linked in continue-here.md for exact
+source checkpoints, artifact hashes, original failures and corrected results.
+
 ## Completed without the owner
 
 - Persisted local draft CRUD, validation, conflict protection and recovery;

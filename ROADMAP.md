@@ -1,5 +1,21 @@
 # ViperPilot roadmap
 
+Read the [current readiness ledger](docs/work/2026-10-29-readiness-ledger.md) for the full completed/pending split and exact source sequence.
+
+## Remote backups and next gate — 2026-10-29
+
+The owner subsequently authorized remote updates. The test-repair, keyboard-fix
+and regression-test branches are backed up remotely at 5bc0f13, 512bab4 and
+d30547a respectively. New PR events/hosted runs remain deferred; local CI passes,
+and no main branch, protections, production launch gate or hardware support
+changed. Earlier local-only notes below describe prior checkpoints.
+
+The next prerequisite is the [concrete supervised production proposal](docs/work/2026-10-29-production-validation-proposal.md):
+explicit tray storage isolation, refresh's startup side effect, hotkey ownership,
+and owner-reviewed identity/baseline provenance are not yet resolved for launch.
+Further isolated editor QA passed the recorded non-destructive paths; Discard
+confirmation and broader owner/accessibility gates remain pending.
+
 ## Current continuation checkpoint — 2026-10-29
 
 The latest local runtime checkpoint is native Enter fix 71a8010 on

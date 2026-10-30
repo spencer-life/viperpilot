@@ -8,11 +8,11 @@ projects:
     - ViperPilot dashboard
 state: open
 state_reason: ""
-synced_at: 2026-09-30T11:09:04.970287424Z
+synced_at: 2026-10-30T02:21:45.619577095Z
 info:
     author: spencer-life
     created_at: 2026-09-29T18:22:41Z
-    updated_at: 2026-09-30T07:21:41Z
+    updated_at: 2026-10-30T02:21:38Z
 ---
 
 ## Context
@@ -88,3 +88,11 @@ independent source review were checked; failed experiments remain in the
 [validation record](https://github.com/spencer-life/viperpilot/blob/codex/device-dashboard-layout/docs/native-visual-validation.md).
 Enter/Space activation of the revised views, screen-reader speech, other scales,
 high contrast and production/hardware gates remain open. Installed app untouched.
+
+## Isolated keyboard and visual checkpoint — 2026-10-29
+
+Automated Windows Computer Use inspected Compact, Device and Buttons containment and tested focus, Tab/Shift+Tab, Space and Enter. The original Enter-after-view-restored-focus failure is retained; runtime fix 71a8010 passes the exact reproduction without a Tab detour. Separate local harness checks pass default/reversed/unavailable scenarios, standard Button/Invoke/name/enabled semantics, hidden-control guards, default-button assertions and clean exits. Test layer d30547a adds queued Enter activation with opposite-profile verification and rejection of unfocused/disabled targets.
+
+[Runtime evidence](https://github.com/spencer-life/viperpilot/blob/fix/native-enter-focus/docs/work/2026-10-29-native-enter.md) and [repeatable local regression](https://github.com/spencer-life/viperpilot/blob/test/native-enter-regression/docs/work/2026-10-29-native-enter-regression.md) distinguish automated observations from owner physical input. Local core/editor CI, strict Windows cross-checks and security checks pass. Branch checkpoints are backed up remotely; new PR events and hosted Actions are deferred while local CI is used.
+
+Keep this issue open: screen-reader speech, other actual display scales/high contrast and production UI gates remain. No production tray, installer, startup or mouse operation occurred; the legacy app was preserved.

@@ -8,11 +8,11 @@ projects:
     - ViperPilot dashboard
 state: open
 state_reason: ""
-synced_at: 2026-09-30T09:56:30.782035892Z
+synced_at: 2026-10-30T02:21:45.619850315Z
 info:
     author: spencer-life
     created_at: 2026-09-29T18:22:45Z
-    updated_at: 2026-09-30T07:11:11Z
+    updated_at: 2026-10-30T02:21:40Z
 ---
 
 ## Context
@@ -96,3 +96,11 @@ reads the exact Unicode name and DPI 1200/1200. Strict preview checks (159 tests
 Windows cross-lint/build and independent review passed. No font installation,
 redistribution, tray/device or legacy-app changes. IME composition, screen-reader
 speech and other display scales remain unobserved.
+
+## Isolated editor checkpoint — 2026-10-29
+
+Automated Windows Computer Use checked the isolated editor at 1080 x 790 and 850 x 640 client sizes. Inspected content remained contained, Mouse5/review were reachable by scrolling, and Save/disabled Apply stayed pinned. Tested DPI-field Tab/Shift+Tab and disclosure Enter/Space paths passed. Invalid empty Mouse5 Unmodeled description disabled Save until corrected.
+
+Save/close/reopen with the same explicit development fixture root preserved the draft identity, unequal DPI, polling and both side-button intents. [Recorded evidence and limits](https://github.com/spencer-life/viperpilot/blob/fix/native-enter-focus/docs/figma-visual-validation.md) remain separate from hardware and production validation. An additional isolated editor-input/accessibility pass is in progress; its results are not yet claimed.
+
+Keep this issue open for remaining owner-observed, screen-reader, IME and actual display-scale/high-contrast gates. The editor runtime is unchanged by the native Enter fix. No production tray, installation, startup, device or legacy-app change occurred.

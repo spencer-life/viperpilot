@@ -6,12 +6,12 @@ labels:
 projects:
     - ViperPilot dashboard
 state: open
-state_reason: null
-synced_at: 2026-09-30T09:56:30.126320262Z
+state_reason: ""
+synced_at: 2026-10-30T02:21:45.619127791Z
 info:
     author: spencer-life
     created_at: 2026-09-29T18:22:54Z
-    updated_at: 2026-09-30T00:06:57Z
+    updated_at: 2026-10-30T02:21:42Z
 ---
 
 ## Context
@@ -96,3 +96,11 @@ reads the exact Unicode name and DPI 1200/1200. Strict preview checks (159 tests
 Windows cross-lint/build and independent review passed. No font installation,
 redistribution, tray/device or legacy-app changes. IME composition, screen-reader
 speech and other display scales remain unobserved.
+
+## Isolated persistence checkpoint — 2026-10-29
+
+A separate Windows Computer Use session saved and reopened a development-only draft with the same stable ID, asymmetric DPI, polling and both side-button intents. Validation feedback, tested keyboard paths, scrolling and the pinned Save/disabled Apply footer passed at the recorded normal/minimum client sizes. Apply stayed disabled throughout.
+
+[The local validation record](https://github.com/spencer-life/viperpilot/blob/test/native-enter-regression/docs/work/2026-10-29-native-enter.md) distinguishes this automated fixture evidence from owner observations. Local core/editor CI and Windows cross-builds pass; current native helper/harness follow-ups remain separate review layers. The extended editor CRUD/dirty-navigation/Unicode pass is in progress and not counted as passed.
+
+Keep this issue open pending its remaining acceptance and review/delivery gates. Saving intent never authorizes or performs a mouse write. No production tray, install, startup or legacy-app operation occurred.

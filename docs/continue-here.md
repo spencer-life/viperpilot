@@ -28,6 +28,19 @@ three-scenario native harness and local core/editor CI pass. Future runtime
 changes requiring Windows interaction are coordinated with the separate
 Computer Use chat; unchanged code does not need repeated visual checks.
 
+**Remote checkpoint update — 2026-10-29:** the owner subsequently authorized
+remote repository updates. Development branches fix/rust199-ci (5bc0f13),
+fix/native-enter-focus (512bab4) and test/native-enter-regression (d30547a) are
+now backed up remotely. No new PRs were opened, no main branch changed, and no
+Actions runs were triggered. Earlier local-only/publication-blocked notes below
+are historical; local CI remains the validation route while hosted quota is
+exhausted. Read the [production validation proposal](work/2026-10-29-production-validation-proposal.md)
+before approaching any remaining production, startup, hotkey or mouse gate.
+The separate editor QA pass records further automated successes; Discard remains
+pending action-time confirmation. Do not claim complete UI or production readiness.
+
+Read the [current readiness ledger](work/2026-10-29-readiness-ledger.md) for the full completed/pending split and exact source sequence.
+
 ## Project and source
 
 - Public development repository: https://github.com/spencer-life/viperpilot

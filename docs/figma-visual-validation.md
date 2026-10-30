@@ -172,3 +172,25 @@ physical input, hardware, exhaustive accessibility or pixel-exact Figma evidence
 The native-only Enter correction does not change editor runtime source.
 See the [same-day continuation record](work/2026-10-29-native-enter.md);
 private raw evidence and fixture data are retained outside the repository.
+
+## Extended isolated editor input pass — 2026-10-29
+
+Using the same c05b47880fef6ae0702961adb104c00447687a38215cf566ec615b7807569a0a
+editor and a new development fixture on Windows build 26300, automated Computer
+Use verified keyboard-only create/name/DPI X editing/Save/reopen, mixed
+Latin/Japanese tool text entry with exact reopen, duplicate/rename preserving
+independent identities and the original, dirty Cancel and Save-and-continue,
+and minimum-size validation with disabled Save/Apply on an empty name.
+
+UIA exposed labeled name Edit, DPI Spin buttons, polling/side-action Combo boxes
+and disabled Apply; inspected focus paths were visible. Discard remains pending
+action-time confirmation on a deliberately unsaved scratch suffix. No persistent
+draft was deleted. No physical-key, actual clipboard-paste, IME composition,
+screen-reader speech, other scale or high-contrast pass is claimed.
+
+One early GPU capture was white while UIA content existed; a later Tab/repaint
+showed the content. The cause and any general rendering remedy remain unproven.
+The saved fixtures and raw report are preserved privately. This session's editor
+window is still at the pending confirmation; cleanup is not yet a recorded pass.
+See the [current ledger](work/2026-10-29-readiness-ledger.md) for completed and
+remaining gates, including the separate production-launch proposal.
