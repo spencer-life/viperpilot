@@ -150,3 +150,16 @@ confirmed no longer running; its exit code was not verified by the external
 Get-Process wrapper, which reported an error on the exit-code check. The prior
 session record and staged folder were retained. Automated staged sessions above
 reported exit code 0. No other process was closed.
+
+## Isolated keyboard follow-up — 2026-10-29
+
+Automated Windows QA on build 26300 reproduced Enter failing immediately after
+view-restored focus, despite visible focus and working Space. The
+[focused Enter routing record](work/2026-10-29-native-enter.md) preserves the
+failure, source correction, exact tested hashes and independent retest.
+The corrected synthetic preview passed that Enter sequence without a Tab
+detour, tested Tab/Shift+Tab and Space, and unavailable-state navigation.
+All three native harness scenarios passed default-button, UIA, routing and
+hidden-control checks with clean exit. This narrows the observed keyboard gap;
+screen-reader speech, physical owner input, real scaling/high contrast and
+production/hardware gates remain open. The installed legacy app was preserved.

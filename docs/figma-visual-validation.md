@@ -156,3 +156,19 @@ DPI-scale behavior. IME composition and screen-reader speech remain unobserved.
 
 Font-fixed Windows binary SHA-256:
 `e15529a64537c2dafacf1941241a75eccc996135f02b6b05a5d77fa84a70f870`.
+
+## Isolated editor follow-up — 2026-10-29
+
+A separate Windows Computer Use session on build 26300 inspected 1080 x 790
+and 850 x 640 client sizes. Tested content remained contained; scrolling reached
+Mouse5 and capability review while Save/disabled Apply stayed pinned. Tested
+Tab/Shift+Tab focus and Enter/Space disclosure behavior passed. An invalid empty
+Mouse5 unmodeled description disabled Save until corrected.
+
+Save/close/reopen using the same explicit development fixture root preserved the
+draft identity, DPI X/Y 1200/1600, polling 500 Hz, Mouse4 Unassigned and Mouse5
+Unmodeled description. These are automated fixture observations, not owner
+physical input, hardware, exhaustive accessibility or pixel-exact Figma evidence.
+The native-only Enter correction does not change editor runtime source.
+See the [same-day continuation record](work/2026-10-29-native-enter.md);
+private raw evidence and fixture data are retained outside the repository.

@@ -426,8 +426,19 @@ try {
         throw "Timed out waiting for preview view $View."
     }
 
+    # 2026-10-29: UIA Invoke alone misses Enter after SetFocus. Query the
+    # dialog default immediately after each transition, before any Tab input.
+    function Assert-FocusedDefaultButton {
+        param([AllowNull()][object[]] $ExpectedControlIds)
+        $state = Invoke-NativeUiAutomationClient -Action inspect -ControlId 2003
+        if ($ExpectedControlIds -notcontains $state.DefaultButtonId) {
+            throw "Expected dialog default '$ExpectedControlIds', got '$($state.DefaultButtonId)'."
+        }
+    }
+
     function Assert-DeviceDashboard {
         Wait-PreviewView -View Device
+        Assert-FocusedDefaultButton -ExpectedControlIds 2003
         [void](Assert-Button -ControlId 2003 -ExpectedName 'Quick switch' -ExpectedEnabled $true)
         [void](Assert-Button -ControlId 2004 -ExpectedName 'Customize buttons' -ExpectedEnabled $true)
         [void](Assert-Button -ControlId 2005 -ExpectedName 'Device' -ExpectedEnabled $true)
@@ -438,6 +449,8 @@ try {
 
     function Assert-CompactView {
         Wait-PreviewView -View Compact
+        $expectedDefault = if ($profilesEnabled) { @(2001) } else { @($null, 2003) }
+        Assert-FocusedDefaultButton -ExpectedControlIds $expectedDefault
         [void](Assert-Button -ControlId 2001 -ExpectedName $firstProfileName -ExpectedEnabled $profilesEnabled)
         [void](Assert-Button -ControlId 2002 -ExpectedName $secondProfileName -ExpectedEnabled $profilesEnabled)
         [void](Assert-Button -ControlId 2003 -ExpectedName 'Details' -ExpectedEnabled $true)
@@ -448,6 +461,7 @@ try {
 
     function Assert-ButtonsInspector {
         Wait-PreviewView -View Buttons
+        Assert-FocusedDefaultButton -ExpectedControlIds 2005
         [void](Assert-Button -ControlId 2001 -ExpectedName 'Apply Developer recovery preset' -ExpectedEnabled $true)
         [void](Assert-Button -ControlId 2002 -ExpectedName 'Apply Gaming recovery preset' -ExpectedEnabled $true)
         [void](Assert-Button -ControlId 2003 -ExpectedName 'Quick switch' -ExpectedEnabled $true)

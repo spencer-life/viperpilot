@@ -8,6 +8,8 @@ and records the focused `fix/rust199-ci` follow-up. Read it before treating the
 historical checkpoints below as current validation. The owner requested software
 checks only; isolated Windows desktop checks are a separate handoff.
 
+**2026-10-29 native keyboard follow-up:** read the [Enter routing record](work/2026-10-29-native-enter.md) for the measured post-transition failure, focused fix and validation status. Keep automated preview/editor evidence separate from production/device gates.
+
 ## Project and source
 
 - Public development repository: https://github.com/spencer-life/viperpilot

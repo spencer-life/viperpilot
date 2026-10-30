@@ -6,7 +6,7 @@ mod windows_client {
     use serde::Serialize;
     use std::env;
     use windows::Win32::{
-        Foundation::HWND,
+        Foundation::{HWND, LPARAM, WPARAM},
         System::Com::{
             CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx,
             CoUninitialize,
@@ -17,8 +17,9 @@ mod windows_client {
                 UIA_ButtonControlTypeId, UIA_InvokePatternId,
             },
             WindowsAndMessaging::{
-                GetClassNameW, GetDlgCtrlID, GetDlgItem, GetParent, GetWindowThreadProcessId,
-                IsWindow, IsWindowVisible,
+                DC_HASDEFID, DM_GETDEFID, GetClassNameW, GetDlgCtrlID, GetDlgItem, GetParent,
+                GetWindowThreadProcessId, IsWindow, IsWindowVisible, SMTO_ABORTIFHUNG,
+                SendMessageTimeoutW,
             },
         },
     };
@@ -52,6 +53,7 @@ mod windows_client {
         control_type_id: i32,
         invoke_available: bool,
         visible: bool,
+        default_button_id: Option<i32>,
     }
 
     fn parse_number<T: std::str::FromStr>(name: &str, value: Option<String>) -> Result<T, String> {
@@ -146,7 +148,39 @@ mod windows_client {
         Ok(child)
     }
 
-    fn inspect(element: &IUIAutomationElement, child: HWND) -> windows::core::Result<Inspection> {
+    // Query only the already identity-checked synthetic preview; bound the
+    // cross-process call so a hung preview cannot hang this helper.
+    fn default_button_id(parent: HWND) -> Result<Option<i32>, String> {
+        let mut value = 0;
+        let sent = unsafe {
+            SendMessageTimeoutW(
+                parent,
+                DM_GETDEFID,
+                WPARAM(0),
+                LPARAM(0),
+                SMTO_ABORTIFHUNG,
+                2_000,
+                Some(&mut value),
+            )
+        };
+        if sent.0 == 0 {
+            return Err("preview default-button query timed out or failed".to_owned());
+        }
+        if value == 0 {
+            return Ok(None);
+        }
+        let id = (value & 0xffff) as i32;
+        if (value >> 16) != DC_HASDEFID as usize || !ALLOWED_CONTROLS.contains(&id) {
+            return Err("preview returned an invalid default-button identifier".to_owned());
+        }
+        Ok(Some(id))
+    }
+
+    fn inspect(
+        element: &IUIAutomationElement,
+        child: HWND,
+        default_button_id: Option<i32>,
+    ) -> windows::core::Result<Inspection> {
         let name = unsafe { element.CurrentName()? }.to_string();
         let enabled = unsafe { element.CurrentIsEnabled()? }.as_bool();
         let control_type_id = unsafe { element.CurrentControlType()? }.0;
@@ -157,6 +191,7 @@ mod windows_client {
             control_type_id,
             invoke_available,
             visible: unsafe { IsWindowVisible(child) }.as_bool(),
+            default_button_id,
         })
     }
 
@@ -169,7 +204,9 @@ mod windows_client {
                 .map_err(|error| error.to_string())?;
         let element =
             unsafe { automation.ElementFromHandle(child) }.map_err(|error| error.to_string())?;
-        let state = inspect(&element, child).map_err(|error| error.to_string())?;
+        let default_button_id = default_button_id(hwnd_from(parent))?;
+        let state =
+            inspect(&element, child, default_button_id).map_err(|error| error.to_string())?;
 
         if action == "invoke" {
             // 2026-09-30: dashboard/inspector controls stay alive but hidden;

@@ -51,8 +51,8 @@ use windows::Win32::UI::HiDpi::{
     SetProcessDpiAwarenessContext,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    EnableWindow, IsWindowEnabled, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, RegisterHotKey, SetFocus,
-    UnregisterHotKey,
+    EnableWindow, GetFocus, IsWindowEnabled, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, RegisterHotKey,
+    SetFocus, UnregisterHotKey,
 };
 use windows::Win32::UI::Shell::{
     NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_TIP, NIIF_ERROR, NIIF_INFO, NIM_ADD, NIM_DELETE,
@@ -60,19 +60,20 @@ use windows::Win32::UI::Shell::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, BN_CLICKED, CREATESTRUCTW, CW_USEDEFAULT, CreatePopupMenu, CreateWindowExW,
-    DefWindowProcW, DestroyMenu, DestroyWindow, DispatchMessageW, FindWindowW, GWLP_USERDATA,
-    GetClientRect, GetCursorPos, GetDlgItem, GetMessageW, GetWindowLongPtrW, HICON, HMENU,
-    ICON_BIG, ICON_SMALL, IDC_ARROW, IDI_APPLICATION, IMAGE_BITMAP, IMAGE_ICON, IsDialogMessageW,
-    IsIconic, IsWindowVisible, LR_LOADFROMFILE, LoadCursorW, LoadIconW, LoadImageW, MF_CHECKED,
-    MF_GRAYED, MF_POPUP, MF_STRING, MSG, MoveWindow, PostMessageW, PostQuitMessage, RegisterClassW,
-    RegisterWindowMessageW, SPI_GETHIGHCONTRAST, SW_HIDE, SW_RESTORE, SW_SHOW, SWP_NOACTIVATE,
-    SWP_NOMOVE, SWP_NOZORDER, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos,
-    SetWindowTextW, ShowWindow, SystemParametersInfoW, TPM_RETURNCMD, TPM_RIGHTBUTTON,
-    TrackPopupMenu, TranslateMessage, WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
-    WM_CONTEXTMENU, WM_CTLCOLORSTATIC, WM_DESTROY, WM_DEVICECHANGE, WM_DPICHANGED, WM_DRAWITEM,
-    WM_HOTKEY, WM_LBUTTONDBLCLK, WM_LBUTTONUP, WM_NCCREATE, WM_NCDESTROY, WM_NOTIFY, WM_PAINT,
-    WM_RBUTTONUP, WM_SETFONT, WM_SETICON, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_CLIPCHILDREN,
-    WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    DC_HASDEFID, DM_GETDEFID, DefWindowProcW, DestroyMenu, DestroyWindow, DispatchMessageW,
+    FindWindowW, GWLP_USERDATA, GetClientRect, GetCursorPos, GetDlgCtrlID, GetDlgItem, GetMessageW,
+    GetWindowLongPtrW, HICON, HMENU, ICON_BIG, ICON_SMALL, IDC_ARROW, IDI_APPLICATION,
+    IMAGE_BITMAP, IMAGE_ICON, IsDialogMessageW, IsIconic, IsWindowVisible, LR_LOADFROMFILE,
+    LoadCursorW, LoadIconW, LoadImageW, MF_CHECKED, MF_GRAYED, MF_POPUP, MF_STRING, MSG,
+    MoveWindow, PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW,
+    SPI_GETHIGHCONTRAST, SW_HIDE, SW_RESTORE, SW_SHOW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER,
+    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow,
+    SystemParametersInfoW, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage,
+    WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CTLCOLORSTATIC,
+    WM_DESTROY, WM_DEVICECHANGE, WM_DPICHANGED, WM_DRAWITEM, WM_HOTKEY, WM_LBUTTONDBLCLK,
+    WM_LBUTTONUP, WM_NCCREATE, WM_NCDESTROY, WM_NOTIFY, WM_PAINT, WM_RBUTTONUP, WM_SETFONT,
+    WM_SETICON, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_CLIPCHILDREN, WS_MINIMIZEBOX, WS_OVERLAPPED,
+    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{BOOL, PCWSTR, w};
 
@@ -587,6 +588,24 @@ fn valid_window_command(window: HWND, wparam: WPARAM, lparam: LPARAM) -> Option<
             IsWindowVisible(*child).as_bool() && IsWindowEnabled(*child).as_bool()
         })
         .map(|_| id)
+}
+
+// 2026-10-29: IsDialogMessage asks this custom top-level window for a
+// default button. Derive it from current focus so plain SetFocus after a
+// view transition works like Tab, without retaining a hidden/stale default.
+// Reuse the normal child-command identity/visibility/enabled guards.
+fn focused_default_button(window: HWND) -> LRESULT {
+    let focus = unsafe { GetFocus() };
+    if focus.0.is_null() {
+        return LRESULT(0);
+    }
+    let Ok(id) = usize::try_from(unsafe { GetDlgCtrlID(focus) }) else {
+        return LRESULT(0);
+    };
+    if valid_window_command(window, WPARAM(id), LPARAM(focus.0 as isize)).is_none() {
+        return LRESULT(0);
+    }
+    LRESULT(((DC_HASDEFID as usize) << 16 | id) as isize)
 }
 
 #[cfg(test)]
@@ -2152,6 +2171,7 @@ unsafe extern "system" fn window_proc(
     }
 
     match message {
+        DM_GETDEFID => return focused_default_button(window),
         DEFERRED_DRAIN_EVENT => {
             drain_deferred(runtime, window);
             return LRESULT(0);
