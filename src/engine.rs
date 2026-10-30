@@ -937,7 +937,7 @@ mod tests {
                 && message.contains("refusing resend")
         }));
         let rollback = report.rollback_result.expect("rollback report");
-        assert!(rollback.attempted_fields.is_empty());
+        assert_eq!(rollback.attempted_fields, Vec::<String>::new());
         assert!(!rollback.final_state_restored);
         assert!(
             rollback
@@ -1026,7 +1026,7 @@ mod tests {
                 && message.contains("manual recovery")
         }));
         let rollback = report.rollback_result.expect("rollback report");
-        assert!(rollback.attempted_fields.is_empty());
+        assert_eq!(rollback.attempted_fields, Vec::<String>::new());
         assert!(!rollback.final_state_restored);
         assert!(
             rollback
@@ -1141,7 +1141,7 @@ mod tests {
                 && message.contains("setter was not called")
         }));
         let rollback = report.rollback_result.expect("rollback report");
-        assert!(rollback.attempted_fields.is_empty());
+        assert_eq!(rollback.attempted_fields, Vec::<String>::new());
         assert!(!rollback.final_state_restored);
         assert_eq!(report.final_state, Some(external_state));
     }
@@ -1171,7 +1171,7 @@ mod tests {
                 .any(|message| { message.contains("identity changed") })
         );
         let rollback = report.rollback_result.expect("rollback report");
-        assert!(rollback.attempted_fields.is_empty());
+        assert_eq!(rollback.attempted_fields, Vec::<String>::new());
         assert!(!rollback.final_state_restored);
         assert_eq!(report.final_state, Some(changed_identity_state));
     }
@@ -1339,7 +1339,7 @@ mod tests {
         assert!(!report.success);
         let rollback = report.rollback_result.expect("rollback result");
         assert!(!rollback.final_state_restored);
-        assert!(!rollback.errors.is_empty());
+        assert_ne!(rollback.errors, Vec::<String>::new());
     }
 
     #[test]
@@ -1437,7 +1437,7 @@ mod tests {
                 && message.contains("manual review")
         }));
         let rollback = report.rollback_result.expect("rollback report");
-        assert!(rollback.attempted_fields.is_empty());
+        assert_eq!(rollback.attempted_fields, Vec::<String>::new());
         assert!(
             rollback
                 .errors

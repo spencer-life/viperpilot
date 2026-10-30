@@ -282,7 +282,7 @@ mod tests {
                 .unwrap_err()
                 .contains("changed outside")
         );
-        assert!(second.library().entries().is_empty());
+        assert_eq!(second.library().entries(), []);
         assert_eq!(fs::read(&paths.profile_drafts).unwrap(), on_disk);
 
         let mut opened_existing = DraftEditor::open(paths.clone()).unwrap();
@@ -302,7 +302,7 @@ mod tests {
         fs::write(&missing_paths.profile_drafts, b"external").unwrap();
         let external = fs::read(&missing_paths.profile_drafts).unwrap();
         assert!(opened_missing.create(intent("Must stay local")).is_err());
-        assert!(opened_missing.library().entries().is_empty());
+        assert_eq!(opened_missing.library().entries(), []);
         assert_eq!(fs::read(&missing_paths.profile_drafts).unwrap(), external);
         clean(&root);
     }
@@ -337,7 +337,7 @@ mod tests {
                 .unwrap_err()
                 .contains("stale lock")
         );
-        assert!(editor.library().entries().is_empty());
+        assert_eq!(editor.library().entries(), []);
         assert!(!paths.profile_drafts.exists());
         assert_eq!(fs::read(&lock_path).unwrap(), b"active editor");
         clean(&root);

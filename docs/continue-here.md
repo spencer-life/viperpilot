@@ -2,6 +2,12 @@
 
 Updated 2026-09-30. This brief is the starting point for a new coding session.
 
+**2026-10-29 continuation:** the [software resume record](work/2026-10-29-resume.md)
+reconciles draft #29, summarizes the implemented design and remaining checks,
+and records the focused `fix/rust199-ci` follow-up. Read it before treating the
+historical checkpoints below as current validation. The owner requested software
+checks only; isolated Windows desktop checks are a separate handoff.
+
 ## Project and source
 
 - Public development repository: https://github.com/spencer-life/viperpilot

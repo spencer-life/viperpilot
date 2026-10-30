@@ -222,7 +222,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(preview(&root).unwrap(), expected);
-        assert!(directory_names(&root).is_empty());
+        assert_eq!(directory_names(&root), Vec::<String>::new());
         fs::remove_dir(root).unwrap();
     }
 

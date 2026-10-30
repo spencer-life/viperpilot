@@ -1453,7 +1453,7 @@ mod tests {
         app.show_dirty_prompt = false;
         assert!(app.is_dirty());
         assert!(!app.save_draft());
-        assert!(app.buffer.name.is_empty());
+        assert_eq!(app.buffer.name, "");
         assert!(
             app.error
                 .as_deref()
