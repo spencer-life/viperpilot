@@ -4,7 +4,6 @@ use std::process::ExitCode;
 
 #[cfg(windows)]
 use serde::Serialize;
-#[cfg(windows)]
 use std::path::Path;
 #[cfg(windows)]
 use viper_v4_utility::engine::{DeviceControl, apply_write_plan};
@@ -49,16 +48,26 @@ fn run() -> Result<(), String> {
         print_help();
         return Ok(());
     }
-    if let Some(json) = run_catalog_command(&arguments)? {
+    if let Some(json) = run_offline_command(&arguments)? {
         println!("{json}");
         return Ok(());
     }
     run_platform(&arguments)
 }
 
-/// Handle hardware-free catalog commands before platform dispatch. They are
-/// available in the native CLI on Windows, Linux, and macOS.
-fn run_catalog_command(arguments: &[String]) -> Result<Option<String>, String> {
+/// Handle offline catalog and snapshot inspection before platform dispatch.
+/// These commands are available in the native CLI on Windows, Linux, and macOS.
+fn run_offline_command(arguments: &[String]) -> Result<Option<String>, String> {
+    if arguments.first().map(String::as_str) == Some("inspect-snapshot") {
+        if arguments.len() != 2 {
+            return Err("expected inspect-snapshot PATH".to_owned());
+        }
+        let snapshot = viper_v4_utility::storage::read_snapshot(Path::new(&arguments[1]))
+            .map_err(|error| error.to_string())?;
+        return serde_json::to_string_pretty(&snapshot)
+            .map(Some)
+            .map_err(|error| format!("could not render JSON: {error}"));
+    }
     let command = match arguments.first().map(String::as_str) {
         Some("catalog-preview") => viper_v4_utility::catalog_export::preview,
         Some("catalog-export") => viper_v4_utility::catalog_export::export,
@@ -71,6 +80,15 @@ fn run_catalog_command(arguments: &[String]) -> Result<Option<String>, String> {
     catalog.to_json().map(Some)
 }
 
+#[cfg(any(windows, test))]
+fn validate_observe_arguments(arguments: &[String]) -> Result<(), String> {
+    if arguments.is_empty() {
+        Ok(())
+    } else {
+        Err("observe does not accept arguments".to_owned())
+    }
+}
+
 #[cfg(not(windows))]
 fn run_platform(_arguments: &[String]) -> Result<(), String> {
     Err("viperctl hardware commands require the x86_64-pc-windows-msvc build".to_owned())
@@ -80,6 +98,7 @@ fn run_platform(_arguments: &[String]) -> Result<(), String> {
 fn run_platform(arguments: &[String]) -> Result<(), String> {
     match arguments[0].as_str() {
         "enumerate" => command_enumerate(&arguments[1..])?,
+        "observe" => command_observe(&arguments[1..])?,
         "probe-polling" => {
             require_exact_argument_count(arguments, 1)?;
             refuse_if_synapse_running()?;
@@ -133,6 +152,16 @@ fn run_platform(arguments: &[String]) -> Result<(), String> {
         other => return Err(format!("unknown command {other:?}; run viperctl --help")),
     }
     Ok(())
+}
+
+#[cfg(windows)]
+fn command_observe(arguments: &[String]) -> Result<(), String> {
+    validate_observe_arguments(arguments)?;
+    refuse_if_synapse_running()?;
+    let mut device = RazerDevice::open_unique()?;
+    let snapshot = device.read_snapshot()?;
+    snapshot.validate()?;
+    print_json(&snapshot)
 }
 
 #[cfg(windows)]
@@ -568,7 +597,9 @@ viperctl — Viper V4 Pro backup, verification, and diagnostics
 USAGE:
   viperctl catalog-preview --root DIRECTORY
   viperctl catalog-export --root DIRECTORY
+  viperctl inspect-snapshot PATH
   viperctl enumerate [--json]
+  viperctl observe
   viperctl probe-polling
   viperctl snapshot [--output PATH]
   viperctl plan developer|gaming
@@ -588,12 +619,16 @@ USAGE:
 catalog-preview reads the local alias and draft libraries without writing
 files. catalog-export freezes the same catalog to profile-catalog-v1.json
 without replacing an existing file. Both commands are offline and hardware-free.
+inspect-snapshot validates and prints a local snapshot JSON file; it does not
+open a device or write files. Its output can contain private device identity.
 
-enumerate performs OS enumeration only. snapshot, plan, plan-polling, and verify
-use documented GET reports only. apply, isolated apply commands, and restore require an
-immutable baseline and exact serial suffix, deduplicate writes, independently
-read back each field, and roll back on failure. The isolated commands can only
-touch their named field. The tray application remains gated on successful hardware proof."
+enumerate performs OS enumeration only. observe performs a validated live GET
+and prints JSON without creating a baseline or other files. snapshot, plan,
+plan-polling, and verify use documented GET reports only. apply, isolated apply
+commands, and restore require an immutable baseline and exact serial suffix,
+deduplicate writes, independently read back each field, and roll back on
+failure. The isolated commands can only touch their named field. The tray
+application remains gated on successful hardware proof."
     );
 }
 
@@ -603,7 +638,7 @@ mod catalog_command_tests {
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicU64, Ordering};
 
-    use super::run_catalog_command;
+    use super::run_offline_command;
     use viper_v4_utility::profile_catalog::ProfileCatalogV1;
 
     static NEXT_ROOT: AtomicU64 = AtomicU64::new(0);
@@ -622,7 +657,7 @@ mod catalog_command_tests {
     fn catalog_commands_are_available_before_platform_dispatch() {
         let root = temp_root();
         let root_arg = root.to_string_lossy().into_owned();
-        let preview = run_catalog_command(&[
+        let preview = run_offline_command(&[
             "catalog-preview".to_owned(),
             "--root".to_owned(),
             root_arg.clone(),
@@ -634,7 +669,7 @@ mod catalog_command_tests {
         assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
 
         let exported =
-            run_catalog_command(&["catalog-export".to_owned(), "--root".to_owned(), root_arg])
+            run_offline_command(&["catalog-export".to_owned(), "--root".to_owned(), root_arg])
                 .unwrap()
                 .unwrap();
         assert_eq!(
@@ -647,9 +682,9 @@ mod catalog_command_tests {
 
     #[test]
     fn catalog_commands_reject_malformed_arguments() {
-        assert!(run_catalog_command(&["catalog-preview".to_owned()]).is_err());
+        assert!(run_offline_command(&["catalog-preview".to_owned()]).is_err());
         assert!(
-            run_catalog_command(&[
+            run_offline_command(&[
                 "catalog-export".to_owned(),
                 "--root".to_owned(),
                 "/tmp".to_owned(),
@@ -658,9 +693,81 @@ mod catalog_command_tests {
             .is_err()
         );
         assert!(
-            run_catalog_command(&["snapshot".to_owned()])
+            run_offline_command(&["snapshot".to_owned()])
                 .unwrap()
                 .is_none()
         );
+    }
+}
+
+#[cfg(test)]
+mod inspect_snapshot_command_tests {
+    use std::fs;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    use super::run_offline_command;
+
+    static NEXT_ROOT: AtomicU64 = AtomicU64::new(0);
+
+    fn temp_root() -> PathBuf {
+        let root = std::env::temp_dir().join(format!(
+            "viperctl-inspect-snapshot-{}-{}",
+            std::process::id(),
+            NEXT_ROOT.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir(&root).unwrap();
+        root
+    }
+
+    #[test]
+    fn inspect_snapshot_requires_exactly_one_path() {
+        assert_eq!(
+            run_offline_command(&["inspect-snapshot".to_owned()]).unwrap_err(),
+            "expected inspect-snapshot PATH"
+        );
+        assert_eq!(
+            run_offline_command(&[
+                "inspect-snapshot".to_owned(),
+                "snapshot.json".to_owned(),
+                "extra".to_owned(),
+            ])
+            .unwrap_err(),
+            "expected inspect-snapshot PATH"
+        );
+    }
+
+    #[test]
+    fn inspect_snapshot_rejects_invalid_schema_without_writing_files() {
+        let root = temp_root();
+        let path = root.join("invalid-snapshot.json");
+        fs::write(
+            &path,
+            r#"{"schema_version":999,"captured_at_unix_ms":1,"device":{"vendor_id":5426,"product_id":230,"serial":"fixture","firmware":{"major":1,"minor":0},"path":"fixture","interface_number":3,"usage_page":12,"usage":1},"polling":{"transport":"wireless_v2","raw_code":8},"dpi":{"profile_id":1,"current":{"x":1600,"y":1600},"active_stage_id":1,"stages":[{"id":1,"x":1600,"y":1600}]},"button_assignments":[{"profile_id":1,"protocol_button_id":1,"mode":0,"function_id":1,"data_size":1,"data":[1,0,0,0,0]},{"profile_id":1,"protocol_button_id":2,"mode":0,"function_id":1,"data_size":1,"data":[2,0,0,0,0]},{"profile_id":1,"protocol_button_id":3,"mode":0,"function_id":1,"data_size":1,"data":[3,0,0,0,0]},{"profile_id":1,"protocol_button_id":4,"mode":0,"function_id":1,"data_size":1,"data":[4,0,0,0,0]},{"profile_id":1,"protocol_button_id":5,"mode":0,"function_id":1,"data_size":1,"data":[5,0,0,0,0]},{"profile_id":1,"protocol_button_id":96,"mode":0,"function_id":1,"data_size":1,"data":[96,0,0,0,0]}]}"#,
+        )
+        .unwrap();
+        let result = run_offline_command(&[
+            "inspect-snapshot".to_owned(),
+            path.to_string_lossy().into_owned(),
+        ]);
+        assert!(result.is_err());
+        assert_eq!(fs::read_dir(&root).unwrap().count(), 1);
+        fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod observe_argument_tests {
+    use super::validate_observe_arguments;
+
+    #[test]
+    fn observe_rejects_all_arguments_before_device_work() {
+        assert!(validate_observe_arguments(&[]).is_ok());
+        for argument in ["--unknown", "--output", "anything"] {
+            assert_eq!(
+                validate_observe_arguments(&[argument.to_owned()]).unwrap_err(),
+                "observe does not accept arguments"
+            );
+        }
     }
 }
