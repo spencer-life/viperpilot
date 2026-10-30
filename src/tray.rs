@@ -4211,9 +4211,9 @@ fn refresh_state(
     paths: &StoragePaths,
     config: &mut UtilityConfigV1,
 ) -> Result<WorkerEvent, String> {
-    // Keep the per-user Run value consistent after a prior crash or moved
-    // executable. This never opens the mouse or sends a HID command.
-    set_startup_value(config.start_with_windows)?;
+    // 2026-10-29: reading status must not reconcile the Run registry value.
+    // Startup changes belong only to the explicit SetStartWithWindows command;
+    // a crash/moved-executable repair must also be an explicit owner action.
     refuse_if_synapse_running()?;
     let mut device = RazerDevice::open_unique()?;
     let snapshot = crate::engine::DeviceControl::read_snapshot(&mut device)?;
