@@ -39,7 +39,7 @@ the original draft archive and private device evidence.
 
 ## Delivered draft and artifact evidence
 
-The [refreshed draft](https://github.com/spencer-life/viperpilot/releases/tag/untagged-4160b6d899496f6c5e90)
+The [refreshed draft](https://github.com/spencer-life/viperpilot/releases/tag/untagged-44aff682ade6a01cda9b)
 is pinned to source `2df219c66db0a9b67a42f99b549b69488b4f1711`, tagged
 `pilot-2026-10-29-2df219c66db0`. It remains draft/prerelease. ZIP name:
 `ViperPilot-pilot-2df219c66db0-windows-x64.zip`, 4,606,984 bytes. Its external
