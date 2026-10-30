@@ -252,3 +252,66 @@ fn keyboard_context_sentinel_accepts_zero_and_sign_extended_coordinates() {
     assert!(!context_menu_from_keyboard(0xffff_0001));
     assert!(!context_menu_from_keyboard(0x0001_ffff));
 }
+
+#[test]
+fn pair_swap_is_atomic_and_device_inert_in_read_only_preview() {
+    let mut app = preview_app(false, false, true).unwrap();
+    let (tx, rx) = mpsc::channel();
+    app.command_tx = tx;
+    let tree = snapshot(&app);
+    assert_eq!(find(&tree, MENU_SWAP_PAIR).unwrap().state & MF_GRAYED.0, 0);
+    assert!(app.handle_preview_menu_command(MENU_SWAP_PAIR));
+    assert_eq!(
+        app.library.as_ref().unwrap().quick_switch(),
+        &["gaming".to_owned(), "developer".to_owned()]
+    );
+    assert_eq!(app.current, ProfileMatch::Developer);
+    assert!(app.handle_preview_menu_command(MENU_SWAP_PAIR));
+    assert_eq!(
+        app.library.as_ref().unwrap().quick_switch(),
+        &["developer".to_owned(), "gaming".to_owned()]
+    );
+    assert!(matches!(rx.try_recv(), Err(TryRecvError::Empty)));
+}
+
+#[test]
+fn read_only_worker_swaps_only_local_library_and_preserves_baseline() {
+    let session = crate::pilot::tests::fixture(false);
+    let baseline = std::fs::read(
+        session
+            .paths()
+            .baseline_path(&session.baseline().device.serial),
+    )
+    .unwrap();
+    let result = handle_worker_command(WorkerCommand::SwapQuickSwitch, Some(&session)).unwrap();
+    let WorkerEvent::LibraryUpdated(library) = result else {
+        panic!("expected local library update")
+    };
+    assert_eq!(
+        library.quick_switch(),
+        &["gaming".to_owned(), "developer".to_owned()]
+    );
+    assert_eq!(load_profile_library(session.paths()).unwrap(), library);
+    assert_eq!(
+        std::fs::read(
+            session
+                .paths()
+                .baseline_path(&session.baseline().device.serial)
+        )
+        .unwrap(),
+        baseline
+    );
+    assert!(!session.paths().config.exists());
+    assert!(!session.paths().reports.exists());
+    std::fs::remove_dir_all(&session.paths().root).unwrap();
+}
+
+#[test]
+fn shell_v4_and_legacy_activation_open_the_window_without_profile_actions() {
+    for event in [NIN_SELECT, NIN_KEYSELECT, WM_LBUTTONUP, WM_LBUTTONDBLCLK] {
+        assert!(tray_event_opens_window(event));
+    }
+    for event in [WM_CONTEXTMENU, WM_RBUTTONUP, WM_HOTKEY, WORKER_EVENT] {
+        assert!(!tray_event_opens_window(event));
+    }
+}

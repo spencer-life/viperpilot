@@ -1344,6 +1344,100 @@ mod tests {
     }
 
     #[test]
+    fn ime_preedit_updates_commit_unicode_and_survives_save_reopen() {
+        let paths = temp_paths("ime-commit");
+        let root = paths.root.clone();
+        let app = EguiPreview::from_paths(Ok(paths.clone()));
+        let mut harness = Harness::builder()
+            .with_size(Vec2::new(1080.0, 790.0))
+            .build_ui_state(|ui, app| app.view(ui), app);
+        harness.run();
+
+        harness
+            .get_by_role_and_label(Role::TextInput, "Profile name")
+            .click();
+        harness.run();
+        harness.key_press(egui::Key::End);
+        harness.run();
+        harness.event(egui::Event::Ime(egui::ImeEvent::Preedit {
+            text: "にほん".to_owned(),
+            active_range_chars: Some(0..3),
+        }));
+        harness.run();
+        assert_eq!(harness.state().buffer.name, "My Profileにほん");
+
+        // A later preedit replaces the current composition; Commit finalizes it.
+        harness.event(egui::Event::Ime(egui::ImeEvent::Preedit {
+            text: "日本".to_owned(),
+            active_range_chars: Some(0..2),
+        }));
+        harness.run();
+        assert_eq!(harness.state().buffer.name, "My Profile日本");
+        harness.event(egui::Event::Ime(egui::ImeEvent::Commit(
+            "日本語".to_owned(),
+        )));
+        harness.run();
+        assert_eq!(harness.state().buffer.name, "My Profile日本語");
+
+        // Saving after focus moves away must preserve the committed Unicode text.
+        harness
+            .get_by_role_and_label(Role::Button, "Save draft")
+            .click();
+        harness.run();
+        let selected_id = harness.state().selected_id.clone().unwrap();
+        let reopened = DraftEditor::open(paths).unwrap();
+        assert_eq!(
+            reopened.library().get(&selected_id).unwrap().intent().name,
+            "My Profile日本語"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn ime_preedit_cancel_then_focus_change_save_reopen_does_not_persist_preedit() {
+        let paths = temp_paths("ime-cancel");
+        let root = paths.root.clone();
+        let app = EguiPreview::from_paths(Ok(paths.clone()));
+        let mut harness = Harness::builder()
+            .with_size(Vec2::new(1080.0, 790.0))
+            .build_ui_state(|ui, app| app.view(ui), app);
+        harness.run();
+
+        harness
+            .get_by_role_and_label(Role::TextInput, "Profile name")
+            .click();
+        harness.run();
+        harness.key_press(egui::Key::End);
+        harness.run();
+        harness.event(egui::Event::Ime(egui::ImeEvent::Preedit {
+            text: "未確定".to_owned(),
+            active_range_chars: Some(0..3),
+        }));
+        harness.run();
+        assert_eq!(harness.state().buffer.name, "My Profile未確定");
+
+        // egui documents empty Preedit as the integration's composition-dismissal event.
+        harness.event(egui::Event::Ime(egui::ImeEvent::Preedit {
+            text: String::new(),
+            active_range_chars: None,
+        }));
+        harness.run();
+        assert_eq!(harness.state().buffer.name, "My Profile");
+
+        harness
+            .get_by_role_and_label(Role::Button, "Save draft")
+            .click();
+        harness.run();
+        let selected_id = harness.state().selected_id.clone().unwrap();
+        let reopened = DraftEditor::open(paths).unwrap();
+        assert_eq!(
+            reopened.library().get(&selected_id).unwrap().intent().name,
+            "My Profile"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn duplicate_name_is_accessibly_labelled_and_edits_the_copy_name() {
         let paths = temp_paths("duplicate-accessibility");
         let root = paths.root.clone();
@@ -1362,6 +1456,36 @@ mod tests {
         harness.run();
         assert!(harness.state().duplicate_name.contains("edited"));
         fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn duplicate_dialog_rejects_blank_name_and_cancel_leaves_library_unchanged() {
+        let paths = temp_paths("duplicate-cancel");
+        let root = paths.root.clone();
+        let mut seed = DraftEditor::open(paths.clone()).unwrap();
+        let source_id = seed.create(new_intent()).unwrap();
+        let mut app = EguiPreview::from_paths(Ok(paths.clone()));
+        app.selected_id = Some(source_id);
+        app.deferred = Some(DeferredAction::Duplicate);
+        app.duplicate_name = "   ".to_owned();
+        let mut harness = Harness::builder().build_ui_state(|ui, app| app.view(ui), app);
+        harness.run();
+
+        assert!(
+            harness
+                .get_by_role_and_label(Role::Button, "Create copy")
+                .accesskit_node()
+                .is_disabled()
+        );
+        harness
+            .get_by_role_and_label(Role::Button, "Cancel")
+            .click();
+        harness.run();
+
+        let reopened = DraftEditor::open(paths).unwrap();
+        assert_eq!(reopened.library().entries().len(), 1);
+        assert!(harness.state().deferred.is_none());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

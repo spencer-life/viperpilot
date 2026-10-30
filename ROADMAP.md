@@ -1,5 +1,13 @@
 # ViperPilot roadmap
 
+**Latest 2026-10-29 UI continuation:** [additional isolated coverage](docs/work/2026-10-29-remaining-ui.md)
+fixes pair reversal, adds an opt-in synthetic tray icon and extends composition
+and editor desktop checks. Local CI, pair-swap retesting and native harnesses
+pass; notification-area inspection is unavailable through the UI tool, and
+disposable Delete/discard confirmations are pending. Real-device work is
+preparation for review only. Actual OS accessibility/display and hardware gates
+are still open; the uploaded draft remains frozen.
+
 **2026-10-29 unattended checks:** [synthetic menu validation](docs/work/2026-10-29-synthetic-menu.md)
 adds real native menu structure/state tests and a preview-only popup. Windows
 CI now executes both preview features. A separate source branch verifies the

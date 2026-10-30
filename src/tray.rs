@@ -55,8 +55,9 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     SetFocus, UnregisterHotKey,
 };
 use windows::Win32::UI::Shell::{
-    NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_TIP, NIIF_ERROR, NIIF_INFO, NIM_ADD, NIM_DELETE,
-    NIM_MODIFY, NIM_SETVERSION, NOTIFYICON_VERSION_4, NOTIFYICONDATAW, Shell_NotifyIconW,
+    NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_SHOWTIP, NIF_TIP, NIIF_ERROR, NIIF_INFO, NIM_ADD,
+    NIM_DELETE, NIM_MODIFY, NIM_SETVERSION, NIN_SELECT, NINF_KEY, NOTIFYICON_VERSION_4,
+    NOTIFYICONDATAW, Shell_NotifyIconW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, BN_CLICKED, CREATESTRUCTW, CW_USEDEFAULT, CreatePopupMenu, CreateWindowExW,
@@ -115,6 +116,8 @@ const TRAY_CALLBACK: u32 = WM_APP + 1;
 const WORKER_EVENT: u32 = WM_APP + 2;
 const DEFERRED_DRAIN_EVENT: u32 = WM_APP + 3;
 const HOTKEY_ID: i32 = 0x5654;
+// Shell SDK macro (not emitted by windows metadata): NIN_SELECT | NINF_KEY.
+const NIN_KEYSELECT: u32 = NIN_SELECT | NINF_KEY;
 
 const MENU_OPEN: usize = 1000;
 const MENU_DEVELOPER: usize = 1001;
@@ -126,6 +129,7 @@ const MENU_EXIT: usize = 1006;
 const MENU_RELOAD_LIBRARY: usize = 1007;
 const MENU_QUICK_APPLY_FIRST: usize = 1008;
 const MENU_QUICK_APPLY_SECOND: usize = 1009;
+const MENU_SWAP_PAIR: usize = 1010;
 const MENU_SAVED_APPLY_BASE: usize = 3000;
 const MENU_QUICK_FIRST_BASE: usize = 4000;
 const MENU_QUICK_SECOND_BASE: usize = MENU_QUICK_FIRST_BASE + MAX_SAVED_PROFILES;
@@ -224,6 +228,7 @@ enum WorkerCommand {
         profile_id: String,
     },
     ToggleQuickSwitch,
+    SwapQuickSwitch,
     SetStartWithWindows(bool),
     SetDiagnostics(bool),
     SetExitAfterGaming(bool),
@@ -514,6 +519,7 @@ struct WindowRuntime {
     popup_pending: Cell<bool>,
     closing: Cell<bool>,
     preview_mode: bool,
+    preview_tray_icon: bool,
     show_message: u32,
     fallback_brush: HBRUSH,
 }
@@ -559,6 +565,7 @@ fn is_known_menu_command(id: usize) -> bool {
             | MENU_EXIT_AFTER_GAMING
             | MENU_EXIT
             | MENU_RELOAD_LIBRARY
+            | MENU_SWAP_PAIR
             | MENU_QUICK_APPLY_FIRST
             | MENU_QUICK_APPLY_SECOND
     ) || (MENU_SAVED_APPLY_BASE..MENU_SAVED_APPLY_BASE + MAX_SAVED_PROFILES).contains(&id)
@@ -739,6 +746,7 @@ impl WindowRuntime {
             popup_pending: Cell::new(false),
             closing: Cell::new(false),
             preview_mode,
+            preview_tray_icon: false,
             show_message,
             fallback_brush: unsafe { CreateSolidBrush(CAT_SURFACE0) },
         }
@@ -1001,12 +1009,25 @@ pub fn run_preview_with_options(
     unavailable_library: bool,
     read_only_pilot: bool,
 ) -> Result<(), String> {
+    run_preview_with_tray(reversed_pair, unavailable_library, read_only_pilot, false)
+}
+
+/// Opt-in synthetic Shell integration: a distinct PREVIEW window/tooltip owns
+/// the icon. There is still no device worker, storage, hotkey or startup path.
+#[cfg(feature = "ui-preview")]
+pub fn run_preview_with_tray(
+    reversed_pair: bool,
+    unavailable_library: bool,
+    read_only_pilot: bool,
+    show_tray_icon: bool,
+) -> Result<(), String> {
     let _ = unsafe { SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) };
-    let runtime = Box::new(WindowRuntime::new(
+    let mut runtime = Box::new(WindowRuntime::new(
         preview_app(reversed_pair, unavailable_library, read_only_pilot)?,
         true,
         0,
     ));
+    runtime.preview_tray_icon = show_tray_icon;
     let window = create_main_window(&runtime)?;
     let controls = match create_status_controls(window) {
         Ok(controls) => controls,
@@ -1028,12 +1049,32 @@ pub fn run_preview_with_options(
         app.update_ui(window);
     }
     drain_deferred(&runtime, window);
+    let preview_icon = if show_tray_icon {
+        if let Err(error) = add_tray_icon_with_tip(window, "ViperPilot PREVIEW — no device access")
+        {
+            destroy_status_window(&runtime, window);
+            return Err(error);
+        }
+        Some(PreviewTrayIcon(window))
+    } else {
+        None
+    };
     let _ = unsafe { ShowWindow(window, SW_SHOW) };
     let _ = unsafe { SetForegroundWindow(window) };
     let result = message_loop(window);
+    drop(preview_icon);
     destroy_status_window(&runtime, window);
     drop(runtime);
     result
+}
+
+#[cfg(feature = "ui-preview")]
+struct PreviewTrayIcon(HWND);
+#[cfg(feature = "ui-preview")]
+impl Drop for PreviewTrayIcon {
+    fn drop(&mut self) {
+        remove_tray_icon(self.0);
+    }
 }
 
 #[cfg(feature = "ui-preview")]
@@ -2247,6 +2288,10 @@ unsafe extern "system" fn window_proc(
             unsafe { SetWindowLongPtrW(window, GWLP_USERDATA, 0) };
             return result;
         }
+        WM_CLOSE if runtime.preview_mode && runtime.preview_tray_icon => {
+            let _ = unsafe { ShowWindow(window, SW_HIDE) };
+            return LRESULT(0);
+        }
         WM_CLOSE if runtime.preview_mode => {
             unsafe { PostQuitMessage(0) };
             return LRESULT(0);
@@ -2294,12 +2339,15 @@ unsafe extern "system" fn window_proc(
             }
         }
         TRAY_CALLBACK => match u32::from(crate::tray_logic::notification_event_code(lparam.0)) {
-            WM_CONTEXTMENU | WM_RBUTTONUP if !runtime.preview_mode => {
+            WM_CONTEXTMENU | WM_RBUTTONUP if !runtime.preview_mode || runtime.preview_tray_icon => {
                 if !runtime.popup_pending.replace(true) {
                     runtime.defer(DeferredAction::TrayMenu(false));
                 }
             }
-            WM_LBUTTONUP | WM_LBUTTONDBLCLK if !runtime.preview_mode => {
+            event
+                if tray_event_opens_window(event)
+                    && (!runtime.preview_mode || runtime.preview_tray_icon) =>
+            {
                 runtime.defer(DeferredAction::TrayOpen)
             }
             _ => {}
@@ -3430,6 +3478,9 @@ impl TrayApp {
                 self.request_apply(window, ProfileName::Developer);
             }
             MENU_GAMING | BUTTON_GAMING => self.request_apply(window, ProfileName::Gaming),
+            MENU_SWAP_PAIR if self.busy.is_none() => {
+                self.request_config(window, WorkerCommand::SwapQuickSwitch)
+            }
             MENU_STARTUP if !self.pilot_mode && self.busy.is_none() => self.request_config(
                 window,
                 WorkerCommand::SetStartWithWindows(!self.config.start_with_windows),
@@ -3559,6 +3610,11 @@ impl TrayApp {
         // 2026-10-29: this simulation never calls production command dispatch,
         // notifications, storage, startup helpers or the device channel.
         match command {
+            MENU_SWAP_PAIR => {
+                if let Some(library) = self.library.as_mut() {
+                    let _ = swap_quick_pair(library);
+                }
+            }
             MENU_EXIT => self.quit_requested = true,
             MENU_STARTUP if !self.pilot_mode => {
                 self.config.start_with_windows = !self.config.start_with_windows
@@ -3710,6 +3766,12 @@ impl TrayApp {
                 append_popup(menu, saved_menu, "Apply saved local profile");
 
                 if let Ok(pair_menu) = unsafe { CreatePopupMenu() } {
+                    append_menu(
+                        pair_menu,
+                        disabled,
+                        MENU_SWAP_PAIR,
+                        "Swap first and second targets",
+                    );
                     append_quick_slot_menu(pair_menu, library, 0, MENU_QUICK_FIRST_BASE, disabled);
                     append_quick_slot_menu(pair_menu, library, 1, MENU_QUICK_SECOND_BASE, disabled);
                     let first = library.quick_switch()[0].as_str();
@@ -3779,6 +3841,13 @@ impl TrayApp {
 
         Some(menu)
     }
+}
+
+fn swap_quick_pair(library: &mut ProfileLibraryV1) -> Result<(), String> {
+    // 2026-10-29: a two-entry pair cannot reverse through one-slot edits
+    // without temporarily duplicating a preset. Validate the swap atomically.
+    let pair = library.quick_switch().clone();
+    library.set_quick_switch(&pair[1], &pair[0])
 }
 
 fn context_menu_from_keyboard(lparam: isize) -> bool {
@@ -4208,13 +4277,27 @@ fn append_menu(
     let _ = unsafe { AppendMenuW(menu, flags, id, PCWSTR(wide.as_mut_ptr())) };
 }
 
+fn tray_event_opens_window(event: u32) -> bool {
+    // 2026-10-29: version-4 Shell icons report activation through NIN_SELECT /
+    // NIN_KEYSELECT as well as the older mouse notifications.
+    matches!(
+        event,
+        WM_LBUTTONUP | WM_LBUTTONDBLCLK | NIN_SELECT | NIN_KEYSELECT
+    )
+}
+
 fn add_tray_icon(window: HWND) -> Result<(), String> {
+    add_tray_icon_with_tip(window, "Viper V4 Pro: starting")
+}
+
+fn add_tray_icon_with_tip(window: HWND, tip: &str) -> Result<(), String> {
     let icon = load_app_icon(32, 32)?;
     let mut data = tray_data(window);
-    data.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
+    // Standard tooltips need NIF_SHOWTIP with NOTIFYICON_VERSION_4.
+    data.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP;
     data.uCallbackMessage = TRAY_CALLBACK;
     data.hIcon = icon;
-    copy_wide(&mut data.szTip, "Viper V4 Pro: starting");
+    copy_wide(&mut data.szTip, tip);
     if !unsafe { Shell_NotifyIconW(NIM_ADD, &data) }.as_bool() {
         return Err("could not add Viper V4 Pro tray icon".to_owned());
     }
@@ -4308,7 +4391,7 @@ fn remove_tray_icon(window: HWND) {
 
 fn set_tooltip(window: HWND, text: &str) {
     let mut data = tray_data(window);
-    data.uFlags = NIF_TIP;
+    data.uFlags = NIF_TIP | NIF_SHOWTIP;
     copy_wide(&mut data.szTip, text);
     let _ = unsafe { Shell_NotifyIconW(NIM_MODIFY, &data) };
 }
@@ -4402,6 +4485,7 @@ fn handle_worker_command(
         WorkerCommand::Apply(ProfileName::Gaming) => "apply gaming",
         WorkerCommand::ApplySaved { .. } => "apply saved local profile",
         WorkerCommand::SetQuickSwitch { .. } => "change quick-switch pair",
+        WorkerCommand::SwapQuickSwitch => "swap quick-switch pair",
         WorkerCommand::ToggleQuickSwitch => "toggle quick-switch pair",
         WorkerCommand::SetStartWithWindows(_) => "change startup option",
         WorkerCommand::SetDiagnostics(_) => "change diagnostics option",
@@ -4442,6 +4526,19 @@ fn handle_worker_command(
             let mut pair = library.quick_switch().clone();
             pair[slot] = profile_id;
             if let Err(error) = library.set_quick_switch(&pair[0], &pair[1]) {
+                return Ok(WorkerEvent::LocalError(error));
+            }
+            if let Err(error) = save_profile_library(&paths, &library) {
+                return Ok(WorkerEvent::LocalError(error.to_string()));
+            }
+            Ok(WorkerEvent::LibraryUpdated(library))
+        }
+        WorkerCommand::SwapQuickSwitch => {
+            let mut library = match load_profile_library(&paths) {
+                Ok(library) => library,
+                Err(error) => return Ok(WorkerEvent::LibraryError(error.to_string())),
+            };
+            if let Err(error) = swap_quick_pair(&mut library) {
                 return Ok(WorkerEvent::LocalError(error));
             }
             if let Err(error) = save_profile_library(&paths, &library) {

@@ -1,6 +1,15 @@
 # Continue ViperPilot development
 
-Updated 2026-09-30. This brief is the starting point for a new coding session.
+Updated 2026-10-29. This brief is the starting point for a new coding session.
+
+**Latest isolated UI continuation:** read [additional UI coverage](work/2026-10-29-remaining-ui.md)
+for the atomic pair-swap fix, opt-in synthetic notification-area icon, new editor
+composition tests and fresh desktop evidence. Local native CI passes. Follow-up
+notification-area visual checks and two disposable-data confirmations remain
+open; pair-swap visual retesting and all three native harnesses passed. Actual OS
+display/IME/speech and live-device gates remain open. The owner requested
+real-device preparation for review, not hardware execution. The uploaded draft
+remains frozen at `33adccf7dafa`.
 
 **2026-10-29 unattended follow-up:** see [synthetic menu validation](work/2026-10-29-synthetic-menu.md)
 for actual native menu objects, in-memory preview command routing, nine new menu
