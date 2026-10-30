@@ -26,8 +26,9 @@ in the pilot folder's `backups/baseline-v1-FULL_SERIAL.json` (the existing utili
 sanitizes unsafe filename characters). Verify the original and copy hashes.
 Nothing automatically imports legacy records or captures a new baseline.
 
-Run `Start-Pilot.ps1 -FullSerial 'FULL_MOUSE_SERIAL' -Root 'ABSOLUTE_PILOT_FOLDER'`
-from PowerShell. The default is device read-only: profile actions are disabled.
+Open PowerShell in the extracted package folder. Run
+`.\Start-Pilot.ps1 -FullSerial 'FULL_MOUSE_SERIAL' -Root 'ABSOLUTE_PILOT_FOLDER'`.
+The default is device read-only: profile actions are disabled.
 GET reports and development configuration/status writes can occur. The full
 identity must match the reviewed baseline, including path and firmware; a
 different transport/port/path requires review rather than weakening this guard.

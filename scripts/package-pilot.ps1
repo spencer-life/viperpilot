@@ -15,10 +15,14 @@ try {
     $viperCommit = (git rev-parse HEAD).Trim()
     if ($LASTEXITCODE -ne 0) { throw 'Cannot determine candidate source commit.' }
     if (git status --porcelain) { throw 'Commit candidate source before packaging.' }
+    # Pin both target and output: inherited Cargo overrides must not select a
+    # different architecture or make us copy stale artifacts from another build.
+    $viperBuildDirectory = Join-Path $viperRepository 'target\portable-build'
+    $viperReleaseDirectory = Join-Path $viperBuildDirectory 'x86_64-pc-windows-msvc\release'
     # 2026-10-29: compile only. No executable, installer or hardware command runs.
-    cargo build --release --locked --bin viper-v4-utility --bin viperctl
+    cargo build --target x86_64-pc-windows-msvc --target-dir $viperBuildDirectory --release --locked --bin viper-v4-utility --bin viperctl
     if ($LASTEXITCODE -ne 0) { throw 'Native core build failed.' }
-    cargo build --release --locked --features ui-preview,egui-preview --bin viperpilot-ui-preview --bin viperpilot-egui-preview
+    cargo build --target x86_64-pc-windows-msvc --target-dir $viperBuildDirectory --release --locked --features ui-preview,egui-preview --bin viperpilot-ui-preview --bin viperpilot-egui-preview
     if ($LASTEXITCODE -ne 0) { throw 'Native preview/editor build failed.' }
     $viperName = 'ViperPilot-pilot-' + $viperCommit.Substring(0,12) + '-windows-x64'
     $viperStage = Join-Path $viperRepository ('target\dist\' + $viperName)
@@ -28,7 +32,7 @@ try {
     }
     New-Item -ItemType Directory -Path $viperStage | Out-Null
     foreach ($viperBinary in @('viper-v4-utility.exe','viperctl.exe','viperpilot-ui-preview.exe','viperpilot-egui-preview.exe')) {
-        Copy-Item -LiteralPath (Join-Path $viperRepository ('target\release\' + $viperBinary)) -Destination $viperStage
+        Copy-Item -LiteralPath (Join-Path $viperReleaseDirectory $viperBinary) -Destination $viperStage
     }
     foreach ($viperAsset in @('viper-utility-icon.ico','viperpilot-mouse-silhouette.bmp','viper-v4-black-dashboard.bmp')) {
         Copy-Item -LiteralPath (Join-Path $viperRepository ('assets\' + $viperAsset)) -Destination $viperStage
