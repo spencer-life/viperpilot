@@ -126,7 +126,7 @@ try {
 
     function Invoke-NativeUiAutomationClient {
         param(
-            [Parameter(Mandatory = $true)][ValidateSet('inspect', 'invoke')][string] $Action,
+            [Parameter(Mandatory = $true)][ValidateSet('inspect', 'invoke', 'enter')][string] $Action,
             [Parameter(Mandatory = $true)][int] $ControlId
         )
 
@@ -508,6 +508,47 @@ try {
     Assert-DeviceDashboard
     Write-ProgressMarker 'Compact/Device/Buttons transitions and hidden-control guards passed.'
 
+    # Exercise the actual GetMessage/IsDialogMessage path without moving
+    # focus through Tab, rather than only querying DM_GETDEFID or using Invoke.
+    Write-ProgressMarker 'Checking queued Enter immediately after restored view focus.'
+    Invoke-PreviewButton -ControlId 2004
+    Assert-ButtonsInspector
+    if ($Scenario -ne 'unavailable') {
+        $beforeEnterProfile = if ($Scenario -eq 'reversed') { 'Developer' } else { 'Gaming' }
+        $recoveryControl = if ($beforeEnterProfile -eq 'Developer') { 2001 } else { 2002 }
+        Click-PreviewButton -ControlId $recoveryControl
+        Wait-ForWindowName -ExpectedText $beforeEnterProfile -Context 'Enter regression initial state'
+    }
+    Invoke-PreviewButton -ControlId 2005
+    Assert-DeviceDashboard
+    # Visible/enabled but unfocused Customize must not be an Enter target.
+    $refused = $false
+    try { [void](Invoke-NativeUiAutomationClient -Action enter -ControlId 2004) }
+    catch {
+        if ($_.Exception.Message -notlike '*refusing Enter for an unfocused preview control*') { throw }
+        $refused = $true
+    }
+    if (-not $refused) { throw 'Enter helper accepted an unfocused control.' }
+    [void](Invoke-NativeUiAutomationClient -Action enter -ControlId 2003)
+    Assert-CompactView
+    if ($Scenario -eq 'unavailable') {
+        $refused = $false
+        try { [void](Invoke-NativeUiAutomationClient -Action enter -ControlId 2001) }
+        catch {
+            if ($_.Exception.Message -notlike '*refusing to enter disabled control ID 2001*') { throw }
+            $refused = $true
+        }
+        if (-not $refused) { throw 'Enter helper accepted a disabled profile.' }
+        [void](Invoke-NativeUiAutomationClient -Action enter -ControlId 2003)
+        Assert-DeviceDashboard
+        Wait-ForWindowName -ExpectedText 'Developer' -Context 'unavailable Enter navigation'
+    } else {
+        [void](Invoke-NativeUiAutomationClient -Action enter -ControlId 2001)
+        $afterEnterProfile = if ($Scenario -eq 'reversed') { 'Gaming' } else { 'Developer' }
+        Wait-ForWindowName -ExpectedText $afterEnterProfile -Context 'Enter after restored Compact focus'
+    }
+    Write-ProgressMarker 'Queued Enter regression and refused unfocused/disabled targets passed.'
+
     Write-ProgressMarker 'Closing the preview window and waiting up to 5 seconds for exit.'
     if (-not $previewProcess.CloseMainWindow()) {
         throw 'CloseMainWindow could not close the preview window.'
@@ -519,7 +560,7 @@ try {
         throw "Preview exited with code $($previewProcess.ExitCode); expected 0."
     }
 
-    Write-Output "PASS: $Scenario scenario verified UIA names/enabled states, back-to-back profile commands, Compact/Device/Buttons transitions, hidden-control guards, and exit code 0."
+    Write-Output "PASS: $Scenario scenario verified UIA names/enabled states, back-to-back profile commands, Compact/Device/Buttons transitions, hidden-control guards, queued Enter routing, and exit code 0."
 } finally {
     if ($null -ne $previewProcess) {
         try {

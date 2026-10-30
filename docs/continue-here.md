@@ -20,6 +20,14 @@ spencer-life/viperpilot repository. Continue local work and coordination
 without treating that permission as granted. The [roadmap](../ROADMAP.md)
 identifies remaining gates.
 
+**Local-only continuation — 2026-10-29:** the owner requested local development
+and CI. Do not push or trigger hosted workflows. Local branch
+test/native-enter-regression adds [repeatable queued Enter coverage](work/2026-10-29-native-enter-regression.md)
+above the validated runtime fix and status checkpoint 512bab4. Both the expanded
+three-scenario native harness and local core/editor CI pass. Future runtime
+changes requiring Windows interaction are coordinated with the separate
+Computer Use chat; unchanged code does not need repeated visual checks.
+
 ## Project and source
 
 - Public development repository: https://github.com/spencer-life/viperpilot

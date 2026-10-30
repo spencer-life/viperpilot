@@ -4,7 +4,7 @@ use std::process::ExitCode;
 mod windows_client {
     use super::ExitCode;
     use serde::Serialize;
-    use std::env;
+    use std::{env, mem::size_of};
     use windows::Win32::{
         Foundation::{HWND, LPARAM, WPARAM},
         System::Com::{
@@ -16,10 +16,11 @@ mod windows_client {
                 CUIAutomation, IUIAutomation, IUIAutomationElement, IUIAutomationInvokePattern,
                 UIA_ButtonControlTypeId, UIA_InvokePatternId,
             },
+            Input::KeyboardAndMouse::VK_RETURN,
             WindowsAndMessaging::{
-                DC_HASDEFID, DM_GETDEFID, GetClassNameW, GetDlgCtrlID, GetDlgItem, GetParent,
-                GetWindowThreadProcessId, IsWindow, IsWindowVisible, SMTO_ABORTIFHUNG,
-                SendMessageTimeoutW,
+                DC_HASDEFID, DM_GETDEFID, GUITHREADINFO, GetClassNameW, GetDlgCtrlID, GetDlgItem,
+                GetGUIThreadInfo, GetParent, GetWindowThreadProcessId, IsWindow, IsWindowVisible,
+                PostMessageW, SMTO_ABORTIFHUNG, SendMessageTimeoutW, WM_KEYDOWN,
             },
         },
     };
@@ -66,7 +67,7 @@ mod windows_client {
     fn parse_arguments() -> Result<(String, isize, u32, i32), String> {
         let mut args = env::args().skip(1);
         let action = args.next().ok_or_else(usage)?;
-        if action != "inspect" && action != "invoke" {
+        if action != "inspect" && action != "invoke" && action != "enter" {
             return Err(usage());
         }
         let mut parent = None;
@@ -99,7 +100,7 @@ mod windows_client {
     }
 
     fn usage() -> String {
-        "usage: viperpilot-ui-test-client <inspect|invoke> --parent-hwnd <decimal> --expected-pid <pid> --control-id <id>".to_owned()
+        "usage: viperpilot-ui-test-client <inspect|invoke|enter> --parent-hwnd <decimal> --expected-pid <pid> --control-id <id>".to_owned()
     }
 
     fn hwnd_from(value: isize) -> HWND {
@@ -195,6 +196,32 @@ mod windows_client {
         })
     }
 
+    // 2026-10-29: test only the owned preview's queued Enter path.
+    // No SendInput, thread attachment, global hooks or arbitrary key support.
+    fn post_preview_enter(parent: HWND, child: HWND) -> Result<(), String> {
+        let thread = unsafe { GetWindowThreadProcessId(parent, None) };
+        if thread == 0 {
+            return Err("preview GUI thread is unavailable".to_owned());
+        }
+        let mut info = GUITHREADINFO {
+            cbSize: size_of::<GUITHREADINFO>() as u32,
+            ..GUITHREADINFO::default()
+        };
+        unsafe { GetGUIThreadInfo(thread, &mut info) }.map_err(|error| error.to_string())?;
+        if info.hwndFocus != child {
+            return Err("refusing Enter for an unfocused preview control".to_owned());
+        }
+        unsafe {
+            PostMessageW(
+                Some(child),
+                WM_KEYDOWN,
+                WPARAM(VK_RETURN.0 as usize),
+                LPARAM(1),
+            )
+        }
+        .map_err(|error| error.to_string())
+    }
+
     fn run() -> Result<(), String> {
         let (action, parent, expected_pid, control_id) = parse_arguments()?;
         let child = checked_child(parent, expected_pid, control_id)?;
@@ -208,11 +235,13 @@ mod windows_client {
         let state =
             inspect(&element, child, default_button_id).map_err(|error| error.to_string())?;
 
-        if action == "invoke" {
+        if action == "invoke" || action == "enter" {
             // 2026-09-30: dashboard/inspector controls stay alive but hidden;
             // direct HWND access must not invoke a control outside its view.
             if !state.visible {
-                return Err(format!("refusing to invoke hidden control ID {control_id}"));
+                return Err(format!(
+                    "refusing to {action} hidden control ID {control_id}"
+                ));
             }
             if state.control_type_id != UIA_ButtonControlTypeId.0 {
                 return Err(format!(
@@ -221,7 +250,7 @@ mod windows_client {
             }
             if !state.enabled {
                 return Err(format!(
-                    "refusing to invoke disabled control ID {control_id}"
+                    "refusing to {action} disabled control ID {control_id}"
                 ));
             }
             if !state.invoke_available {
@@ -229,10 +258,16 @@ mod windows_client {
                     "control ID {control_id} does not expose InvokePattern"
                 ));
             }
-            let pattern: IUIAutomationInvokePattern =
-                unsafe { element.GetCurrentPatternAs(UIA_InvokePatternId) }
-                    .map_err(|error| error.to_string())?;
-            unsafe { pattern.Invoke() }.map_err(|error| error.to_string())?;
+            if action == "enter" {
+                // Recheck identity immediately before querying focus/queuing.
+                let child = checked_child(parent, expected_pid, control_id)?;
+                post_preview_enter(hwnd_from(parent), child)?;
+            } else {
+                let pattern: IUIAutomationInvokePattern =
+                    unsafe { element.GetCurrentPatternAs(UIA_InvokePatternId) }
+                        .map_err(|error| error.to_string())?;
+                unsafe { pattern.Invoke() }.map_err(|error| error.to_string())?;
+            }
         }
 
         println!(

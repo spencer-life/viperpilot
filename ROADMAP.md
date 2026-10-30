@@ -2,7 +2,7 @@
 
 ## Current continuation checkpoint — 2026-10-29
 
-The latest local software checkpoint is native Enter fix 71a8010 on
+The latest local runtime checkpoint is native Enter fix 71a8010 on
 fix/native-enter-focus, based on Rust 1.99 test repair 5bc0f13. The last
 published dashboard layer remains draft PR #29 at 11bb982. Neither local
 follow-up has been pushed; GitHub publication requires explicit approval
@@ -18,6 +18,13 @@ tested keyboard routes and Save/reopen also passed at the recorded window
 sizes and fixture. These results narrow the desktop evidence gap without
 clearing owner-observed, screen-reader, actual display-scale/high-contrast,
 production-tray, performance or hardware gates.
+
+The subsequent local test/native-enter-regression layer adds
+[repeatable queued Enter checks](docs/work/2026-10-29-native-enter-regression.md),
+including opposite-profile verification, reversed slots, unavailable navigation
+and rejected unfocused/disabled targets. Local core/editor CI and all three
+expanded Windows harness scenarios pass. The owner requested local-only work;
+publication and hosted workflows remain deferred.
 
 Next bounded work:
 
