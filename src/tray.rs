@@ -84,6 +84,7 @@ use crate::gui_logic::{
 use crate::model::{
     DpiPair, ProfileName, ProfileSpec, RawButtonAssignment, UtilityConfigV1, WirelessPowerSettings,
 };
+use crate::pilot::PilotSession;
 use crate::planning::{plan_profile_with_baseline, require_proven_polling_writes};
 use crate::profile_library::{MAX_SAVED_PROFILES, ProfileLibraryV1};
 use crate::storage::{
@@ -486,6 +487,8 @@ struct TrayApp {
     mouse_bitmap: Option<DashboardBitmap>,
     compact_mouse_bitmap: Option<DashboardBitmap>,
     preview_mode: bool,
+    pilot_mode: bool,
+    device_writes_enabled: bool,
     quit_requested: bool,
 }
 
@@ -683,6 +686,42 @@ mod window_command_tests {
         ));
         assert!(!is_known_menu_command(9999));
     }
+
+    #[test]
+    fn read_only_pilot_rejects_every_write_route_before_config_or_device_io() {
+        let session = crate::pilot::tests::fixture(false);
+        for command in [
+            WorkerCommand::Apply(ProfileName::Developer),
+            WorkerCommand::Apply(ProfileName::Gaming),
+            WorkerCommand::ApplySaved {
+                id: "developer".to_owned(),
+                expected_preset: ProfileName::Developer,
+            },
+            WorkerCommand::ToggleQuickSwitch,
+            WorkerCommand::SetStartWithWindows(true),
+            WorkerCommand::SetStartWithWindows(false),
+        ] {
+            assert!(handle_worker_command(command, Some(&session)).is_err());
+        }
+        assert!(!session.paths().config.exists());
+        assert!(!session.paths().reports.exists());
+        assert!(!session.paths().diagnostics.exists());
+        session.validate_storage().unwrap();
+        std::fs::remove_dir_all(&session.paths().root).unwrap();
+    }
+
+    #[test]
+    fn write_enabled_pilot_still_rejects_startup_changes_before_io() {
+        let session = crate::pilot::tests::fixture(true);
+        for enabled in [false, true] {
+            assert!(
+                handle_worker_command(WorkerCommand::SetStartWithWindows(enabled), Some(&session))
+                    .is_err()
+            );
+        }
+        assert!(!session.paths().config.exists());
+        std::fs::remove_dir_all(&session.paths().root).unwrap();
+    }
 }
 
 impl WindowRuntime {
@@ -756,10 +795,27 @@ impl Drop for TrayApp {
 /// and exits successfully instead of starting a second instance.
 pub fn run(show_window_at_start: bool) -> Result<(), String> {
     gui_logic::require_isolated_tray_launch().map_err(str::to_owned)?;
+    run_inner(show_window_at_start, None)
+}
+
+/// An explicit, owner-supervised pilot. This never registers a global hotkey
+/// or changes startup. Ordinary production launch keeps its original gate.
+pub fn run_pilot(show_window_at_start: bool, session: PilotSession) -> Result<(), String> {
+    run_inner(show_window_at_start, Some(session))
+}
+
+fn run_inner(show_window_at_start: bool, pilot: Option<PilotSession>) -> Result<(), String> {
+    // 2026-10-29: write permission is fixed for this process; enabling it requires
+    // a separately reviewed owner session and a new explicit launch.
+    let pilot_mode = pilot.is_some();
+    let device_writes_enabled = pilot.as_ref().is_none_or(PilotSession::writes_enabled);
     let _ = unsafe { SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) };
     let show_message = unsafe { RegisterWindowMessageW(SHOW_MESSAGE_NAME) };
     let instance_mutex = match create_single_instance_mutex()? {
         InstanceGate::Primary(handle) => handle,
+        InstanceGate::AlreadyRunning if pilot_mode => {
+            return Err("Another ViperPilot development session is running. Close it before choosing pilot storage, identity or permissions.".to_owned());
+        }
         InstanceGate::AlreadyRunning => return signal_existing_instance(show_message),
     };
     let (event_tx, event_rx) = mpsc::channel();
@@ -790,6 +846,8 @@ pub fn run(show_window_at_start: bool) -> Result<(), String> {
             mouse_bitmap: load_mouse_bitmap(DASHBOARD_MOUSE_BMP),
             compact_mouse_bitmap: load_mouse_bitmap(COMPACT_MOUSE_BMP),
             preview_mode: false,
+            pilot_mode,
+            device_writes_enabled,
             quit_requested: false,
         },
         false,
@@ -817,7 +875,7 @@ pub fn run(show_window_at_start: bool) -> Result<(), String> {
     let worker_window = window.0 as usize;
     let worker = thread::Builder::new()
         .name("viper-device-worker".to_owned())
-        .spawn(move || worker_loop(command_rx, event_tx, worker_window))
+        .spawn(move || worker_loop(command_rx, event_tx, worker_window, pilot))
         .map_err(|error| format!("could not start serialized device worker: {error}"));
     if let Err(error) = worker {
         destroy_status_window(&runtime, window);
@@ -828,15 +886,19 @@ pub fn run(show_window_at_start: bool) -> Result<(), String> {
         destroy_status_window(&runtime, window);
         return Err(error);
     }
-    let hotkey = unsafe {
-        RegisterHotKey(
-            Some(window),
-            HOTKEY_ID,
-            MOD_CONTROL | MOD_ALT | MOD_NOREPEAT,
-            u32::from(b'P'),
-        )
-    }
-    .map_err(|error| format!("could not register Ctrl+Alt+P: {error}"));
+    let hotkey = if pilot_mode {
+        Ok(())
+    } else {
+        unsafe {
+            RegisterHotKey(
+                Some(window),
+                HOTKEY_ID,
+                MOD_CONTROL | MOD_ALT | MOD_NOREPEAT,
+                u32::from(b'P'),
+            )
+        }
+        .map_err(|error| format!("could not register Ctrl+Alt+P: {error}"))
+    };
     if let Err(error) = hotkey {
         remove_tray_icon(window);
         destroy_status_window(&runtime, window);
@@ -850,7 +912,9 @@ pub fn run(show_window_at_start: bool) -> Result<(), String> {
         .and_then(|()| runtime.app.borrow().command_tx.send(WorkerCommand::Refresh))
         .map_err(|error| format!("could not request startup state: {error}"));
     if let Err(error) = startup_request {
-        let _ = unsafe { UnregisterHotKey(Some(window), HOTKEY_ID) };
+        if !pilot_mode {
+            let _ = unsafe { UnregisterHotKey(Some(window), HOTKEY_ID) };
+        }
         remove_tray_icon(window);
         destroy_status_window(&runtime, window);
         return Err(error);
@@ -861,7 +925,9 @@ pub fn run(show_window_at_start: bool) -> Result<(), String> {
     }
 
     let result = message_loop(window);
-    let _ = unsafe { UnregisterHotKey(Some(window), HOTKEY_ID) };
+    if !pilot_mode {
+        let _ = unsafe { UnregisterHotKey(Some(window), HOTKEY_ID) };
+    }
     remove_tray_icon(window);
     destroy_status_window(&runtime, window);
     drop(runtime);
@@ -909,6 +975,8 @@ pub fn run_preview(reversed_pair: bool, unavailable_library: bool) -> Result<(),
             mouse_bitmap: load_mouse_bitmap(DASHBOARD_MOUSE_BMP),
             compact_mouse_bitmap: load_mouse_bitmap(COMPACT_MOUSE_BMP),
             preview_mode: true,
+            pilot_mode: false,
+            device_writes_enabled: true,
             quit_requested: false,
         },
         true,
@@ -2467,7 +2535,8 @@ impl TrayApp {
     /// Renders the platform-independent presentation into the Win32 controls,
     /// the button enablement, and the tray tooltip.
     fn update_ui(&mut self, window: HWND) {
-        let presentation = gui_logic::present(&self.gui_state());
+        let mut presentation = gui_logic::present(&self.gui_state());
+        presentation.buttons_enabled &= self.device_writes_enabled;
         let assignment = gui_logic::assignment_presentation(
             self.selected_mouse_control,
             self.button_assignments.as_deref(),
@@ -2479,6 +2548,24 @@ impl TrayApp {
             );
         }
         if let Some(status) = &self.status {
+            if self.pilot_mode {
+                set_text(
+                    status.brand_subtitle,
+                    if self.device_writes_enabled {
+                        "Supervised profile pilot · no global hotkey"
+                    } else {
+                        "Read-only pilot · device changes disabled"
+                    },
+                );
+                set_text(
+                    window,
+                    if self.device_writes_enabled {
+                        "ViperPilot — supervised pilot"
+                    } else {
+                        "ViperPilot — read-only pilot"
+                    },
+                );
+            }
             set_text(status.profile_value, &presentation.profile_line);
             set_text(status.dpi_value, &presentation.dpi_line);
             set_text(status.polling_value, &presentation.polling_line);
@@ -3193,7 +3280,10 @@ impl TrayApp {
     }
 
     fn handle_hotkey(&mut self, window: HWND) {
-        if self.connection != ConnectionStatus::Connected {
+        if self.pilot_mode
+            || !self.device_writes_enabled
+            || self.connection != ConnectionStatus::Connected
+        {
             return;
         }
         // The worker rereads the mouse and library before resolving the pair.
@@ -3293,7 +3383,7 @@ impl TrayApp {
                 self.request_apply(window, ProfileName::Developer);
             }
             MENU_GAMING | BUTTON_GAMING => self.request_apply(window, ProfileName::Gaming),
-            MENU_STARTUP if self.busy.is_none() => self.request_config(
+            MENU_STARTUP if !self.pilot_mode && self.busy.is_none() => self.request_config(
                 window,
                 WorkerCommand::SetStartWithWindows(!self.config.start_with_windows),
             ),
@@ -3367,7 +3457,7 @@ impl TrayApp {
         profile_id: String,
         expected_preset: ProfileName,
     ) {
-        if self.busy.is_some() {
+        if !self.device_writes_enabled || self.busy.is_some() {
             return;
         }
         self.busy = Some(BusyKind::Changing);
@@ -3385,7 +3475,7 @@ impl TrayApp {
     }
 
     fn request_apply(&mut self, window: HWND, profile: ProfileName) {
-        if self.busy.is_some() {
+        if !self.device_writes_enabled || self.busy.is_some() {
             return;
         }
         self.busy = Some(BusyKind::Changing);
@@ -3420,6 +3510,14 @@ impl TrayApp {
         } else {
             MF_STRING
         };
+        let apply_disabled = if !self.device_writes_enabled
+            || self.busy.is_some()
+            || self.connection != ConnectionStatus::Connected
+        {
+            MF_GRAYED
+        } else {
+            MF_STRING
+        };
         append_menu(menu, MF_STRING, MENU_OPEN, "Open dashboard");
         append_menu(menu, disabled, MENU_RELOAD_LIBRARY, "Reload saved profiles");
         if let Some(library) = self.library.as_ref() {
@@ -3428,7 +3526,7 @@ impl TrayApp {
                 .enumerate()
             {
                 match quick_switch_action(library, slot) {
-                    Ok(action) => append_menu(menu, disabled, command, &action.label),
+                    Ok(action) => append_menu(menu, apply_disabled, command, &action.label),
                     Err(_) => append_menu(
                         menu,
                         MF_GRAYED,
@@ -3458,11 +3556,16 @@ impl TrayApp {
         append_menu(menu, MF_GRAYED, 0, "Apply complete built-in preset");
         append_menu(
             menu,
-            disabled,
+            apply_disabled,
             MENU_DEVELOPER,
             "Developer (recovery preset)",
         );
-        append_menu(menu, disabled, MENU_GAMING, "Gaming (recovery preset)");
+        append_menu(
+            menu,
+            apply_disabled,
+            MENU_GAMING,
+            "Gaming (recovery preset)",
+        );
         append_menu(
             menu,
             MF_GRAYED,
@@ -3479,7 +3582,7 @@ impl TrayApp {
                         entry.name(),
                         entry.source_preset()
                     );
-                    append_menu(saved_menu, disabled, id, &label);
+                    append_menu(saved_menu, apply_disabled, id, &label);
                 }
                 append_popup(menu, saved_menu, "Apply saved local profile");
 
@@ -3507,7 +3610,11 @@ impl TrayApp {
                     append_popup(
                         menu,
                         pair_menu,
-                        "Choose quick-switch pair (Ctrl+Alt+P; selection does not apply)",
+                        if self.pilot_mode {
+                            "Choose quick-switch pair (selection does not apply)"
+                        } else {
+                            "Choose quick-switch pair (Ctrl+Alt+P; selection does not apply)"
+                        },
                     );
                 }
             }
@@ -3525,12 +3632,14 @@ impl TrayApp {
             0,
             &format!("Observed device: {profile_line}"),
         );
-        append_menu(
-            menu,
-            MF_STRING | checked(self.config.start_with_windows),
-            MENU_STARTUP,
-            "Start with Windows",
-        );
+        if !self.pilot_mode {
+            append_menu(
+                menu,
+                MF_STRING | checked(self.config.start_with_windows),
+                MENU_STARTUP,
+                "Start with Windows",
+            );
+        }
         append_menu(
             menu,
             MF_STRING | checked(self.config.diagnostics_enabled),
@@ -4091,9 +4200,10 @@ fn worker_loop(
     command_rx: Receiver<WorkerCommand>,
     event_tx: Sender<WorkerEvent>,
     window_bits: usize,
+    pilot: Option<PilotSession>,
 ) {
     for command in command_rx {
-        let event = match handle_worker_command(command) {
+        let event = match handle_worker_command(command, pilot.as_ref()) {
             Ok(event) => event,
             Err(error) => WorkerEvent::Error(error),
         };
@@ -4107,8 +4217,31 @@ fn worker_loop(
     }
 }
 
-fn handle_worker_command(command: WorkerCommand) -> Result<WorkerEvent, String> {
-    let paths = StoragePaths::discover().map_err(|error| error.to_string())?;
+fn handle_worker_command(
+    command: WorkerCommand,
+    pilot: Option<&PilotSession>,
+) -> Result<WorkerEvent, String> {
+    if let Some(session) = pilot {
+        if matches!(&command, WorkerCommand::SetStartWithWindows(_)) {
+            return Err("Startup changes are disabled throughout a pilot session.".to_owned());
+        }
+        if !session.writes_enabled()
+            && matches!(
+                &command,
+                WorkerCommand::Apply(_)
+                    | WorkerCommand::ApplySaved { .. }
+                    | WorkerCommand::ToggleQuickSwitch
+            )
+        {
+            return Err("Device changes are disabled in a read-only pilot.".to_owned());
+        }
+        session.validate_storage()?;
+    }
+    let paths = if let Some(session) = pilot {
+        session.paths().clone()
+    } else {
+        StoragePaths::discover().map_err(|error| error.to_string())?
+    };
     if matches!(&command, WorkerCommand::LoadLibrary) {
         return Ok(match load_profile_library(&paths) {
             Ok(library) => WorkerEvent::LibraryUpdated(library),
@@ -4134,8 +4267,8 @@ fn handle_worker_command(command: WorkerCommand) -> Result<WorkerEvent, String> 
     }
     let result = match command {
         WorkerCommand::LoadLibrary => unreachable!("handled before loading config"),
-        WorkerCommand::Refresh => refresh_state(&paths, &mut config),
-        WorkerCommand::Apply(profile) => apply_profile(&paths, &mut config, profile),
+        WorkerCommand::Refresh => refresh_state(&paths, &mut config, pilot),
+        WorkerCommand::Apply(profile) => apply_profile(&paths, &mut config, profile, pilot),
         WorkerCommand::ApplySaved {
             id,
             expected_preset,
@@ -4148,7 +4281,7 @@ fn handle_worker_command(command: WorkerCommand) -> Result<WorkerEvent, String> 
                 Ok(profile) => profile,
                 Err(error) => return Ok(WorkerEvent::LibraryError(error)),
             };
-            apply_profile(&paths, &mut config, profile)
+            apply_profile(&paths, &mut config, profile, pilot)
         }
         WorkerCommand::SetQuickSwitch { slot, profile_id } => {
             if slot > 1 {
@@ -4175,7 +4308,7 @@ fn handle_worker_command(command: WorkerCommand) -> Result<WorkerEvent, String> 
                 Ok(library) => library,
                 Err(error) => return Ok(WorkerEvent::LibraryError(error.to_string())),
             };
-            toggle_saved_profile(&paths, &mut config, &library)
+            toggle_saved_profile(&paths, &mut config, &library, pilot)
         }
         WorkerCommand::SetStartWithWindows(enabled) => {
             set_startup_value(enabled)?;
@@ -4210,6 +4343,7 @@ fn handle_worker_command(command: WorkerCommand) -> Result<WorkerEvent, String> 
 fn refresh_state(
     paths: &StoragePaths,
     config: &mut UtilityConfigV1,
+    pilot: Option<&PilotSession>,
 ) -> Result<WorkerEvent, String> {
     // 2026-10-29: reading status must not reconcile the Run registry value.
     // Startup changes belong only to the explicit SetStartWithWindows command;
@@ -4217,8 +4351,16 @@ fn refresh_state(
     refuse_if_synapse_running()?;
     let mut device = RazerDevice::open_unique()?;
     let snapshot = crate::engine::DeviceControl::read_snapshot(&mut device)?;
+    if let Some(session) = pilot {
+        session.validate_live(&snapshot)?;
+    }
     let baseline = read_snapshot(&paths.baseline_path(&snapshot.device.serial))
         .map_err(|error| format!("immutable baseline is required before tray use: {error}"))?;
+    if pilot.is_some_and(|session| session.baseline() != &baseline) {
+        return Err(
+            "The reviewed pilot baseline changed; stop and review before relaunching.".to_owned(),
+        );
+    }
     let profile = classify_profile(&snapshot, &baseline)?;
     if let ProfileMatch::Developer = profile {
         config.last_verified_profile = Some(ProfileName::Developer);
@@ -4241,10 +4383,14 @@ fn toggle_saved_profile(
     paths: &StoragePaths,
     config: &mut UtilityConfigV1,
     library: &ProfileLibraryV1,
+    pilot: Option<&PilotSession>,
 ) -> Result<WorkerEvent, String> {
     refuse_if_synapse_running()?;
     let mut device = RazerDevice::open_unique()?;
     let before = crate::engine::DeviceControl::read_snapshot(&mut device)?;
+    if let Some(session) = pilot {
+        session.validate_live(&before)?;
+    }
     let baseline = read_snapshot(&paths.baseline_path(&before.device.serial)).map_err(|error| {
         format!("immutable baseline is required before quick switching: {error}")
     })?;
@@ -4265,6 +4411,7 @@ fn toggle_saved_profile(
         before,
         baseline,
         target.source_preset(),
+        pilot,
     )
 }
 
@@ -4272,14 +4419,18 @@ fn apply_profile(
     paths: &StoragePaths,
     config: &mut UtilityConfigV1,
     profile: ProfileName,
+    pilot: Option<&PilotSession>,
 ) -> Result<WorkerEvent, String> {
     refuse_if_synapse_running()?;
     let mut device = RazerDevice::open_unique()?;
     let before = crate::engine::DeviceControl::read_snapshot(&mut device)?;
+    if let Some(session) = pilot {
+        session.validate_live(&before)?;
+    }
     let baseline = read_snapshot(&paths.baseline_path(&before.device.serial)).map_err(|error| {
         format!("immutable baseline is required before any tray write: {error}")
     })?;
-    apply_profile_from_snapshot(paths, config, &mut device, before, baseline, profile)
+    apply_profile_from_snapshot(paths, config, &mut device, before, baseline, profile, pilot)
 }
 
 fn apply_profile_from_snapshot<D: crate::engine::DeviceControl>(
@@ -4289,7 +4440,13 @@ fn apply_profile_from_snapshot<D: crate::engine::DeviceControl>(
     before: crate::model::DeviceSnapshotV1,
     baseline: crate::model::DeviceSnapshotV1,
     profile: ProfileName,
+    pilot: Option<&PilotSession>,
 ) -> Result<WorkerEvent, String> {
+    // 2026-10-29: every apply alias and quick-switch/recovery route converges
+    // here. Permission/identity/baseline rejection precedes journaling/setters.
+    if let Some(session) = pilot {
+        session.authorize_profile_write(&before, &baseline)?;
+    }
     let plan = plan_profile_with_baseline(&before, &baseline, profile)
         .map_err(|error| error.to_string())?;
     // This gate is deliberately before both the journal and apply engine: an

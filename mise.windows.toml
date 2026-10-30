@@ -2,3 +2,8 @@
 # CI sets MISE_ENV=windows so this overrides the WSL/Linux shell in mise.toml.
 [task_config]
 shell = "powershell"
+
+# 2026-10-29: build a portable draft candidate without executing the app.
+[tasks.package-pilot]
+description = "Build and package a clean-commit Windows pilot ZIP; never launch or install."
+run = "powershell -NoProfile -File scripts/package-pilot.ps1"

@@ -11,4 +11,6 @@ stored preference, registry identity, installer and ordinary launch gate remain
 unchanged. No registry operation, production launch or mouse operation was run.
 
 Revert this source commit to restore the old behavior; no machine setting needs
-rollback. Native Windows local CI is being run because WSL execution timed out.
+rollback. Native Windows core and preview CI passed, including the subsequent
+pilot guard tests. WSL execution timed out, so a native local source clone was
+used without restarting WSL or disturbing the original checkouts.

@@ -11,6 +11,7 @@ pub mod draft_editor;
 pub mod engine;
 pub mod gui_logic;
 pub mod model;
+pub mod pilot;
 pub mod planning;
 pub mod profile_catalog;
 pub mod profile_intent;

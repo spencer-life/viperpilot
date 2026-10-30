@@ -2,6 +2,18 @@
 
 Updated 2026-09-30. This brief is the starting point for a new coding session.
 
+**2026-10-29 tonight-use priority:** current native Windows work is in
+`feat/controlled-pilot`, above the published `fix/editor-storage-status`
+checkpoint. See [portable pilot instructions](pilot-candidate.md). The owner
+wants a GitHub download; prepare a draft candidate, preserve the legacy fallback
+and keep ordinary production launch blocked. The opt-in pilot binds an explicit
+root, immutable baseline bytes and full identity; it defaults to device read-only
+and never registers a global hotkey or changes startup. Live profile approval and
+hardware validation remain outstanding. Native Windows CI replaces hosted Actions
+and the unavailable WSL command runner. No new PR or hosted workflow is needed.
+Earlier local-only/publication notes below are historical: the owner subsequently
+authorized remote branch updates and now requests a downloadable candidate.
+
 **2026-10-29 continuation:** the [software resume record](work/2026-10-29-resume.md)
 reconciles draft #29, summarizes the implemented design and remaining checks,
 and records the focused `fix/rust199-ci` follow-up. Read it before treating the

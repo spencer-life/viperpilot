@@ -7,8 +7,20 @@ use windows::core::{HSTRING, w};
 
 #[cfg(windows)]
 fn main() -> std::process::ExitCode {
-    let minimized = viper_v4_utility::gui_logic::wants_minimized(std::env::args().skip(1));
-    match viper_v4_utility::tray::run(!minimized) {
+    let args: Vec<_> = std::env::args_os().skip(1).collect();
+    let result = if args.iter().any(|arg| arg == "--pilot") {
+        viper_v4_utility::pilot::PilotOptions::parse(args).and_then(|options| {
+            let show = !options.minimized;
+            options
+                .load()
+                .and_then(|session| viper_v4_utility::tray::run_pilot(show, session))
+        })
+    } else if args.iter().any(|arg| arg != "--minimized") {
+        Err("Unknown launch arguments. Pilot launch requires --pilot --root DIRECTORY --confirm-device FULL_SERIAL.".to_owned())
+    } else {
+        viper_v4_utility::tray::run(!args.iter().any(|arg| arg == "--minimized"))
+    };
+    match result {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("viper-v4-utility: {error}");
