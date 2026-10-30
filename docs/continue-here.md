@@ -10,6 +10,16 @@ checks only; isolated Windows desktop checks are a separate handoff.
 
 **2026-10-29 native keyboard follow-up:** read the [Enter routing record](work/2026-10-29-native-enter.md) for the measured post-transition failure, focused fix and validation status. Keep automated preview/editor evidence separate from production/device gates.
 
+**Current delivery state — 2026-10-29:** local branch
+fix/native-enter-focus contains keyboard fix 71a8010 above test repair 5bc0f13.
+Both passed their recorded software checks; automated Windows QA and all three
+native harness scenarios passed the keyboard fix. The original dashboard
+checkout is preserved. Neither follow-up was pushed or opened as a PR:
+automatic review requires explicit permission to publish to the public
+spencer-life/viperpilot repository. Continue local work and coordination
+without treating that permission as granted. The [roadmap](../ROADMAP.md)
+identifies remaining gates.
+
 ## Project and source
 
 - Public development repository: https://github.com/spencer-life/viperpilot

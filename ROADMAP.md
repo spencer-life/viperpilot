@@ -1,5 +1,37 @@
 # ViperPilot roadmap
 
+## Current continuation checkpoint — 2026-10-29
+
+The latest local software checkpoint is native Enter fix 71a8010 on
+fix/native-enter-focus, based on Rust 1.99 test repair 5bc0f13. The last
+published dashboard layer remains draft PR #29 at 11bb982. Neither local
+follow-up has been pushed; GitHub publication requires explicit approval
+after an automatic-review rejection. Preserve these separate review layers
+and the original dashboard checkout.
+
+[The current validation record](docs/work/2026-10-29-native-enter.md) records
+passing core/editor software checks, Windows cross-builds, native harness
+default/reversed/unavailable scenarios and separate automated Windows
+Computer Use retesting. The original Enter-after-view-change failure is
+retained alongside the passing corrected sequence. Isolated editor scrolling,
+tested keyboard routes and Save/reopen also passed at the recorded window
+sizes and fixture. These results narrow the desktop evidence gap without
+clearing owner-observed, screen-reader, actual display-scale/high-contrast,
+production-tray, performance or hardware gates.
+
+Next bounded work:
+
+1. Publish the validated test repair and keyboard fix as separate draft
+   review layers once publication is approved; assess hosted checks at each
+   exact published head. Keep issues open for their remaining acceptance gates.
+2. Continue isolated desktop checks only when they address an untested gate;
+   coordinate any new Windows interaction with the Computer Use chat.
+3. Keep production tray, installation, startup, device writes and custom Apply
+   blocked. New hardware experiments require their separately reviewed gates.
+
+The sections below preserve earlier milestones and historical evidence.
+Use the dated record above for the latest automated preview/editor status.
+
 > **Current direction · 2026-09-29.** ViperPilot is a lightweight native Windows utility for the Razer Viper V4 Pro. The immediate product priority is a fast tray and hotkey path with minimal idle overhead. Users should also be able to create and save their own profile drafts; device writes remain limited to the documented Viper V4 Pro field scope and its evidence gates. This roadmap is planning, not proof of hardware support.
 
 Live work: [public GitHub issues](https://github.com/spencer-life/viperpilot/issues). The current implementation candidate is [PR 3](https://github.com/spencer-life/viperpilot/pull/3), still a draft. Hosted [Linux/Windows Core CI](https://github.com/spencer-life/viperpilot/actions/runs/36648753194) and [Security](https://github.com/spencer-life/viperpilot/actions/runs/36648753154) passed at `6406e17` before the capability contract slice. Later commits require their own checks. These are software checks only; no production tray or physical mouse validation is claimed. See [quick-switch status](docs/quick-switch-status.md) for the validation boundary.
@@ -22,13 +54,13 @@ The product's device scope is the Razer Viper V4 Pro and the field-level capabil
 | **Research** | A field or transport needs additional evidence; no write support is implied. |
 | **Blocked** | Do not ship or enable until the named gate passes. |
 
-Historical foundation sources compile and their software suites pass: 108 core tests plus 3 egui preview tests have been reported, alongside the candidate's local build checks. Hosted Linux and Windows Core CI plus Security passed at checkpoint `7cb0440`. These checks do not count as mouse tests. The production tray and hotkey have not passed their owner-present manual gate, and the optional egui editor now saves local drafts; its Windows UI validation remains open.
+Historical foundation sources compile and their software suites pass: 108 core tests plus 3 egui preview tests have been reported, alongside the candidate's local build checks. Hosted Linux and Windows Core CI plus Security passed at checkpoint `7cb0440`. These checks do not count as mouse tests. The production tray and hotkey have not passed their owner-present manual gate, and the optional egui editor now saves local drafts; its broader Windows UI and owner-observed validation remains open; see the newer isolated results above.
 
 ## Current priority
 
 The next software work follows the public issue sequence:
 
-1. [#12 — persist profile drafts offline](https://github.com/spencer-life/viperpilot/issues/12): software implemented in the draft PR; review and owner-observed Windows UI checks remain, with no device planner or HID path.
+1. [#12 — persist profile drafts offline](https://github.com/spencer-life/viperpilot/issues/12): software implemented; isolated automated editor checks passed at the recorded checkpoint, while review/delivery and owner-observed Windows UI checks remain. No device planner or HID path is enabled.
 2. [#4 — define per-field capability contracts](https://github.com/spencer-life/viperpilot/issues/4): read-only exact-scope registry and fail-closed request preflight implemented in the draft PR; review and delivery remain. No custom combination is approved.
 3. [#13 — add guarded promotion to the device path](https://github.com/spencer-life/viperpilot/issues/13): offline catalog preview/export and reversible frozen projection implemented; actual promotion remains blocked pending complete-profile evidence.
 

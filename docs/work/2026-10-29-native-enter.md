@@ -58,6 +58,7 @@ routing, hidden-control refusals, synthetic profile state and clean process exit
 | Native harness default/reversed/unavailable | All three pass new default-button assertions, standard Button/Invoke/name/enabled semantics, repeated views, hidden-control refusals, synthetic state checks and exit code 0. |
 | Separate Windows Computer Use retest | Pass original Gaming -> Details -> Customize -> Device -> Enter -> Compact -> Enter -> Developer sequence, with no Tab detour. Tested Tab/Shift+Tab and Space pass with visible focus. |
 | Unavailable Computer Use retest | Both profiles disabled; enabled Details/Quick switch Enter navigation works without changing the synthetic Developer state. |
+| mise run security | Pass at local source 71a8010: actionlint, redacted Gitleaks history scan (51 commits, no leaks) and zizmor (no findings, one existing suppression). |
 | git diff --check | Pass. |
 
 The separate Windows QA chat verified the built hashes before staging and
@@ -87,3 +88,14 @@ launched a program or reached hardware.
 No production tray, installer, startup operation, Synapse change, device command
 or legacy-app operation is authorized by this follow-up. All release, complete
 profile, hotkey and hardware evidence gates remain in force.
+
+## Delivery state
+
+The validated runtime fix is committed locally as 71a8010. The test repair
+remains a separate lower checkpoint, 5bc0f13. A combined attempt to push these
+two branches and create draft PRs was rejected before execution by automatic
+approval review: explicit user permission to publish the source/documentation
+to spencer-life/viperpilot is required. No branch was pushed and no PR was
+created. Preserve the local worktrees, evidence and separate layer boundaries;
+do not bypass this publication decision. Later local documentation updates
+synchronize the roadmap and continuation status without changing runtime code.

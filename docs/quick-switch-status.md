@@ -1,5 +1,14 @@
 # Quick-switch implementation and validation status
 
+**Latest local checkpoint — 2026-10-29:** see the
+[native Enter follow-up](work/2026-10-29-native-enter.md) for source 71a8010,
+the original failed keyboard sequence, independent automated Windows retest,
+all three passing synthetic harness scenarios, and passed Linux/Windows
+software checks. The same-day editor fixture checks passed tested keyboard,
+scrolling and Save/reopen routes. Publication is pending; these are local,
+automated development results, not production or hardware validation.
+Historical checkpoint details below remain preserved.
+
 Updated 2026-09-29. The historical foundation checkpoint below is public commit `7cb0440a8b21f54154c1042757c810f3b9552c24` in [draft PR #3](https://github.com/spencer-life/viperpilot/pull/3), branch `codex/sanitized-quick-switch`. Its hosted software checks passed; it is not release approval or physical-device validation. The issue #12 local editor now has a later software checkpoint; neither checkpoint is manual validation. Start a new session with [the continuation brief](continue-here.md) and track open work in the [public issue tracker](https://github.com/spencer-life/viperpilot/issues). GitHub is the implementation source; the old ZIP patch must not be reapplied.
 
 ## Goal and scope
@@ -13,7 +22,7 @@ The application currently supports only its documented Viper V4 Pro device and f
 - A validated local profile-alias library supports protected built-ins, user-named aliases, and a two-entry quick-switch selection.
 - Tray actions and the global hotkey reload the selection, verify current device state, and use the existing guarded profile-apply path. Pair selection and library reload do not write to the device.
 - The native compact switcher opens first, with a Details view for the existing read-only inspector and recovery actions. The UI preview is isolated from the production tray and hardware worker.
-- User-authored profile intent has versioned local draft storage separate from complete-preset aliases and device baselines. The optional egui editor now supports local create/edit/rename/duplicate/delete/save/reopen. Apply stays disabled. Default tray builds exclude both the editor session and eframe. Windows interaction is still unverified.
+- User-authored profile intent has versioned local draft storage separate from complete-preset aliases and device baselines. The optional egui editor now supports local create/edit/rename/duplicate/delete/save/reopen. Apply stays disabled. Default tray builds exclude both the editor session and eframe. Isolated Windows interaction has automated evidence at the dated checkpoint above; broader owner-observed and accessibility gates remain open.
 - Hardware-free tasks cover formatting, lint, tests, native build, and CLI smoke. Separate preview tasks exercise synthetic UI states and Windows accessibility metadata.
 
 The guarded write engine also checks each planned field against the last trusted snapshot before writing, advances that snapshot only after a complete validated readback, verifies device identity on readback, and stops when identity or field state is ambiguous. A rejected write is classified using readback; an ambiguous acknowledgement cannot be treated as proof that an equal-value DPI write succeeded. These checks reduce stale-plan and rollback risk. They do not establish additional device support or authorize new writes.
