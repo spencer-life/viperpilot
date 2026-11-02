@@ -1,12 +1,15 @@
 # Real-device review preparation
 
-Updated 2026-10-29. This document prepares a future owner-present review and
-authorizes no hardware action. The owner privately ran `viperctl
-inspect-snapshot` against the existing baseline candidate; snapshot validation
-passed and its hash remained unchanged. No identifiers, path, hash or snapshot
-contents are recorded here. No baseline import or device access occurred.
+Updated 2026-11-02. This document defines staged owner-present review and
+authorizes no hardware action by itself. Private offline `viperctl
+inspect-snapshot` inspection of the existing baseline candidate passed validation
+and its hash remained unchanged. No identifiers, path, hash or snapshot
+contents are recorded here. No baseline import occurred. On November 2 the
+owner separately approved OS enumeration and GET-only observation while baseline
+provenance remained uncertain. That capture succeeded; it does not authorize
+setters or establish the backup's original provenance.
 
-The new `viperctl observe` command is intended for a later, explicitly approved,
+The new `viperctl observe` command is intended for an explicitly approved,
 read-only capture. It refuses extra arguments before device access, applies the
 existing Synapse-running refusal, opens one unambiguous supported device,
 performs the existing snapshot GETs, validates the snapshot, and prints only
@@ -14,11 +17,11 @@ JSON. It does not discover storage paths, read or write configuration, create a
 snapshot or baseline, journal a plan, or call a setter. The separate
 `viperctl inspect-snapshot PATH` command validates and prints a supplied local
 snapshot without device access or file writes. Enumeration and observation
-have not been run as part of this preparation.
+were run only under that later explicit owner approval.
 
-Every hardware command below is a planning example and remains unexecuted,
-including enumeration, observation and plan generation. The offline
-`inspect-snapshot` review is the only command execution recorded here.
+Commands below describe gates, not blanket authorization. Enumeration and
+observation have later private execution evidence; plan generation and setters
+remain unexecuted in this session. See the dated owner-session record.
 Source-level support statements are not evidence about the connected mouse. Do
 not infer support for a device, transport, firmware, setting, or transition
 from this document.
@@ -48,8 +51,10 @@ viperctl inspect-snapshot "<private reviewed candidate path>"
 
 ## Phase 2: separately approved read-only capture
 
-After Phase 1 is reviewed, obtain explicit approval for OS enumeration and a
-GET-only observation in an owner-present session. Only after that approved
+Obtain explicit approval for OS enumeration and a GET-only observation in an
+owner-present session. If baseline provenance is uncertain, the owner may approve
+this diagnostic phase separately to help establish identity; provenance and
+restore-point review remain mandatory before setters. Only after that approved
 capture, compare the returned live identity privately against the reviewed
 baseline and stop on any mismatch or ambiguity. Keep output in a reviewed
 private capture location; do not pipe it to a repository file or use
@@ -89,27 +94,93 @@ development data arrangement and baseline staging before running either plan
 command. If the matching baseline is not available there, stop. Do not run
 `snapshot` to create one or use an automatic import path as a workaround.
 
-Planned, unexecuted plan commands:
+Planned, unexecuted GET-only plan commands:
 
 ```powershell
 viperctl plan developer
 viperctl plan gaming
+viperctl plan-restore "<private reviewed target snapshot path>"
 ```
 
+`plan-restore PATH` refuses all additional arguments before device work, applies
+the existing Synapse refusal, reads and validates the supplied target snapshot,
+opens one unique supported device and performs a fresh validated snapshot GET.
+It requires the current device's matching immutable baseline, then uses full
+identity equality and the existing restore planner. It prints the same JSON
+plan shape as other planners, including packet intents, and creates no storage,
+journal or configuration files and sends no setters. Unsupported plan
+operations remain explicitly visible; a plan does not claim they can be
+applied.
+
+For every setter command (`apply`, `apply-dpi-1600`, `apply-button`,
+`apply-polling`, and `restore`), pass both `--reviewed-plan PATH` and the usual
+`--confirm-device SERIAL_SUFFIX`. Missing, duplicate or unknown guard arguments
+are rejected before device access. Review the exact JSON plan output and retain
+it as the artifact. The setter rereads that artifact once, recomputes the
+command-specific plan from a fresh device GET and current immutable baseline,
+applies the command's existing proven-polling and clean-start restrictions,
+then compares the complete plan and packet intents. Only the fresh capture
+timestamp and GET-only power field may differ; all identity, before-state,
+target, operations, rollback operations, skipped fields, force choices and
+packet intents must match. Unknown fields or any other difference fail before
+journaling or setters. The reviewed file is an authorization check on the
+recomputed plan; its operations are never executed directly. The supervising
+reviewer records and verifies the artifact SHA-256 using .NET and holds the
+reviewed handle against writes during the command.
+
 Review the plans, baseline provenance, complete identities, recovery path and
-exact serial-suffix guards together. A plan is not authorization. Obtain
-separate explicit approval before any write session.
+exact serial-suffix guards together. A plan and matching artifact are not
+authorization. Obtain separate explicit approval before any write session.
 
 ## Phase 4: one-field experiments, each separately gated
 
 For every approved experiment, change only one logical field. Before the setter,
 reconfirm the reviewed complete identity, immutable baseline, expected current
-state and exact write plan. Independently GET the field after the setter. Then
+state and exact write plan, including the bounded retry and conditional recovery
+scope below. Independently GET the field after the setter. Then
 restore that field to the recorded baseline and independently GET the restored
-value before considering another field. Treat ambiguous acknowledgements,
-disconnects, mismatches and failed readbacks as stop conditions; preserve the
-diagnostics and resolve the actual state before any further action. Every
-experiment and restoration requires its own explicit review and approval.
+value before considering another field. An ambiguous acknowledgement enters the
+engine's bounded readback classification; it does not mean unconditional immediate
+halt or unconditional restoration. Terminal uncertainty follows the engine's
+stop classification. Preserve diagnostics and independently establish state
+after failure before proposing another command.
+
+### Transaction retry and recovery scope (2026-11-02)
+
+Approval must identify the exact command, candidate binary and reviewed artifact,
+including forward operations and conditional recovery operations. The current
+source permits the following bounded behavior; these are not measured flash-write
+counts or a single transaction-wide limit:
+
+- Each physical SET packet may be sent up to eleven times including its initial
+  send, with immediate retransmission only after a validated BUSY response.
+  Each send may drain up to eleven acknowledgement reads; stale validated replies
+  do not themselves cause another send.
+- An ambiguous logical write is independently read back. An observed target may
+  be accepted; an unchanged pre-write field may permit one logical resend.
+  A single-report operation can therefore reach twenty-two sends before any
+  separate recovery. Unchanged readback cannot prove an ambiguous forced
+  equal-value DPI write succeeded.
+- Wireless V2 polling uses two physical reports, each with the transport limit.
+  An unverifiable partial operation aborts forward progress and may force both
+  reviewed polling recovery reports, even if aggregate readback looks unchanged.
+  This recovery validates identity/state preflight but permits the current
+  polling field to differ from its expected pre-write value.
+- Automatic rollback makes one reverse traversal of eligible attempted
+  operations, with the same bounded write/readback machinery and no recursive
+  rollback transaction. Recovery targets are the reviewed transaction-before
+  values, which need not equal the immutable baseline. Recovery is conditional,
+  not guaranteed; errors remain failures and earlier inverse operations may
+  continue only when the existing failure classification permits it.
+- Identity mismatch, failed validated readback, unexpected third-value state or
+  failed logical resend stops transaction writes where classified by the engine.
+  Final observational reads may still occur. A failed transaction is never
+  permission to restart it or issue a manual recovery command automatically.
+
+Every experiment and subsequent baseline-restoration command requires its own
+reviewed artifact and explicit approval. Conditional recovery already reviewed
+inside that transaction is distinct from approving another command. Source:
+`src/windows.rs` transport exchange and `src/engine.rs` write/recovery handling.
 
 ## Phase 5: later complete-profile and product gates
 
