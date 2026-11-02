@@ -624,12 +624,11 @@ pub fn plan_restore(
     target_snapshot
         .validate()
         .map_err(PlanError::InvalidSnapshot)?;
-    if before.device.vendor_id != target_snapshot.device.vendor_id
-        || before.device.product_id != target_snapshot.device.product_id
-        || before.device.serial != target_snapshot.device.serial
-    {
+    // 2026-11-02: restoration must bind the receiver, firmware and HID collection
+    // as well as the body serial; a port/identity change requires fresh review.
+    if before.device != target_snapshot.device {
         return Err(PlanError::IdentityMismatch(
-            "restore snapshot VID/PID/serial does not match the connected device".to_owned(),
+            "restore snapshot device identity does not match the connected device".to_owned(),
         ));
     }
     let target = TargetState {
@@ -1189,6 +1188,60 @@ mod tests {
             operation,
             WriteOperation::SetButton { after, .. }
                 if after.function_id == 0xfe && after.data == [9, 8, 7, 6, 5]
+        )));
+    }
+
+    #[test]
+    fn restore_rejects_any_changed_device_identity_field() {
+        let before = snapshot();
+        type IdentityMutation = (&'static str, fn(&mut DeviceIdentity));
+        let mutations: [IdentityMutation; 7] = [
+            ("HID descriptor serial", |device| {
+                device.hid_descriptor_serial = Some("OTHER-DONGLE".to_owned());
+            }),
+            ("firmware", |device| device.firmware.minor += 1),
+            ("HID path", |device| device.path.push_str("-other")),
+            ("interface", |device| device.interface_number += 1),
+            ("usage page", |device| device.usage_page += 1),
+            ("usage", |device| device.usage += 1),
+            ("serial", |device| device.serial.push_str("-other")),
+        ];
+
+        for (field, mutate) in mutations {
+            let mut target = before.clone();
+            mutate(&mut target.device);
+            assert!(
+                matches!(
+                    plan_restore(&before, &target),
+                    Err(PlanError::IdentityMismatch(_))
+                ),
+                "restore accepted changed {field}"
+            );
+        }
+    }
+
+    #[test]
+    fn restore_with_matching_full_identity_plans_real_field_differences() {
+        let before = snapshot();
+        let mut target = before.clone();
+        target.dpi.current = DpiPair { x: 1600, y: 1600 };
+        target.polling.raw_code = 0x08;
+
+        let plan = plan_restore(&before, &target).expect("matching identity restore plan");
+        assert!(plan.ordered_operations.iter().any(|operation| matches!(
+            operation,
+            WriteOperation::SetCurrentDpi {
+                after: DpiPair { x: 1600, y: 1600 },
+                ..
+            }
+        )));
+        assert!(plan.ordered_operations.iter().any(|operation| matches!(
+            operation,
+            WriteOperation::SetPolling {
+                before_raw_code: 0x04,
+                after_raw_code: 0x08,
+                ..
+            }
         )));
     }
 }
