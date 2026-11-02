@@ -1,6 +1,18 @@
 # Continue ViperPilot development
 
-Updated 2026-10-29. This brief is the starting point for a new coding session.
+Updated 2026-11-02. This brief is the starting point for a new coding session.
+
+**Owner-present November 2 continuation:** current source is
+`feat/supervised-pilot-hotkey`, above `fix/reviewed-device-boundaries`. Read the
+[owner-session record](work/2026-11-02-owner-session.md) before inheriting older
+status notes. Packaged isolated UI checks now passed, including owner-assisted
+synthetic icon hide/reopen/Exit. The owner approved GET-only capture, accepted
+the retained restore reference and manually exited the legacy app. Identity and
+unchanged state were verified; original bytes are preserved. No setting write
+or live pilot/hotkey launch has occurred. Reviewed source now binds CLI setters
+to exact transactions and offers an explicit default-off pilot shortcut; local
+native integration CI passed. The old `2df219c66db0` draft lacks these updates.
+Do not change the owner's display/input settings to complete optional coverage.
 
 **Current assembled source:** `feat/pilot-candidate-refresh` integrates the UI
 follow-up, read-only review CLI and static package verifier. Read the

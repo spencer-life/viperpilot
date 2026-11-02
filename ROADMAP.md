@@ -1,5 +1,14 @@
 # ViperPilot roadmap
 
+**November 2 owner-present continuation:** see the
+[session record](docs/work/2026-11-02-owner-session.md). Current source adds strict
+restore identity, reviewed CLI transactions and an explicit default-off pilot
+hotkey; source review and local native CI passed. Existing packaged UI checks
+passed, while fresh candidate/device/profile/hotkey/persistence/performance
+validation remains pending. The owner approved GET-only observation and the
+retained restore reference, then personally exited the legacy app. No setter,
+installation or startup change occurred. Leave display/input settings unchanged.
+
 **Current assembled source:** [candidate refresh](docs/work/2026-10-29-candidate-refresh.md)
 integrates the reviewed UI fix, offline/read-only review CLI and package
 verifier on `feat/pilot-candidate-refresh`. Native integration CI passed;
