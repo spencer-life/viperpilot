@@ -14,6 +14,7 @@ pub struct PilotOptions {
     root: PathBuf,
     serial: String,
     allow_established_profiles: bool,
+    pilot_hotkey: bool,
     pub minimized: bool,
 }
 
@@ -28,6 +29,7 @@ impl PilotOptions {
         let mut serial = None;
         let mut allow_established_profiles = false;
         let mut minimized = false;
+        let mut pilot_hotkey = false;
         while let Some(arg) = args.next() {
             let flag = arg.to_str().ok_or("pilot flags must be valid text")?;
             if !seen.insert(flag.to_owned()) {
@@ -36,6 +38,7 @@ impl PilotOptions {
             match flag {
                 "--pilot" => {}
                 "--minimized" => minimized = true,
+                "--pilot-hotkey" => pilot_hotkey = true,
                 "--allow-established-profiles" => allow_established_profiles = true,
                 "--root" => {
                     root = Some(PathBuf::from(
@@ -60,10 +63,16 @@ impl PilotOptions {
         if !seen.contains("--pilot") {
             return Err("explicit --pilot is required".to_owned());
         }
+        if pilot_hotkey && !allow_established_profiles {
+            return Err(
+                "--pilot-hotkey requires --pilot and --allow-established-profiles".to_owned(),
+            );
+        }
         Ok(Self {
             root: root.ok_or("pilot requires --root with an existing isolated directory")?,
             serial: serial.ok_or("pilot requires --confirm-device with the full mouse serial")?,
             allow_established_profiles,
+            pilot_hotkey,
             minimized,
         })
     }
@@ -101,6 +110,7 @@ impl PilotOptions {
             baseline,
             baseline_bytes,
             allow_established_profiles: self.allow_established_profiles,
+            pilot_hotkey: self.pilot_hotkey,
         })
     }
 }
@@ -111,6 +121,7 @@ pub struct PilotSession {
     baseline: DeviceSnapshotV1,
     baseline_bytes: Vec<u8>,
     allow_established_profiles: bool,
+    pilot_hotkey: bool,
 }
 
 impl PilotSession {
@@ -127,6 +138,12 @@ impl PilotSession {
     #[must_use]
     pub fn writes_enabled(&self) -> bool {
         self.allow_established_profiles
+    }
+
+    /// Process-scoped opt-in; never serialized into configuration.
+    #[must_use]
+    pub fn hotkey_enabled(&self) -> bool {
+        self.pilot_hotkey
     }
 
     pub fn validate_storage(&self) -> Result<(), String> {
@@ -315,6 +332,43 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn hotkey_defaults_off_and_requires_both_explicit_launch_permissions() {
+        let base = ["--root", "unused", "--confirm-device", "SYNTHETIC-MOUSE"];
+        for permissions in [
+            vec![],
+            vec!["--pilot"],
+            vec!["--allow-established-profiles"],
+        ] {
+            let args = base
+                .into_iter()
+                .chain(permissions)
+                .chain(["--pilot-hotkey"]);
+            assert!(PilotOptions::parse(args.map(OsString::from)).is_err());
+        }
+        for writes in [false, true] {
+            let mut args: Vec<_> = base
+                .into_iter()
+                .chain(["--pilot"])
+                .map(OsString::from)
+                .collect();
+            if writes {
+                args.push("--allow-established-profiles".into());
+            }
+            let options = PilotOptions::parse(args.clone()).unwrap();
+            assert!(!options.pilot_hotkey);
+            if writes {
+                args.push("--pilot-hotkey".into());
+                assert!(PilotOptions::parse(args.clone()).unwrap().pilot_hotkey);
+                args.push("--pilot-hotkey".into());
+                assert!(PilotOptions::parse(args).is_err());
+            }
+        }
+        let session = fixture(true);
+        assert!(!session.hotkey_enabled());
+        fs::remove_dir_all(&session.paths.root).unwrap();
+    }
+
+    #[test]
     fn read_only_session_rejects_writes_but_accepts_matching_observation() {
         let session = fixture(false);
         session.validate_live(session.baseline()).unwrap();
@@ -406,6 +460,7 @@ pub(crate) mod tests {
             root: root.clone(),
             serial: "MOUSE".to_owned(),
             allow_established_profiles: true,
+            pilot_hotkey: false,
             minimized: false,
         };
         assert!(options.load().is_err());
@@ -418,7 +473,15 @@ pub(crate) mod tests {
     fn existing_session_rejects_a_reports_junction_to_another_root() {
         let session = fixture(true);
         let outside = fixture(false);
-        let literal = |path: &Path| path.to_string_lossy().replace('\'', "''");
+        // 2026-11-02: Windows PowerShell New-Item rejects canonical \\?\
+        // prefixes; use the same fixture's ordinary absolute path for creation.
+        let literal = |path: &Path| {
+            let value = path.to_string_lossy();
+            value
+                .strip_prefix(r"\\?\")
+                .unwrap_or(&value)
+                .replace('\'', "''")
+        };
         let command = format!(
             "New-Item -ItemType Junction -Path '{}' -Target '{}' -ErrorAction Stop | Out-Null",
             literal(&session.paths.reports),

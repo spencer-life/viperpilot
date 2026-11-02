@@ -86,6 +86,7 @@ use crate::model::{
     DpiPair, ProfileName, ProfileSpec, RawButtonAssignment, UtilityConfigV1, WirelessPowerSettings,
 };
 use crate::pilot::PilotSession;
+use crate::pilot_hotkey::PilotHotkey;
 use crate::planning::{plan_profile_with_baseline, require_proven_polling_writes};
 use crate::profile_library::{MAX_SAVED_PROFILES, ProfileLibraryV1};
 use crate::storage::{
@@ -255,6 +256,9 @@ enum WorkerEvent {
     },
     ApplyFailed {
         profile: ProfileName,
+        // 2026-11-02: retain transaction safety evidence independently of a
+        // classifiable final profile; a later good refresh cannot erase it.
+        safety_stop: bool,
         detail: String,
         report_path: Option<String>,
         final_connection: ConnectionStatus,
@@ -498,6 +502,8 @@ struct TrayApp {
     preview_mode: bool,
     pilot_mode: bool,
     device_writes_enabled: bool,
+    hotkey: PilotHotkey,
+    fatal_error: Option<String>,
     quit_requested: bool,
 }
 
@@ -699,6 +705,500 @@ mod window_command_tests {
         assert!(!is_known_menu_command(9999));
     }
 
+    fn synthetic_refresh_event() -> WorkerEvent {
+        WorkerEvent::State {
+            profile: ProfileMatch::Developer,
+            polling_hz: Some(1000),
+            dpi: None,
+            power: None,
+            button_assignments: vec![],
+            config: UtilityConfigV1::default(),
+        }
+    }
+
+    #[test]
+    fn pilot_hotkey_worker_events_require_refresh_and_pair_and_register_once() {
+        for library_first in [false, true] {
+            let mut hotkey = PilotHotkey::new(true);
+            let registrations = Cell::new(0);
+            let register = || {
+                registrations.set(registrations.get() + 1);
+                Ok(())
+            };
+            let library_event = WorkerEvent::LibraryUpdated(ProfileLibraryV1::default());
+            let refresh_event = synthetic_refresh_event();
+            let (first, second) = if library_first {
+                (&library_event, &refresh_event)
+            } else {
+                (&refresh_event, &library_event)
+            };
+            reconcile_pilot_hotkey(&mut hotkey, first, false, register, || {
+                panic!("early cleanup")
+            })
+            .unwrap();
+            assert_eq!(registrations.get(), 0);
+            reconcile_pilot_hotkey(&mut hotkey, second, library_first, register, || {
+                panic!("early cleanup")
+            })
+            .unwrap();
+            reconcile_pilot_hotkey(&mut hotkey, &refresh_event, true, register, || {
+                panic!("early cleanup")
+            })
+            .unwrap();
+            assert_eq!(registrations.get(), 1);
+        }
+    }
+
+    #[test]
+    fn pilot_hotkey_invalid_refresh_missing_pair_or_conflict_has_zero_toggle_commands() {
+        let session = crate::pilot::tests::fixture(true);
+        let mut invalid_identity = session.baseline().clone();
+        invalid_identity.device.path.push('X');
+        let validation_error = session.validate_live(&invalid_identity).unwrap_err();
+        for event in [
+            WorkerEvent::Error(validation_error),
+            WorkerEvent::Error("synthetic refresh error".to_owned()),
+            WorkerEvent::LibraryError("synthetic missing pair".to_owned()),
+        ] {
+            let mut hotkey = PilotHotkey::new(true);
+            reconcile_pilot_hotkey(
+                &mut hotkey,
+                &event,
+                false,
+                || panic!("invalid registration"),
+                || panic!("unowned cleanup"),
+            )
+            .unwrap();
+            reconcile_pilot_hotkey(
+                &mut hotkey,
+                &synthetic_refresh_event(),
+                true,
+                || panic!("automatic rearm"),
+                || panic!("unowned cleanup"),
+            )
+            .unwrap();
+            assert!(!hotkey.dispatch(true, true, true, false, || panic!("invalid toggle/setter")));
+        }
+        let mut hotkey = PilotHotkey::new(true);
+        reconcile_pilot_hotkey(
+            &mut hotkey,
+            &synthetic_refresh_event(),
+            false,
+            || panic!("missing pair registration"),
+            || panic!("unowned cleanup"),
+        )
+        .unwrap();
+        assert!(
+            reconcile_pilot_hotkey(
+                &mut hotkey,
+                &WorkerEvent::LibraryUpdated(ProfileLibraryV1::default()),
+                false,
+                || Err("synthetic conflict".to_owned()),
+                || panic!("unowned cleanup")
+            )
+            .is_err()
+        );
+        let (tx, rx) = mpsc::channel();
+        assert!(!hotkey.dispatch(true, true, true, false, || {
+            tx.send(WorkerCommand::ToggleQuickSwitch).unwrap()
+        }));
+        assert!(matches!(rx.try_recv(), Err(TryRecvError::Empty)));
+        hotkey.stop(|| panic!("conflict must not unregister"));
+        std::fs::remove_dir_all(&session.paths().root).unwrap();
+    }
+
+    struct PilotReportDevice {
+        state: crate::model::DeviceSnapshotV1,
+        reads: VecDeque<crate::model::DeviceSnapshotV1>,
+        setters: usize,
+    }
+
+    impl crate::engine::DeviceControl for PilotReportDevice {
+        fn read_snapshot(&mut self) -> Result<crate::model::DeviceSnapshotV1, String> {
+            Ok(self.reads.pop_front().unwrap_or_else(|| self.state.clone()))
+        }
+
+        fn write_operation(
+            &mut self,
+            _: &crate::planning::WriteOperation,
+        ) -> Result<(), crate::engine::WriteFailure> {
+            self.setters += 1;
+            Err(crate::engine::WriteFailure::rejected("synthetic rejection"))
+        }
+    }
+
+    fn synthetic_developer(session: &PilotSession) -> crate::model::DeviceSnapshotV1 {
+        let mut snapshot = session.baseline().clone();
+        for assignment in ProfileSpec::fixed(ProfileName::Developer).side_buttons {
+            let button = snapshot
+                .button_assignments
+                .iter_mut()
+                .find(|button| button.protocol_button_id == assignment.protocol_button_id)
+                .unwrap();
+            *button = assignment;
+        }
+        assert_eq!(
+            classify_profile(&snapshot, session.baseline()).unwrap(),
+            ProfileMatch::Developer
+        );
+        snapshot
+    }
+
+    #[test]
+    fn pilot_hotkey_path_identity_report_permanently_stops_after_matching_refresh() {
+        // Exercise both a wrong final HID path and an engine recovery-stop whose
+        // final GET has already returned to the original, classifiable identity.
+        for original_path_returns_in_report in [false, true] {
+            let session = crate::pilot::tests::fixture(true);
+            let before = synthetic_developer(&session);
+            let mut changed_path = before.clone();
+            changed_path.device.path.push_str("-other");
+            assert_eq!(
+                classify_profile(&changed_path, session.baseline()).unwrap(),
+                ProfileMatch::Developer
+            );
+            let report_final = if original_path_returns_in_report {
+                before.clone()
+            } else {
+                changed_path.clone()
+            };
+            let mut device = PilotReportDevice {
+                state: before.clone(),
+                reads: VecDeque::from([changed_path, report_final]),
+                setters: 0,
+            };
+            let event = apply_profile_from_snapshot(
+                session.paths(),
+                &mut UtilityConfigV1::default(),
+                &mut device,
+                before.clone(),
+                session.baseline().clone(),
+                ProfileName::Gaming,
+                Some(&session),
+            )
+            .unwrap();
+            assert_eq!(device.setters, 0);
+            assert!(
+                device.reads.is_empty(),
+                "engine preflight and final evidence must both be read"
+            );
+            match &event {
+                WorkerEvent::ApplyFailed {
+                    safety_stop,
+                    final_connection,
+                    final_profile,
+                    ..
+                } => {
+                    assert!(*safety_stop);
+                    if original_path_returns_in_report {
+                        assert_eq!(*final_connection, ConnectionStatus::Connected);
+                        assert_eq!(*final_profile, Some(ProfileMatch::Developer));
+                    } else {
+                        assert_ne!(*final_connection, ConnectionStatus::Connected);
+                        assert!(
+                            final_profile.is_none(),
+                            "full pilot validation must reject a changed final path"
+                        );
+                    }
+                }
+                other => panic!("expected failed engine report, got {other:?}"),
+            }
+            let mut hotkey = PilotHotkey::new(true);
+            reconcile_pilot_hotkey(
+                &mut hotkey,
+                &synthetic_refresh_event(),
+                true,
+                || Ok(()),
+                || panic!("early release"),
+            )
+            .unwrap();
+            let mut worker = WorkerHotkeyState::default();
+            worker.observe(&WorkerEvent::LibraryUpdated(ProfileLibraryV1::default()));
+            worker.observe(&synthetic_refresh_event());
+            worker
+                .dispatch(WorkerCommand::ToggleQuickSwitch, |_| Ok(()))
+                .unwrap();
+            let releases = Cell::new(0);
+            reconcile_pilot_hotkey(
+                &mut hotkey,
+                &event,
+                true,
+                || panic!("rearm"),
+                || {
+                    releases.set(releases.get() + 1);
+                    true
+                },
+            )
+            .unwrap();
+            worker.observe(&event);
+            assert_eq!(
+                releases.get(),
+                1,
+                "path-only engine identity failure must unregister"
+            );
+
+            // A fresh fake GET now matches the original reviewed identity. Its
+            // success must not erase either owner's transaction safety latch.
+            let fresh = crate::engine::DeviceControl::read_snapshot(&mut device).unwrap();
+            session.validate_live(&fresh).unwrap();
+            let matching_refresh = WorkerEvent::State {
+                profile: classify_profile(&fresh, session.baseline()).unwrap(),
+                polling_hz: fresh.polling.hertz(),
+                dpi: Some(fresh.dpi.current),
+                power: fresh.power,
+                button_assignments: fresh.button_assignments,
+                config: UtilityConfigV1::default(),
+            };
+            reconcile_pilot_hotkey(
+                &mut hotkey,
+                &matching_refresh,
+                true,
+                || panic!("automatic rearm"),
+                || panic!("second release"),
+            )
+            .unwrap();
+            worker.observe(&matching_refresh);
+            worker.observe(&WorkerEvent::LibraryUpdated(ProfileLibraryV1::default()));
+            let (tx, rx) = mpsc::channel();
+            assert!(!hotkey.dispatch(true, true, true, false, || {
+                tx.send(WorkerCommand::ToggleQuickSwitch).unwrap()
+            }));
+            assert!(
+                matches!(rx.try_recv(), Err(TryRecvError::Empty)),
+                "deferred input must not enqueue a toggle"
+            );
+            let error = worker
+                .dispatch(WorkerCommand::ToggleQuickSwitch, |_| {
+                    apply_profile_from_snapshot(
+                        session.paths(),
+                        &mut UtilityConfigV1::default(),
+                        &mut device,
+                        before,
+                        session.baseline().clone(),
+                        ProfileName::Gaming,
+                        Some(&session),
+                    )
+                })
+                .unwrap_err();
+            assert!(error.contains("reviewed relaunch"));
+            assert_eq!(
+                device.setters, 0,
+                "worker must reject subsequent setters after matching refresh"
+            );
+            hotkey.stop(|| panic!("already released"));
+            std::fs::remove_dir_all(&session.paths().root).unwrap();
+        }
+    }
+
+    #[test]
+    fn pilot_hotkey_normal_success_and_clean_restored_failure_do_not_stop() {
+        for target in [ProfileName::Developer, ProfileName::Gaming] {
+            let session = crate::pilot::tests::fixture(true);
+            let before = synthetic_developer(&session);
+            let mut device = PilotReportDevice {
+                state: before.clone(),
+                reads: VecDeque::new(),
+                setters: 0,
+            };
+            let event = apply_profile_from_snapshot(
+                session.paths(),
+                &mut UtilityConfigV1::default(),
+                &mut device,
+                before,
+                session.baseline().clone(),
+                target,
+                Some(&session),
+            )
+            .unwrap();
+            if target == ProfileName::Developer {
+                assert!(matches!(event, WorkerEvent::Applied { .. }));
+                assert_eq!(device.setters, 0);
+            } else {
+                assert!(matches!(
+                    event,
+                    WorkerEvent::ApplyFailed {
+                        safety_stop: false,
+                        final_connection: ConnectionStatus::Connected,
+                        final_profile: Some(ProfileMatch::Developer),
+                        ..
+                    }
+                ));
+                assert_eq!(
+                    device.setters, 1,
+                    "synthetic rejection is read back unchanged and cleanly restored"
+                );
+            }
+            assert!(!pilot_hotkey_safety_stop(&event));
+            let mut hotkey = PilotHotkey::new(true);
+            reconcile_pilot_hotkey(
+                &mut hotkey,
+                &synthetic_refresh_event(),
+                true,
+                || Ok(()),
+                || panic!("early release"),
+            )
+            .unwrap();
+            reconcile_pilot_hotkey(
+                &mut hotkey,
+                &event,
+                true,
+                || panic!("second registration"),
+                || panic!("normal report released hotkey"),
+            )
+            .unwrap();
+            assert!(hotkey.can_dispatch(true, true, true, false));
+            let mut worker = WorkerHotkeyState::default();
+            assert!(
+                worker
+                    .dispatch(WorkerCommand::ToggleQuickSwitch, |_| Ok(()))
+                    .is_err()
+            );
+            worker.observe(&synthetic_refresh_event());
+            assert!(
+                worker
+                    .dispatch(WorkerCommand::ToggleQuickSwitch, |_| Ok(()))
+                    .is_err()
+            );
+            worker.observe(&WorkerEvent::LibraryUpdated(ProfileLibraryV1::default()));
+            worker.observe(&event);
+            worker
+                .dispatch(WorkerCommand::ToggleQuickSwitch, |_| Ok(()))
+                .unwrap();
+            hotkey.stop(|| true);
+            std::fs::remove_dir_all(&session.paths().root).unwrap();
+        }
+    }
+
+    #[test]
+    fn pilot_report_safety_evidence_is_not_erased_by_a_matching_final_snapshot() {
+        use crate::engine::{RollbackResult, VerificationReport, WriteAttempt};
+        let session = crate::pilot::tests::fixture(true);
+        let before = synthetic_developer(&session);
+        let normal = VerificationReport {
+            requested_profile: Some(ProfileName::Gaming),
+            writes_attempted: vec![],
+            values_observed: vec![before.clone()],
+            mismatches: vec!["synthetic rejection".to_owned()],
+            rollback_result: Some(RollbackResult {
+                attempted_fields: vec![],
+                verified_fields: vec![],
+                errors: vec![],
+                final_state_restored: true,
+            }),
+            final_state: Some(before),
+            success: false,
+        };
+        assert!(!report_requires_pilot_safety_stop(&normal, Some(&session)));
+        let mut historical_identity_error = normal.clone();
+        historical_identity_error.values_observed[0]
+            .device
+            .path
+            .push('X');
+        assert!(report_requires_pilot_safety_stop(
+            &historical_identity_error,
+            Some(&session)
+        ));
+        let mut invalid_final = normal.clone();
+        invalid_final
+            .final_state
+            .as_mut()
+            .unwrap()
+            .device
+            .path
+            .push('X');
+        assert!(report_requires_pilot_safety_stop(
+            &invalid_final,
+            Some(&session)
+        ));
+        let mut recovery_stop = normal.clone();
+        recovery_stop
+            .rollback_result
+            .as_mut()
+            .unwrap()
+            .errors
+            .push("synthetic recovery stop".to_owned());
+        assert!(report_requires_pilot_safety_stop(
+            &recovery_stop,
+            Some(&session)
+        ));
+        let mut uncertain = normal.clone();
+        uncertain.writes_attempted.push(WriteAttempt {
+            field: "synthetic".to_owned(),
+            commands_attempted: 1,
+            ambiguous_result_observed: true,
+            verified: false,
+        });
+        assert!(report_requires_pilot_safety_stop(
+            &uncertain,
+            Some(&session)
+        ));
+        // A resolved ambiguous acknowledgment is not an uncertain write.
+        uncertain.writes_attempted[0].verified = true;
+        assert!(!report_requires_pilot_safety_stop(
+            &uncertain,
+            Some(&session)
+        ));
+        let baseline_path = session
+            .paths()
+            .baseline_path(&session.baseline().device.serial);
+        let mut bytes = std::fs::read(&baseline_path).unwrap();
+        bytes.push(b'\n');
+        std::fs::write(baseline_path, bytes).unwrap();
+        assert!(
+            report_requires_pilot_safety_stop(&normal, Some(&session)),
+            "full final pilot validation must include unchanged baseline bytes"
+        );
+        std::fs::remove_dir_all(&session.paths().root).unwrap();
+    }
+
+    #[test]
+    fn pilot_hotkey_uncertain_final_state_disarms_deferred_input_and_cleanup_only_once() {
+        let mut hotkey = PilotHotkey::new(true);
+        reconcile_pilot_hotkey(
+            &mut hotkey,
+            &synthetic_refresh_event(),
+            true,
+            || Ok(()),
+            || panic!("early cleanup"),
+        )
+        .unwrap();
+        let releases = Cell::new(0);
+        let uncertain = WorkerEvent::ApplyFailed {
+            profile: ProfileName::Gaming,
+            safety_stop: true,
+            detail: "synthetic final read failure".to_owned(),
+            report_path: None,
+            final_connection: ConnectionStatus::Unavailable,
+            final_profile: None,
+            polling_hz: None,
+            dpi: None,
+            power: None,
+            button_assignments: None,
+        };
+        reconcile_pilot_hotkey(
+            &mut hotkey,
+            &uncertain,
+            true,
+            || panic!("rearm"),
+            || {
+                releases.set(releases.get() + 1);
+                true
+            },
+        )
+        .unwrap();
+        assert!(!hotkey.dispatch(true, true, true, false, || panic!("deferred toggle/setter")));
+        reconcile_pilot_hotkey(
+            &mut hotkey,
+            &synthetic_refresh_event(),
+            true,
+            || panic!("rearm"),
+            || panic!("second release"),
+        )
+        .unwrap();
+        hotkey.stop(|| panic!("second release"));
+        assert_eq!(releases.get(), 1);
+    }
+
     #[test]
     fn read_only_pilot_rejects_every_write_route_before_config_or_device_io() {
         let session = crate::pilot::tests::fixture(false);
@@ -719,6 +1219,18 @@ mod window_command_tests {
         assert!(!session.paths().reports.exists());
         assert!(!session.paths().diagnostics.exists());
         session.validate_storage().unwrap();
+        std::fs::remove_dir_all(&session.paths().root).unwrap();
+    }
+
+    #[test]
+    fn write_enabled_pilot_without_hotkey_rejects_toggle_before_any_io() {
+        let session = crate::pilot::tests::fixture(true);
+        let error =
+            handle_worker_command(WorkerCommand::ToggleQuickSwitch, Some(&session)).unwrap_err();
+        assert!(error.contains("--pilot-hotkey"));
+        assert!(!session.paths().config.exists());
+        assert!(!session.paths().reports.exists());
+        assert!(!session.paths().diagnostics.exists());
         std::fs::remove_dir_all(&session.paths().root).unwrap();
     }
 
@@ -811,8 +1323,8 @@ pub fn run(show_window_at_start: bool) -> Result<(), String> {
     run_inner(show_window_at_start, None)
 }
 
-/// An explicit, owner-supervised pilot. This never registers a global hotkey
-/// or changes startup. Ordinary production launch keeps its original gate.
+/// An explicit, owner-supervised pilot. A separately opted-in hotkey arms only
+/// after validated refresh. Startup and ordinary production launch stay blocked.
 pub fn run_pilot(show_window_at_start: bool, session: PilotSession) -> Result<(), String> {
     run_inner(show_window_at_start, Some(session))
 }
@@ -822,6 +1334,7 @@ fn run_inner(show_window_at_start: bool, pilot: Option<PilotSession>) -> Result<
     // a separately reviewed owner session and a new explicit launch.
     let pilot_mode = pilot.is_some();
     let device_writes_enabled = pilot.as_ref().is_none_or(PilotSession::writes_enabled);
+    let hotkey_enabled = pilot.as_ref().is_some_and(PilotSession::hotkey_enabled);
     let _ = unsafe { SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) };
     let show_message = unsafe { RegisterWindowMessageW(SHOW_MESSAGE_NAME) };
     let instance_mutex = match create_single_instance_mutex()? {
@@ -861,6 +1374,8 @@ fn run_inner(show_window_at_start: bool, pilot: Option<PilotSession>) -> Result<
             preview_mode: false,
             pilot_mode,
             device_writes_enabled,
+            hotkey: PilotHotkey::new(hotkey_enabled),
+            fatal_error: None,
             quit_requested: false,
         },
         false,
@@ -899,24 +1414,6 @@ fn run_inner(show_window_at_start: bool, pilot: Option<PilotSession>) -> Result<
         destroy_status_window(&runtime, window);
         return Err(error);
     }
-    let hotkey = if pilot_mode {
-        Ok(())
-    } else {
-        unsafe {
-            RegisterHotKey(
-                Some(window),
-                HOTKEY_ID,
-                MOD_CONTROL | MOD_ALT | MOD_NOREPEAT,
-                u32::from(b'P'),
-            )
-        }
-        .map_err(|error| format!("could not register Ctrl+Alt+P: {error}"))
-    };
-    if let Err(error) = hotkey {
-        remove_tray_icon(window);
-        destroy_status_window(&runtime, window);
-        return Err(error);
-    }
     let startup_request = runtime
         .app
         .borrow()
@@ -925,9 +1422,7 @@ fn run_inner(show_window_at_start: bool, pilot: Option<PilotSession>) -> Result<
         .and_then(|()| runtime.app.borrow().command_tx.send(WorkerCommand::Refresh))
         .map_err(|error| format!("could not request startup state: {error}"));
     if let Err(error) = startup_request {
-        if !pilot_mode {
-            let _ = unsafe { UnregisterHotKey(Some(window), HOTKEY_ID) };
-        }
+        runtime.app.borrow_mut().stop_hotkey(window);
         remove_tray_icon(window);
         destroy_status_window(&runtime, window);
         return Err(error);
@@ -938,14 +1433,16 @@ fn run_inner(show_window_at_start: bool, pilot: Option<PilotSession>) -> Result<
     }
 
     let result = message_loop(window);
-    if !pilot_mode {
-        let _ = unsafe { UnregisterHotKey(Some(window), HOTKEY_ID) };
-    }
+    let fatal_error = {
+        let mut app = runtime.app.borrow_mut();
+        app.stop_hotkey(window);
+        app.fatal_error.take()
+    };
     remove_tray_icon(window);
     destroy_status_window(&runtime, window);
     drop(runtime);
     drop(instance_mutex);
-    result
+    fatal_error.map_or(result, Err)
 }
 
 /// Opens the existing native controls with synthetic state only. This opt-in
@@ -997,6 +1494,8 @@ fn preview_app(
         preview_mode: true,
         pilot_mode: read_only_pilot,
         device_writes_enabled: !read_only_pilot,
+        hotkey: PilotHotkey::new(false),
+        fatal_error: None,
         quit_requested: false,
     })
 }
@@ -2321,7 +2820,15 @@ unsafe extern "system" fn window_proc(
         }
         WORKER_EVENT if !runtime.preview_mode => runtime.defer(DeferredAction::WorkerEvent),
         WM_HOTKEY if !runtime.preview_mode && wparam.0 as i32 == HOTKEY_ID => {
-            runtime.defer(DeferredAction::Hotkey)
+            // Drop input received while blocked, including reentrant input
+            // while the application is borrowed. Never buffer a busy shortcut.
+            let ready = runtime
+                .app
+                .try_borrow()
+                .is_ok_and(|app| app.hotkey_input_allowed());
+            if ready {
+                runtime.defer(DeferredAction::Hotkey);
+            }
         }
         WM_DEVICECHANGE if !runtime.preview_mode => runtime.defer(DeferredAction::Refresh),
         WM_COMMAND => {
@@ -2553,7 +3060,15 @@ fn dispatch_deferred(runtime: &WindowRuntime, window: HWND, action: DeferredActi
                     #[cfg(not(feature = "ui-preview"))]
                     app.handle_menu_command(window, command);
                 }
-                DeferredAction::Hotkey => app.handle_hotkey(window),
+                DeferredAction::Hotkey => {
+                    // Events may have arrived inside a native modal loop before
+                    // this input drains. Apply failures/disarm before dispatch.
+                    let was_ready = app.hotkey_input_allowed();
+                    app.drain_worker_events(window);
+                    if was_ready && !app.quit_requested {
+                        app.handle_hotkey(window);
+                    }
+                }
                 DeferredAction::WorkerEvent => app.drain_worker_events(window),
                 DeferredAction::Refresh => {
                     if app.busy.is_none() {
@@ -2601,6 +3116,49 @@ fn dispatch_deferred(runtime: &WindowRuntime, window: HWND, action: DeferredActi
     }
 }
 
+// 2026-11-02: both lifecycle owners consume the explicit report safety stop.
+// Connection/profile summaries alone cannot describe engine uncertainty.
+fn pilot_hotkey_safety_stop(event: &WorkerEvent) -> bool {
+    match event {
+        WorkerEvent::LibraryError(_) | WorkerEvent::Error(_) => true,
+        WorkerEvent::ApplyFailed {
+            safety_stop,
+            final_connection,
+            final_profile,
+            ..
+        } => {
+            *safety_stop
+                || *final_connection != ConnectionStatus::Connected
+                || final_profile.is_none()
+        }
+        _ => false,
+    }
+}
+
+// Registration dependencies are injected here for headless lifecycle tests.
+// Only a State event from refresh_state establishes successful live validation.
+fn reconcile_pilot_hotkey(
+    hotkey: &mut PilotHotkey,
+    event: &WorkerEvent,
+    current_pair_available: bool,
+    register: impl FnOnce() -> Result<(), String>,
+    unregister: impl FnOnce() -> bool,
+) -> Result<(), String> {
+    if pilot_hotkey_safety_stop(event) {
+        hotkey.stop(unregister);
+        return Ok(());
+    }
+    let pair_available = match event {
+        WorkerEvent::State { .. } => {
+            hotkey.refresh_validated();
+            current_pair_available
+        }
+        WorkerEvent::LibraryUpdated(library) => library.validate().is_ok(),
+        _ => return Ok(()),
+    };
+    hotkey.arm(pair_available, register)
+}
+
 impl TrayApp {
     fn gui_state(&self) -> gui_logic::GuiState {
         gui_logic::GuiState {
@@ -2635,9 +3193,9 @@ impl TrayApp {
                 set_text(
                     status.brand_subtitle,
                     if self.device_writes_enabled {
-                        "Supervised profile pilot · no global hotkey"
+                        self.hotkey.status()
                     } else {
-                        "Read-only pilot · device changes disabled"
+                        "Read-only pilot · hotkey disabled"
                     },
                 );
                 set_text(
@@ -3226,15 +3784,25 @@ impl TrayApp {
         // Keep the library snapshot fixed while the native popup is open. Its
         // command IDs and labels must continue to refer to what the user saw.
         loop {
-            match self.event_rx.try_recv() {
-                Ok(WorkerEvent::State {
+            let event = match self.event_rx.try_recv() {
+                Ok(event) => event,
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => {
+                    self.stop_hotkey(window);
+                    self.update_ui(window);
+                    break;
+                }
+            };
+            self.observe_hotkey_event(window, &event);
+            match event {
+                WorkerEvent::State {
                     profile,
                     polling_hz,
                     dpi,
                     power,
                     button_assignments,
                     config,
-                }) => {
+                } => {
                     self.current = profile;
                     self.config = config;
                     self.initializing = false;
@@ -3247,7 +3815,7 @@ impl TrayApp {
                     self.last_error = None;
                     self.update_ui(window);
                 }
-                Ok(WorkerEvent::Applied {
+                WorkerEvent::Applied {
                     profile,
                     config,
                     no_changes_needed,
@@ -3255,7 +3823,7 @@ impl TrayApp {
                     dpi,
                     power,
                     button_assignments,
-                }) => {
+                } => {
                     self.current = match profile {
                         ProfileName::Developer => ProfileMatch::Developer,
                         ProfileName::Gaming => ProfileMatch::Gaming,
@@ -3287,8 +3855,9 @@ impl TrayApp {
                         self.quit_requested = true;
                     }
                 }
-                Ok(WorkerEvent::ApplyFailed {
+                WorkerEvent::ApplyFailed {
                     profile,
+                    safety_stop: _,
                     detail,
                     report_path,
                     final_connection,
@@ -3297,7 +3866,7 @@ impl TrayApp {
                     dpi,
                     power,
                     button_assignments,
-                }) => {
+                } => {
                     self.busy = None;
                     let state_is_usable = final_connection == ConnectionStatus::Connected;
                     self.current = if state_is_usable {
@@ -3328,19 +3897,19 @@ impl TrayApp {
                     self.update_ui(window);
                     notify(window, "Profile not verified", &detail, true);
                 }
-                Ok(WorkerEvent::Config(config)) => {
+                WorkerEvent::Config(config) => {
                     self.config = config;
                     self.busy = None;
                     self.update_ui(window);
                 }
-                Ok(WorkerEvent::LibraryUpdated(library)) => {
+                WorkerEvent::LibraryUpdated(library) => {
                     self.library = Some(library);
                     if !self.initializing {
                         self.busy = None;
                     }
                     self.update_ui(window);
                 }
-                Ok(WorkerEvent::LibraryError(error)) => {
+                WorkerEvent::LibraryError(error) => {
                     self.library = None;
                     if !self.initializing {
                         self.busy = None;
@@ -3348,12 +3917,12 @@ impl TrayApp {
                     self.update_ui(window);
                     notify(window, "Saved profiles unavailable", &error, true);
                 }
-                Ok(WorkerEvent::LocalError(error)) => {
+                WorkerEvent::LocalError(error) => {
                     self.busy = None;
                     self.update_ui(window);
                     notify(window, "Quick-switch preference not saved", &error, true);
                 }
-                Ok(WorkerEvent::Error(error)) => {
+                WorkerEvent::Error(error) => {
                     self.initializing = false;
                     self.busy = None;
                     self.current = ProfileMatch::OutOfSync;
@@ -3366,7 +3935,6 @@ impl TrayApp {
                     self.update_ui(window);
                     notify(window, "Viper utility", &error, true);
                 }
-                Err(TryRecvError::Empty | TryRecvError::Disconnected) => break,
             }
             if self.quit_requested {
                 break;
@@ -3374,27 +3942,76 @@ impl TrayApp {
         }
     }
 
+    fn stop_hotkey(&mut self, window: HWND) {
+        self.hotkey
+            .stop(|| unsafe { UnregisterHotKey(Some(window), HOTKEY_ID) }.is_ok());
+    }
+
+    fn observe_hotkey_event(&mut self, window: HWND, event: &WorkerEvent) {
+        let pair_available = self
+            .library
+            .as_ref()
+            .is_some_and(|library| library.validate().is_ok());
+        // Preview construction always disables the lifecycle. Keep an explicit
+        // boundary as well, so synthetic State events can never reach Win32 input.
+        if self.preview_mode {
+            return;
+        }
+        if let Err(error) = reconcile_pilot_hotkey(
+            &mut self.hotkey,
+            event,
+            pair_available,
+            || {
+                unsafe {
+                    RegisterHotKey(
+                        Some(window),
+                        HOTKEY_ID,
+                        MOD_CONTROL | MOD_ALT | MOD_NOREPEAT,
+                        u32::from(b'P'),
+                    )
+                }
+                .map_err(|error| format!("could not register supervised Ctrl+Alt+P: {error}"))
+            },
+            || unsafe { UnregisterHotKey(Some(window), HOTKEY_ID) }.is_ok(),
+        ) {
+            self.fatal_error = Some(error);
+            self.quit_requested = true;
+        }
+    }
+
+    fn hotkey_input_allowed(&self) -> bool {
+        !self.preview_mode
+            && !self.quit_requested
+            && self.hotkey.can_dispatch(
+                self.device_writes_enabled,
+                !self.initializing,
+                self.connection == ConnectionStatus::Connected,
+                self.busy.is_some(),
+            )
+    }
+
     fn handle_hotkey(&mut self, window: HWND) {
-        if self.pilot_mode
-            || !self.device_writes_enabled
-            || self.connection != ConnectionStatus::Connected
-        {
+        if self.preview_mode || self.quit_requested {
             return;
         }
-        // The worker rereads the mouse and library before resolving the pair.
-        // This UI-side busy gate only deduplicates repeated shortcut input.
-        if self.busy.is_some() {
-            return;
+        // Rechecked at deferred dispatch, then the serialized worker performs
+        // the existing fresh library/device/baseline preflight and apply route.
+        let mut sent = None;
+        self.hotkey.dispatch(
+            self.device_writes_enabled,
+            !self.initializing,
+            self.connection == ConnectionStatus::Connected,
+            self.busy.is_some(),
+            || sent = Some(self.command_tx.send(WorkerCommand::ToggleQuickSwitch)),
+        );
+        if let Some(result) = sent {
+            if result.is_ok() {
+                self.busy = Some(BusyKind::Changing);
+            } else {
+                self.stop_hotkey(window);
+            }
+            self.update_ui(window);
         }
-        self.busy = Some(BusyKind::Changing);
-        if self
-            .command_tx
-            .send(WorkerCommand::ToggleQuickSwitch)
-            .is_err()
-        {
-            self.busy = None;
-        }
-        self.update_ui(window);
     }
 
     fn handle_menu_command(&mut self, window: HWND, command: usize) {
@@ -4425,17 +5042,62 @@ fn copy_wide(target: &mut [u16], text: &str) {
     }
 }
 
+#[derive(Default)]
+struct WorkerHotkeyState {
+    stopped: bool,
+    refresh_validated: bool,
+    pair_available: bool,
+}
+
+impl WorkerHotkeyState {
+    fn dispatch<T>(
+        &self,
+        command: WorkerCommand,
+        handle: impl FnOnce(WorkerCommand) -> Result<T, String>,
+    ) -> Result<T, String> {
+        if matches!(&command, WorkerCommand::ToggleQuickSwitch)
+            && (self.stopped || !self.refresh_validated || !self.pair_available)
+        {
+            return Err(
+                "Pilot hotkey is not validated or has stopped; reviewed relaunch required."
+                    .to_owned(),
+            );
+        }
+        handle(command)
+    }
+
+    fn observe(&mut self, event: &WorkerEvent) {
+        self.stopped |= pilot_hotkey_safety_stop(event);
+        match event {
+            WorkerEvent::State { .. } => self.refresh_validated = true,
+            WorkerEvent::LibraryUpdated(library) => {
+                self.pair_available = library.validate().is_ok()
+            }
+            _ => {}
+        }
+    }
+}
+
 fn worker_loop(
     command_rx: Receiver<WorkerCommand>,
     event_tx: Sender<WorkerEvent>,
     window_bits: usize,
     pilot: Option<PilotSession>,
 ) {
+    let mut hotkey = WorkerHotkeyState::default();
     for command in command_rx {
-        let event = match handle_worker_command(command, pilot.as_ref()) {
+        let result = if pilot.is_some() {
+            hotkey.dispatch(command, |command| {
+                handle_worker_command(command, pilot.as_ref())
+            })
+        } else {
+            handle_worker_command(command, pilot.as_ref())
+        };
+        let event = match result {
             Ok(event) => event,
             Err(error) => WorkerEvent::Error(error),
         };
+        hotkey.observe(&event);
         if event_tx.send(event).is_err() {
             return;
         }
@@ -4451,6 +5113,9 @@ fn handle_worker_command(
     pilot: Option<&PilotSession>,
 ) -> Result<WorkerEvent, String> {
     if let Some(session) = pilot {
+        if matches!(&command, WorkerCommand::ToggleQuickSwitch) && !session.hotkey_enabled() {
+            return Err("ToggleQuickSwitch requires explicit --pilot-hotkey.".to_owned());
+        }
         if matches!(&command, WorkerCommand::SetStartWithWindows(_)) {
             return Err("Startup changes are disabled throughout a pilot session.".to_owned());
         }
@@ -4676,6 +5341,31 @@ fn apply_profile(
     apply_profile_from_snapshot(paths, config, &mut device, before, baseline, profile, pilot)
 }
 
+// 2026-11-02: preserve structured engine uncertainty/recovery evidence, even
+// when its last GET happens to match a complete profile again. Do not infer
+// permission from diagnostic wording or collapse this into connection status.
+fn report_requires_pilot_safety_stop(
+    report: &crate::engine::VerificationReport,
+    pilot: Option<&PilotSession>,
+) -> bool {
+    report.final_state.is_none()
+        || report
+            .rollback_result
+            .as_ref()
+            .is_some_and(|rollback| !rollback.final_state_restored || !rollback.errors.is_empty())
+        || report
+            .writes_attempted
+            .iter()
+            .any(|attempt| attempt.ambiguous_result_observed && !attempt.verified)
+        || pilot.is_some_and(|session| {
+            report
+                .values_observed
+                .iter()
+                .chain(report.final_state.iter())
+                .any(|snapshot| session.validate_live(snapshot).is_err())
+        })
+}
+
 fn apply_profile_from_snapshot<D: crate::engine::DeviceControl>(
     paths: &StoragePaths,
     config: &mut UtilityConfigV1,
@@ -4706,11 +5396,16 @@ fn apply_profile_from_snapshot<D: crate::engine::DeviceControl>(
         .final_state
         .as_ref()
         .map(|state| state.button_assignments.clone());
-    if !report.success {
-        let final_profile_result = report
-            .final_state
-            .as_ref()
-            .map(|state| classify_profile(state, &baseline));
+    let safety_stop = report_requires_pilot_safety_stop(&report, pilot);
+    if !report.success || safety_stop {
+        let final_profile_result = report.final_state.as_ref().map(|state| {
+            // A classifiable configuration is not proof of the reviewed
+            // full identity or unchanged immutable baseline.
+            if let Some(session) = pilot {
+                session.validate_live(state)?;
+            }
+            classify_profile(state, &baseline)
+        });
         let final_profile = final_profile_result
             .as_ref()
             .and_then(|result| result.as_ref().ok().copied());
@@ -4722,16 +5417,21 @@ fn apply_profile_from_snapshot<D: crate::engine::DeviceControl>(
             .final_state
             .as_ref()
             .and_then(|state| state.polling.hertz());
+        let mut detail = gui_logic::failure_detail_for_final_state(
+            report
+                .rollback_result
+                .as_ref()
+                .map(|rollback| rollback.final_state_restored),
+            final_profile,
+            report.final_state.is_some(),
+        );
+        if safety_stop && pilot.is_some() {
+            detail.push_str(" Pilot hotkey stopped; reviewed relaunch required.");
+        }
         return Ok(WorkerEvent::ApplyFailed {
             profile,
-            detail: gui_logic::failure_detail_for_final_state(
-                report
-                    .rollback_result
-                    .as_ref()
-                    .map(|rollback| rollback.final_state_restored),
-                final_profile,
-                report.final_state.is_some(),
-            ),
+            safety_stop,
+            detail,
             report_path: Some(report_path.display().to_string()),
             final_connection,
             final_profile,

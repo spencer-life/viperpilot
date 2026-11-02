@@ -49,7 +49,9 @@ try {
         built_at_utc = [DateTime]::UtcNow.ToString('o')
         hardware_validated = $false
         distribution = 'draft supervised pilot candidate'
-        pilot_global_hotkey = $false
+        # 2026-11-02: capability is available only by separately reviewed opt-in.
+        pilot_global_hotkey_default = $false
+        pilot_global_hotkey_opt_in = '--pilot --allow-established-profiles --pilot-hotkey'
         pilot_startup_changes = $false
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $viperStage 'build-info.json') -Encoding utf8
     $viperHashes = Get-ChildItem -LiteralPath $viperStage -File | Sort-Object Name | ForEach-Object {

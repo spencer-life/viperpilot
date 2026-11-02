@@ -51,8 +51,8 @@ GET reports and development configuration/status writes can occur. The full
 identity must match the reviewed baseline, including path and firmware; a
 different transport/port/path requires review rather than weakening this guard.
 
-The pilot does not register Ctrl+Alt+P, change any startup value, or expose the
-startup control. Another development instance must be closed before selecting
+The pilot defaults to no global hotkey. It never changes a startup value or
+exposes the startup control. Another development instance must be closed before selecting
 different pilot options. The installed legacy process is never stopped for you.
 
 ## Enable the existing pair only after review
@@ -71,9 +71,38 @@ and observe process-exit and owner-performed power-cycle behavior. Unexpected
 identity, changed baseline bytes, disconnect or uncertain final state stops the
 session. Keep raw identities and evidence private.
 
-Global hotkeys, installation/startup and public release remain separate follow-up
-decisions after their documented validation. This ZIP does not establish those
-results or promise safe daily replacement tonight.
+## Optional supervised hotkey (2026-11-02)
+
+Ctrl+Alt+P is **off by default**, including when `-AllowEstablishedProfiles` is
+present. Enabling it requires a separate owner review of the hotkey session as
+well as the existing identity, immutable-baseline, exact-plan and recovery gates.
+No hotkey or device behavior has been measured by this implementation.
+
+Only after that review, add both `-AllowEstablishedProfiles -PilotHotkey` to the
+`Start-Pilot.ps1` command above. Direct executable invocation requires all of
+`--pilot --allow-established-profiles --pilot-hotkey` and the same root/full-serial
+arguments. Invalid combinations fail before pilot effects. Permission exists
+only for that process; it is never saved or restored by configuration.
+
+The subtitle reports hotkey disabled, awaiting validation, active or stopped.
+Registration uses Ctrl+Alt+P with repeat suppression only after the initial
+worker refresh validates the live full identity and unchanged baseline and a
+valid saved pair is available. Input uses the existing serialized quick-switch
+worker, with its fresh preflight, proven-polling guard, readback and rollback.
+Busy, uninitialized or disconnected sessions ignore shortcut input; queued input
+is checked again when drained. Previews never register a real hotkey.
+
+A shortcut conflict fails the candidate and performs normal cleanup; it does not
+retry, choose a substitute, stop another app or steal its binding. A disconnect
+observed by refresh/readback, identity/baseline or refresh errors, unavailable saved profiles and uncertain final
+state stop the hotkey for that process. A later successful refresh cannot rearm
+it; close the candidate, review the cause and relaunch explicitly. Device-change
+notifications retain the existing worker refresh route.
+Only a binding successfully registered by this process is unregistered at stop/exit.
+
+Installation/startup and public release remain separate follow-up decisions after
+their documented validation. This ZIP does not establish those results or promise
+safe daily replacement tonight.
 
 ## Return to the old app
 

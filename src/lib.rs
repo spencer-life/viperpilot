@@ -12,6 +12,8 @@ pub mod engine;
 pub mod gui_logic;
 pub mod model;
 pub mod pilot;
+#[cfg(any(windows, test))]
+mod pilot_hotkey;
 pub mod planning;
 pub mod profile_catalog;
 pub mod profile_intent;
